@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fix Supabase Configuration</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .status { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .error { background: #fee; border: 1px solid #fcc; color: #c00; }
+        .success { background: #efe; border: 1px solid #cfc; color: #060; }
+        .warning { background: #ffc; border: 1px solid #fc6; color: #c60; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .config { background: #f5f5f5; padding: 10px; margin: 10px 0; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Fix Supabase Configuration Mismatch</h1>
+        
+        <div id="status"></div>
+        
+        <div class="config">
+            <h3>Current Configuration:</h3>
+            <div id="current-config"></div>
+        </div>
+        
+        <button onclick="checkConfiguration()">Check Configuration</button>
+        <button onclick="fixConfiguration()">Fix Configuration</button>
+        <button onclick="clearAll()">Clear All Admin Overrides</button>
+        
+        <div class="config">
+            <h3>Expected Configuration:</h3>
+            <div>
+                <strong>Project ID:</strong> ggwfrlufsaczhiigwbhl<br>
+                <strong>URL:</strong> https://ggwfrlufsaczhiigwbhl.supabase.co<br>
+                <strong>Source:</strong> process.env (from .env.local)
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function showStatus(message, type = 'info') {
+            const statusDiv = document.getElementById('status');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = message;
+        }
+
+        function updateCurrentConfig() {
+            const processUrl = 'https://ggwfrlufsaczhiigwbhl.supabase.co'; // From your .env.local
+            const adminUrl = localStorage.getItem('admin_env_NEXT_PUBLIC_SUPABASE_URL');
+            const adminKey = localStorage.getItem('admin_env_NEXT_PUBLIC_SUPABASE_ANON_KEY');
+            
+            const processProjectId = processUrl ? new URL(processUrl).hostname.split('.')[0] : 'unknown';
+            const adminProjectId = adminUrl ? new URL(adminUrl).hostname.split('.')[0] : 'none';
+            
+            document.getElementById('current-config').innerHTML = `
+                <strong>Process.env URL:</strong> ${processUrl}<br>
+                <strong>Process.env Project ID:</strong> ${processProjectId}<br>
+                <strong>LocalStorage URL:</strong> ${adminUrl || 'NOT SET'}<br>
+                <strong>LocalStorage Project ID:</strong> ${adminProjectId}<br>
+                <strong>LocalStorage Key:</strong> ${adminKey ? 'SET' : 'NOT SET'}<br>
+                <strong>Mismatch:</strong> ${adminProjectId !== 'none' && adminProjectId !== processProjectId ? 'YES' : 'NO'}
+            `;
+        }
+
+        function checkConfiguration() {
+            updateCurrentConfig();
+            
+            const adminUrl = localStorage.getItem('admin_env_NEXT_PUBLIC_SUPABASE_URL');
+            const processUrl = 'https://ggwfrlufsaczhiigwbhl.supabase.co';
+            
+            if (!adminUrl) {
+                showStatus('No admin overrides detected. Configuration is using process.env defaults.', 'success');
+                return;
+            }
+            
+            const processProjectId = new URL(processUrl).hostname.split('.')[0];
+            const adminProjectId = new URL(adminUrl).hostname.split('.')[0];
+            
+            if (processProjectId !== adminProjectId) {
+                showStatus(`MISMATCH DETECTED: LocalStorage has project ${adminProjectId}, but process.env has ${processProjectId}`, 'error');
+            } else {
+                showStatus('Configuration is consistent.', 'success');
+            }
+        }
+
+        function fixConfiguration() {
+            const adminUrl = localStorage.getItem('admin_env_NEXT_PUBLIC_SUPABASE_URL');
+            const processUrl = 'https://ggwfrlufsaczhiigwbhl.supabase.co';
+            
+            if (!adminUrl) {
+                showStatus('No admin overrides to fix.', 'success');
+                return;
+            }
+            
+            const processProjectId = new URL(processUrl).hostname.split('.')[0];
+            const adminProjectId = new URL(adminUrl).hostname.split('.')[0];
+            
+            if (processProjectId !== adminProjectId) {
+                // Clear the mismatched localStorage values
+                localStorage.removeItem('admin_env_NEXT_PUBLIC_SUPABASE_URL');
+                localStorage.removeItem('admin_env_NEXT_PUBLIC_SUPABASE_ANON_KEY');
+                localStorage.removeItem('admin_env_NEXT_PUBLIC_SUPABASE_URL_updated');
+                localStorage.removeItem('admin_env_NEXT_PUBLIC_SUPABASE_ANON_KEY_updated');
+                
+                showStatus(`FIXED: Cleared localStorage with project ${adminProjectId}. Now using process.env with project ${processProjectId}.`, 'success');
+                updateCurrentConfig();
+            } else {
+                showStatus('No mismatch to fix.', 'success');
+            }
+        }
+
+        function clearAll() {
+            if (!confirm('Clear all admin environment overrides? This will reset to process.env defaults.')) {
+                return;
+            }
+            
+            // Clear all admin environment variables
+            const keys = Object.keys(localStorage).filter(key => key.startsWith('admin_env_'));
+            keys.forEach(key => localStorage.removeItem(key));
+            
+            showStatus(`Cleared ${keys.length} admin environment overrides. Reset to process.env defaults.`, 'success');
+            updateCurrentConfig();
+        }
+
+        // Initialize
+        updateCurrentConfig();
+        checkConfiguration();
+    </script>
+</body>
+</html>

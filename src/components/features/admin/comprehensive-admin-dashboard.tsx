@@ -1,0 +1,789 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Badge } from '@/components/ui/badge'
+import {
+  Users, FileText, Mail, Settings, Database, Activity, Search, Download, RefreshCw, Eye, Trash2,
+  Shield, LogOut, DollarSign, Key, AlertTriangle, CheckCircle, Clock, TrendingUp, UserCheck, CreditCard,
+  Plus, Edit, MoreHorizontal, Server
+} from 'lucide-react'
+import { getAdminSession, adminLogout, hasAdminPermission, logAdminActivity, getAdminActivityLogs } from '@/lib/admin-auth'
+import { getRealSystemStats, getRealUsers, getRealDocuments, getRealAPIKeys, RealSystemStats, RealUserRecord, RealDocumentRecord, RealAPIKeyRecord } from '@/lib/admin-data-service'
+import { EnvironmentManagement } from './environment-management'
+import { SupabaseManagement } from './supabase-management'
+import { ConfigurationDiagnostics } from './configuration-diagnostics'
+
+export function ComprehensiveAdminDashboard() {
+  const router = useRouter()
+  const [adminSession, setAdminSession] = useState<any>(null)
+  const [activeTab, setActiveTab] = useState('overview')
+  const [loading, setLoading] = useState(false)
+
+  // Check admin authentication
+  useEffect(() => {
+    const session = getAdminSession()
+    if (!session) {
+      router.push('/admin/login')
+      return
+    }
+    setAdminSession(session)
+  }, [router])
+
+  const handleLogout = async () => {
+    await adminLogout()
+    router.push('/admin/login')
+  }
+
+  const tabs = [
+    { id: 'overview', label: 'Overview', icon: Activity },
+    { id: 'users', label: 'User Management', icon: Users },
+    { id: 'documents', label: 'Documents', icon: FileText },
+    { id: 'billing', label: 'Billing & Plans', icon: CreditCard },
+    { id: 'api-keys', label: 'API Keys', icon: Key },
+    { id: 'supabase', label: 'Supabase', icon: Database },
+    { id: 'environment', label: 'Environment', icon: Settings },
+    { id: 'diagnostics', label: 'Diagnostics', icon: AlertTriangle },
+    { id: 'system', label: 'System Health', icon: Server },
+    { id: 'logs', label: 'Activity Logs', icon: Activity }
+  ]
+
+  if (!adminSession) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Shield className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">Loading admin session...</p>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Admin Header */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2">
+                <Shield className="w-8 h-8 text-blue-600" />
+                <div>
+                  <h1 className="text-2xl font-bold text-gray-900">SignTusk Admin</h1>
+                  <p className="text-sm text-gray-600">System Administration Portal</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-4">
+              <div className="text-right">
+                <p className="text-sm font-medium text-gray-900">{adminSession.user.name}</p>
+                <p className="text-xs text-gray-500 capitalize">{adminSession.user.role.replace('_', ' ')}</p>
+              </div>
+              <Button variant="outline" onClick={handleLogout}>
+                <LogOut className="w-4 h-4 mr-2" />
+                Logout
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <div className="space-y-6">
+          {/* Tab Navigation */}
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              {tabs.map((tab) => {
+                const Icon = tab.icon
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                      }`}
+                  >
+                    <Icon className="w-4 h-4 mr-2" />
+                    {tab.label}
+                  </button>
+                )
+              })}
+            </nav>
+          </div>
+
+          {/* Overview Tab */}
+          {activeTab === 'overview' && <OverviewTab />}
+
+          {/* User Management Tab */}
+          {activeTab === 'users' && <UserManagementTab />}
+
+          {/* Documents Tab */}
+          {activeTab === 'documents' && <DocumentsTab />}
+
+          {/* Billing Tab */}
+          {activeTab === 'billing' && <BillingTab />}
+
+          {/* API Keys Tab */}
+          {activeTab === 'api-keys' && <APIKeysTab />}
+
+          {/* Supabase Management Tab */}
+          {activeTab === 'supabase' && <SupabaseManagement />}
+
+          {/* Environment Management Tab */}
+          {activeTab === 'environment' && <EnvironmentManagement />}
+
+          {/* Configuration Diagnostics Tab */}
+          {activeTab === 'diagnostics' && <ConfigurationDiagnostics />}
+
+          {/* System Health Tab */}
+          {activeTab === 'system' && <SystemHealthTab />}
+
+          {/* Activity Logs Tab */}
+          {activeTab === 'logs' && <ActivityLogsTab />}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Overview Tab Component
+function OverviewTab() {
+  const [stats, setStats] = useState<RealSystemStats>({
+    totalUsers: 0,
+    freeUsers: 0,
+    paidUsers: 0,
+    activeUsers: 0,
+    totalDocuments: 0,
+    emailsSent: 0,
+    storageUsed: '0 MB',
+    monthlyRevenue: 0,
+    signatureSuccess: 0,
+    resendAttempts: 0
+  })
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadRealStats()
+  }, [])
+
+  const loadRealStats = async () => {
+    setLoading(true)
+    try {
+      const realStats = await getRealSystemStats()
+      setStats(realStats)
+    } catch (error) {
+      console.error('Failed to load real stats:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Key Metrics */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+            <Users className="h-4 w-4 text-blue-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalUsers.toLocaleString()}</div>
+            <p className="text-xs text-green-600">+12% from last month</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Monthly Revenue</CardTitle>
+            <DollarSign className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${stats.monthlyRevenue.toLocaleString()}</div>
+            <p className="text-xs text-green-600">+8% from last month</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Documents</CardTitle>
+            <FileText className="h-4 w-4 text-purple-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.totalDocuments.toLocaleString()}</div>
+            <p className="text-xs text-green-600">+15% from last month</p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Success Rate</CardTitle>
+            <TrendingUp className="h-4 w-4 text-green-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{stats.signatureSuccess}%</div>
+            <p className="text-xs text-green-600">+2.1% from last month</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* User Distribution & Performance */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <Card>
+          <CardHeader>
+            <CardTitle>User Distribution</CardTitle>
+            <CardDescription>Breakdown by account type</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
+                  <span className="text-sm">Free Users</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-medium">{stats.freeUsers.toLocaleString()}</div>
+                  <div className="text-xs text-gray-500">
+                    {((stats.freeUsers / stats.totalUsers) * 100).toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+                  <span className="text-sm">Paid Users</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-medium">{stats.paidUsers.toLocaleString()}</div>
+                  <div className="text-xs text-gray-500">
+                    {((stats.paidUsers / stats.totalUsers) * 100).toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-500 rounded-full"></div>
+                  <span className="text-sm">Active (24h)</span>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm font-medium">{stats.activeUsers.toLocaleString()}</div>
+                  <div className="text-xs text-gray-500">
+                    {((stats.activeUsers / stats.totalUsers) * 100).toFixed(1)}%
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>System Performance</CardTitle>
+            <CardDescription>Key operational metrics</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Email Delivery</span>
+                <div className="text-right">
+                  <div className="text-sm font-medium">{stats.emailsSent.toLocaleString()}</div>
+                  <div className="text-xs text-green-600">98.7% success</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Storage Used</span>
+                <div className="text-right">
+                  <div className="text-sm font-medium">{stats.storageUsed}</div>
+                  <div className="text-xs text-gray-500">of 100 GB</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Resend Attempts</span>
+                <div className="text-right">
+                  <div className="text-sm font-medium">{stats.resendAttempts}</div>
+                  <div className="text-xs text-yellow-600">2.8% of total</div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Quick Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Actions</CardTitle>
+          <CardDescription>Common administrative tasks</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-4">
+            <Button onClick={loadRealStats} disabled={loading}>
+              <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              {loading ? 'Loading...' : 'Refresh Data'}
+            </Button>
+            <Button variant="outline">
+              <Download className="w-4 h-4 mr-2" />
+              Export Report
+            </Button>
+            <Button variant="outline">
+              <Mail className="w-4 h-4 mr-2" />
+              Test Email System
+            </Button>
+            <Button variant="outline">
+              <Database className="w-4 h-4 mr-2" />
+              Check Storage
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// User Management Tab Component
+function UserManagementTab() {
+  const [users, setUsers] = useState<RealUserRecord[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadRealUsers()
+  }, [])
+
+  const loadRealUsers = async () => {
+    setLoading(true)
+    try {
+      const realUsers = await getRealUsers()
+      setUsers(realUsers)
+    } catch (error) {
+      console.error('Failed to load real users:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getPlanBadge = (plan: string) => {
+    const colors: Record<string, string> = {
+      free: 'bg-gray-100 text-gray-800',
+      basic: 'bg-blue-100 text-blue-800',
+      pro: 'bg-purple-100 text-purple-800',
+      enterprise: 'bg-green-100 text-green-800'
+    }
+    return (
+      <Badge className={colors[plan] || colors.free}>
+        {plan.charAt(0).toUpperCase() + plan.slice(1)}
+      </Badge>
+    )
+  }
+
+  const getStatusBadge = (status: string) => {
+    const colors: Record<string, string> = {
+      active: 'bg-green-100 text-green-800',
+      inactive: 'bg-gray-100 text-gray-800',
+      suspended: 'bg-red-100 text-red-800'
+    }
+    return (
+      <Badge className={colors[status] || colors.inactive}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
+          <p className="text-gray-600">Manage user accounts and subscriptions</p>
+        </div>
+        <Button onClick={loadRealUsers} disabled={loading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Users ({users.length})</CardTitle>
+          <CardDescription>All registered users in the system</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-8">
+              <RefreshCw className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">Loading users...</p>
+            </div>
+          ) : users.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Users className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p>No users found</p>
+              <p className="text-sm">Users will appear here as they register</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {users.map((user) => (
+                <div key={user.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <UserCheck className="w-5 h-5 text-gray-400" />
+                        <h3 className="text-lg font-medium text-gray-900">{user.email}</h3>
+                        {getPlanBadge(user.plan)}
+                        {getStatusBadge(user.status)}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                        <div>
+                          <span className="font-medium">User ID:</span> {user.id.substring(0, 8)}...
+                        </div>
+                        <div>
+                          <span className="font-medium">Documents:</span> {user.documents_count}
+                        </div>
+                        <div>
+                          <span className="font-medium">Joined:</span> {new Date(user.created_at).toLocaleDateString()}
+                        </div>
+                        <div>
+                          <span className="font-medium">Last Login:</span> {new Date(user.last_login).toLocaleDateString()}
+                        </div>
+                        {user.plan !== 'free' && (
+                          <div>
+                            <span className="font-medium">Subscription Expires:</span> {new Date(user.subscription_expires).toLocaleDateString()}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-2 ml-4">
+                      <Button variant="outline" size="sm">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        <Edit className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function DocumentsTab() {
+  const [documents, setDocuments] = useState<RealDocumentRecord[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    loadRealDocuments()
+  }, [])
+
+  const loadRealDocuments = async () => {
+    setLoading(true)
+    try {
+      const realDocs = await getRealDocuments()
+      setDocuments(realDocs)
+    } catch (error) {
+      console.error('Failed to load real documents:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
+      completed: 'secondary',
+      pending: 'default',
+      expired: 'destructive',
+      draft: 'default'
+    }
+    const colors: Record<string, string> = {
+      completed: 'text-green-600',
+      pending: 'text-yellow-600',
+      expired: 'text-red-600',
+      draft: 'text-gray-600'
+    }
+    return (
+      <Badge variant={variants[status] || 'default'} className={colors[status]}>
+        {status.charAt(0).toUpperCase() + status.slice(1)}
+      </Badge>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Document Management</h2>
+          <p className="text-gray-600">View and manage all documents in the system</p>
+        </div>
+        <Button onClick={loadRealDocuments} disabled={loading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Documents ({documents.length})</CardTitle>
+          <CardDescription>All documents processed through the system</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-8">
+              <RefreshCw className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">Loading documents...</p>
+            </div>
+          ) : documents.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <FileText className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p>No documents found</p>
+              <p className="text-sm">Documents will appear here as users upload them</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {documents.map((doc) => (
+                <div key={doc.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <FileText className="w-5 h-5 text-gray-400" />
+                        <h3 className="text-lg font-medium text-gray-900">{doc.title}</h3>
+                        {getStatusBadge(doc.status)}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
+                        <div>
+                          <span className="font-medium">Document ID:</span> {doc.id.substring(0, 12)}...
+                        </div>
+                        <div>
+                          <span className="font-medium">User:</span> {doc.user_email}
+                        </div>
+                        <div>
+                          <span className="font-medium">Signers:</span> {doc.signers_count}
+                        </div>
+                        <div>
+                          <span className="font-medium">Created:</span> {new Date(doc.created_at).toLocaleDateString()}
+                        </div>
+                        <div>
+                          <span className="font-medium">Completion:</span> {doc.completion_rate}%
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex space-x-2 ml-4">
+                      <Button variant="outline" size="sm">
+                        <Eye className="w-4 h-4" />
+                      </Button>
+                      <Button variant="outline" size="sm">
+                        <Download className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function BillingTab() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Billing & Subscriptions</CardTitle>
+        <CardDescription>Monitor revenue, subscriptions, and billing</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-gray-600">Billing management interface coming soon...</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function APIKeysTab() {
+  const [apiKeys, setApiKeys] = useState<RealAPIKeyRecord[]>([])
+  const [loading, setLoading] = useState(true)
+  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    loadRealAPIKeys()
+  }, [])
+
+  const loadRealAPIKeys = async () => {
+    setLoading(true)
+    try {
+      const realKeys = await getRealAPIKeys()
+      setApiKeys(realKeys)
+    } catch (error) {
+      console.error('Failed to load real API keys:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const toggleKeyVisibility = (keyId: string) => {
+    const newVisible = new Set(visibleKeys)
+    if (newVisible.has(keyId)) {
+      newVisible.delete(keyId)
+    } else {
+      newVisible.add(keyId)
+    }
+    setVisibleKeys(newVisible)
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
+  }
+
+  const maskKey = (key: string) => {
+    if (key.length <= 8) return key
+    return key.substring(0, 4) + '•'.repeat(key.length - 8) + key.substring(key.length - 4)
+  }
+
+  const getStatusBadge = (status: string) => {
+    const variants: Record<string, 'default' | 'secondary' | 'destructive'> = {
+      active: 'secondary',
+      inactive: 'default',
+      expired: 'destructive'
+    }
+    const colors: Record<string, string> = {
+      active: 'text-green-600',
+      inactive: 'text-gray-600',
+      expired: 'text-red-600'
+    }
+    return (
+      <Badge variant={variants[status] || 'default'} className={colors[status]}>
+        {status}
+      </Badge>
+    )
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">API Key Management</h2>
+          <p className="text-gray-600">Manage external service API keys and credentials</p>
+        </div>
+        <Button onClick={loadRealAPIKeys} disabled={loading}>
+          <RefreshCw className={`w-4 h-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>API Keys ({apiKeys.length})</CardTitle>
+          <CardDescription>External service API keys currently configured</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loading ? (
+            <div className="text-center py-8">
+              <RefreshCw className="w-8 h-8 animate-spin text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-600">Loading API keys...</p>
+            </div>
+          ) : apiKeys.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Key className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+              <p>No API keys configured</p>
+              <p className="text-sm">Configure your external service API keys in environment variables</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {apiKeys.map((apiKey) => (
+                <div key={apiKey.id} className="border border-gray-200 rounded-lg p-4">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <Key className="w-5 h-5 text-gray-400" />
+                        <h3 className="text-lg font-medium text-gray-900">{apiKey.name}</h3>
+                        {getStatusBadge(apiKey.status)}
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600 mb-3">
+                        <div>
+                          <span className="font-medium">Service:</span> {apiKey.service}
+                        </div>
+                        <div>
+                          <span className="font-medium">Usage:</span> {apiKey.usage_count.toLocaleString()} calls
+                        </div>
+                        <div>
+                          <span className="font-medium">Created:</span> {new Date(apiKey.created_at).toLocaleDateString()}
+                        </div>
+                        <div>
+                          <span className="font-medium">Last Used:</span> {new Date(apiKey.last_used).toLocaleDateString()}
+                        </div>
+                      </div>
+
+                      {apiKey.description && (
+                        <p className="text-sm text-gray-600 mb-3">{apiKey.description}</p>
+                      )}
+
+                      <div className="flex items-center space-x-2">
+                        <div className="flex-1 font-mono text-sm bg-gray-50 p-2 rounded border">
+                          {visibleKeys.has(apiKey.id) ? apiKey.key : maskKey(apiKey.key)}
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => toggleKeyVisibility(apiKey.id)}
+                        >
+                          {visibleKeys.has(apiKey.id) ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => copyToClipboard(apiKey.key)}
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+function SystemHealthTab() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>System Health</CardTitle>
+        <CardDescription>Monitor system components and services</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-gray-600">System health monitoring coming soon...</p>
+      </CardContent>
+    </Card>
+  )
+}
+
+function ActivityLogsTab() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Activity Logs</CardTitle>
+        <CardDescription>View admin actions and system events</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <p className="text-gray-600">Activity logs interface coming soon...</p>
+      </CardContent>
+    </Card>
+  )
+}

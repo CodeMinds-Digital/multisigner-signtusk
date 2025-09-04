@@ -1,0 +1,652 @@
+'use client'
+
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import { IoPersonSharp } from 'react-icons/io5'
+import { MdFactory } from 'react-icons/md'
+import { supabase } from '@/lib/supabase'
+
+// Corporate email validation utility
+const validateCorporateEmail = (email: string): { isValid: boolean; error?: string } => {
+  const domain = email.toLowerCase().split('@')[1]
+
+  if (!domain) {
+    return { isValid: false, error: 'Invalid email format' }
+  }
+
+  // List of personal email domains to reject
+  const personalDomains = [
+    'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com',
+    'icloud.com', 'me.com', 'mac.com', 'live.com', 'msn.com',
+    'ymail.com', 'rocketmail.com', 'mail.com', 'gmx.com', 'protonmail.com',
+    'tutanota.com', 'zoho.com', 'fastmail.com', 'hey.com', 'pm.me',
+    'rediffmail.com', 'indiatimes.com', 'sify.com', 'vsnl.net'
+  ]
+
+  if (personalDomains.includes(domain)) {
+    return {
+      isValid: false,
+      error: 'Please use a valid corporate email address. Personal email domains (gmail.com, yahoo.com, etc.) are not allowed for corporate accounts.'
+    }
+  }
+
+  // Additional validation: domain should have at least one dot and be longer than 4 characters
+  if (domain.length < 4 || !domain.includes('.')) {
+    return { isValid: false, error: 'Please enter a valid corporate email domain' }
+  }
+
+  // Domain should not start or end with a dot or hyphen
+  if (domain.startsWith('.') || domain.startsWith('-') || domain.endsWith('.') || domain.endsWith('-')) {
+    return { isValid: false, error: 'Invalid email domain format' }
+  }
+
+  return { isValid: true }
+}
+
+export function SignUpForm() {
+  const navigate = useRouter()
+  const [step, setStep] = useState(1)
+  const [accountType, setAccountType] = useState('Personal')
+  const [termsPopup, setTermsPopup] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
+  const [formData, setFormData] = useState({
+    firstName: '',
+    lastName: '',
+    fullName: '',
+    companyName: '',
+    industryField: '',
+    employeeCount: '',
+    jobTitle: '',
+    department: '',
+    phoneNumber: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+  })
+  const [error, setError] = useState('')
+  const [emailError, setEmailError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target
+    setFormData({ ...formData, [name]: value })
+
+    // Clear validation errors when user starts typing
+    if (validationErrors[name]) {
+      setValidationErrors(prev => ({ ...prev, [name]: '' }))
+    }
+
+    // Real-time email validation for corporate accounts
+    if (name === 'email' && accountType === 'Corporate' && value) {
+      const validation = validateCorporateEmail(value)
+      setEmailError(validation.error || '')
+    } else if (name === 'email') {
+      setEmailError('')
+    }
+  }
+
+  // Validate required fields based on account type
+  const validateForm = (): boolean => {
+    const errors: Record<string, string> = {}
+
+    // Common validations
+    if (!formData.firstName.trim()) {
+      errors.firstName = 'First name is required'
+    }
+
+    if (!formData.lastName.trim()) {
+      errors.lastName = 'Last name is required'
+    }
+
+    if (!formData.email.trim()) {
+      errors.email = 'Email is required'
+    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
+      errors.email = 'Please enter a valid email address'
+    }
+
+    if (!formData.password) {
+      errors.password = 'Password is required'
+    } else if (formData.password.length < 6) {
+      errors.password = 'Password must be at least 6 characters long'
+    }
+
+    if (formData.password !== formData.confirmPassword) {
+      errors.confirmPassword = 'Passwords do not match'
+    }
+
+    // Corporate-specific validations
+    if (accountType === 'Corporate') {
+      if (!formData.companyName.trim()) {
+        errors.companyName = 'Company name is required'
+      } else if (formData.companyName.trim().length < 2) {
+        errors.companyName = 'Company name must be at least 2 characters long'
+      }
+
+      // Validate corporate email
+      if (formData.email) {
+        const emailValidation = validateCorporateEmail(formData.email)
+        if (!emailValidation.isValid) {
+          errors.email = emailValidation.error || 'Invalid corporate email'
+        }
+      }
+    }
+
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleTermsAgree = () => {
+    setAgreedToTerms(true)
+    setTermsPopup(false)
+  }
+
+  const handleStep1Continue = () => {
+    setStep(2)
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+
+    if (!agreedToTerms) {
+      setError('Please agree to the Terms and Conditions')
+      setLoading(false)
+      return
+    }
+
+    // Validate form
+    if (!validateForm()) {
+      setError('Please fix the errors above')
+      setLoading(false)
+      return
+    }
+
+    try {
+      // Prepare user metadata for the enhanced trigger
+      const userMetadata = {
+        account_type: accountType.toLowerCase(),
+        first_name: formData.firstName,
+        last_name: formData.lastName,
+        full_name: `${formData.firstName} ${formData.lastName}`.trim(),
+        ...(accountType === 'Corporate' && {
+          company_name: formData.companyName,
+          industry_field: formData.industryField,
+          employee_count: formData.employeeCount ? parseInt(formData.employeeCount) : null,
+          job_title: formData.jobTitle,
+          department: formData.department,
+          phone_number: formData.phoneNumber,
+        })
+      }
+
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: userMetadata,
+          redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || window.location.origin}/verify-email`,
+        },
+      })
+
+      if (signUpError) {
+        setError(signUpError.message)
+        console.error('Sign-up error:', signUpError)
+        setLoading(false)
+        return
+      }
+
+      if (data.user) {
+        // Enhanced user profile will be created automatically by the database trigger
+        navigate.push('/verify-email')
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'An error occurred')
+      console.error('General error:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (step === 1) {
+    return (
+      <div className="min-h-screen p-6 bg-gray-100">
+        <div className="flex flex-col lg:flex-row min-h-screen max-w-7xl mx-auto">
+          {/* Left side */}
+          <div className="w-full lg:w-1/2 flex flex-col p-4 sm:p-6 md:p-8 bg-white">
+            {/* Logo Section  */}
+            <div className="w-full flex justify-center lg:justify-start">
+              <div className="w-32 sm:w-40 h-16 sm:h-24 bg-blue-600 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-2xl">ST</span>
+              </div>
+            </div>
+
+            {/* Main Content Container */}
+            <div className="flex flex-col flex-grow items-center lg:items-start mt-8 lg:mt-12 max-w-xl mx-auto w-full">
+              {/* Heading */}
+              <h2 className="text-xl sm:text-2xl lg:text-3xl font-bold text-center lg:text-left px-4">
+                How are you planning to use SignTusk?
+              </h2>
+
+              {/* Description */}
+              <p className="text-gray-600 text-sm sm:text-base mt-4 text-center lg:text-left px-4">
+                We&apos;ll fit the experience to your needs. Don&apos;t worry, you can change it later.
+              </p>
+
+              {/* Buttons Container */}
+              <div className="flex flex-col sm:flex-row gap-4 mt-12 w-full justify-center px-4">
+                {/* Personal Button */}
+                <button
+                  onClick={() => setAccountType('Personal')}
+                  className={`w-full sm:w-64 ${accountType === 'Personal' ? 'bg-blue-50 border-blue-500' : 'bg-gray-100'} hover:bg-blue-50 transition-colors duration-200 rounded-xl p-6 flex flex-col items-center group border-2`}
+                >
+                  <IoPersonSharp className={`${accountType === 'Personal' ? 'text-blue-600' : 'text-gray-700'} text-2xl sm:text-3xl mb-3 group-hover:text-blue-600`} />
+                  <h3 className="text-gray-900 font-semibold mb-1">Personal</h3>
+                  <p className="text-gray-500 text-xs">Person</p>
+                </button>
+
+                {/* Corporate Button */}
+                <button
+                  onClick={() => setAccountType('Corporate')}
+                  className={`w-full sm:w-64 ${accountType === 'Corporate' ? 'bg-blue-50 border-blue-500' : 'bg-gray-100'} hover:bg-blue-50 transition-colors duration-200 rounded-xl p-6 flex flex-col items-center group border-2`}
+                >
+                  <MdFactory className={`${accountType === 'Corporate' ? 'text-blue-600' : 'text-gray-700'} text-2xl sm:text-3xl mb-3 group-hover:text-blue-600`} />
+                  <h3 className="text-gray-900 font-semibold mb-1">Corporate</h3>
+                  <p className="text-gray-500 text-xs">Corporate</p>
+                </button>
+              </div>
+
+              {/* Let's Create Button */}
+              <div className="w-full px-4 mt-12">
+                <button
+                  onClick={handleStep1Continue}
+                  className="w-full sm:w-96 mx-auto bg-blue-600 hover:bg-blue-700 text-white py-3 px-6 rounded-xl flex items-center justify-center space-x-2 transition-colors duration-200"
+                >
+                  <span>Let&apos;s Create</span>
+                  <span>→</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right side */}
+          <div className="hidden lg:block w-1/2 bg-gradient-to-br from-blue-600 to-purple-700">
+            <div className="h-full w-full flex items-center justify-center">
+              <div className="text-center text-white p-8">
+                <h2 className="text-4xl font-bold mb-4">Join SignTusk</h2>
+                <p className="text-xl opacity-90">Start your digital signature journey</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen p-6 bg-gray-100">
+      <div className="flex flex-col lg:flex-row h-full max-w-7xl mx-auto rounded-xl shadow bg-white">
+        <div className="flex flex-col w-full lg:w-3/6 p-4 sm:p-6 md:p-8">
+          <div className="mb-6">
+            <h2 className="text-base sm:text-lg text-gray-500">
+              Welcome to <br />
+              <p className="font-bold text-xl sm:text-2xl md:text-3xl text-black">
+                SignTusk, Your Trusted Digital Signature Partner!
+              </p>
+            </h2>
+          </div>
+
+          <p className="text-gray-600 text-xs sm:text-sm mb-6">
+            Let&apos;s get you started. Create your account below to secure and sign
+            your documents with ease.
+          </p>
+
+          <div className="mb-6">
+            <h3 className="text-xs sm:text-sm font-semibold mb-3">Type of Account</h3>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <button
+                type="button"
+                className={`rounded-xl py-3 px-4 w-full sm:w-48 ${accountType === 'Personal'
+                  ? 'bg-blue-200 text-blue-600'
+                  : 'bg-gray-200 text-black'
+                  } hover:bg-blue-200 hover:text-blue-600 flex items-center justify-center`}
+                onClick={() => setAccountType('Personal')}
+              >
+                <IoPersonSharp className="mr-2" /> Personal
+              </button>
+              <button
+                type="button"
+                className={`rounded-xl py-3 px-4 w-full sm:w-48 ${accountType === 'Corporate'
+                  ? 'bg-blue-200 text-blue-600'
+                  : 'bg-gray-200 text-black'
+                  } hover:bg-blue-200 hover:text-blue-600 flex items-center justify-center`}
+                onClick={() => setAccountType('Corporate')}
+              >
+                <MdFactory className="mr-2" /> Corporate
+              </button>
+            </div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="w-full">
+            {error && (
+              <div className="mb-4 p-2 bg-red-100 text-red-600 rounded text-sm">
+                {error}
+              </div>
+            )}
+
+            {emailError && (
+              <div className="mb-4 p-2 bg-yellow-100 text-yellow-700 rounded text-sm">
+                {emailError}
+              </div>
+            )}
+
+            {accountType === 'Personal' ? (
+              <>
+                <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                  <div className="w-full">
+                    <label className="block text-xs font-bold mb-1">First Name *</label>
+                    <input
+                      type="text"
+                      name="firstName"
+                      value={formData.firstName}
+                      onChange={handleChange}
+                      placeholder="Enter your First Name"
+                      className={`w-full p-2.5 text-sm rounded-md border ${validationErrors.firstName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                      required
+                    />
+                    {validationErrors.firstName && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.firstName}</p>
+                    )}
+                  </div>
+                  <div className="w-full">
+                    <label className="block text-xs font-semibold mb-1">Last Name *</label>
+                    <input
+                      type="text"
+                      name="lastName"
+                      value={formData.lastName}
+                      onChange={handleChange}
+                      placeholder="Enter your Last Name"
+                      className={`w-full p-2.5 text-sm rounded-md border ${validationErrors.lastName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                      required
+                    />
+                    {validationErrors.lastName && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.lastName}</p>
+                    )}
+                  </div>
+                </div>
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold mb-1">Email Address *</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Enter your email address"
+                    className={`w-full p-2.5 text-sm rounded-md border ${validationErrors.email ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                    required
+                  />
+                  {validationErrors.email && (
+                    <p className="text-red-500 text-xs mt-1">{validationErrors.email}</p>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                  <div className="w-full">
+                    <label className="block text-xs font-bold mb-1">First Name *</label>
+                    <input
+                      type="text"
+                      name="firstName"
+                      value={formData.firstName}
+                      onChange={handleChange}
+                      placeholder="Enter your First Name"
+                      className={`w-full p-2.5 text-sm rounded-md border ${validationErrors.firstName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                      required
+                    />
+                    {validationErrors.firstName && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.firstName}</p>
+                    )}
+                  </div>
+                  <div className="w-full">
+                    <label className="block text-xs font-semibold mb-1">Last Name *</label>
+                    <input
+                      type="text"
+                      name="lastName"
+                      value={formData.lastName}
+                      onChange={handleChange}
+                      placeholder="Enter your Last Name"
+                      className={`w-full p-2.5 text-sm rounded-md border ${validationErrors.lastName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                      required
+                    />
+                    {validationErrors.lastName && (
+                      <p className="text-red-500 text-xs mt-1">{validationErrors.lastName}</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold mb-1">Company Name *</label>
+                  <input
+                    type="text"
+                    name="companyName"
+                    value={formData.companyName}
+                    onChange={handleChange}
+                    placeholder="Enter your Company Name"
+                    className={`w-full p-2.5 text-sm rounded-md border ${validationErrors.companyName ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                    required
+                  />
+                  {validationErrors.companyName && (
+                    <p className="text-red-500 text-xs mt-1">{validationErrors.companyName}</p>
+                  )}
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold mb-1">Corporate Email *</label>
+                  <input
+                    type="email"
+                    name="email"
+                    value={formData.email}
+                    onChange={handleChange}
+                    placeholder="Enter your corporate email address"
+                    className={`w-full p-2.5 text-sm rounded-md border ${validationErrors.email || emailError ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                    required
+                  />
+                  {validationErrors.email && (
+                    <p className="text-red-500 text-xs mt-1">{validationErrors.email}</p>
+                  )}
+                  <p className="text-gray-500 text-xs mt-1">
+                    Please use your corporate email address. Personal email domains (gmail.com, yahoo.com, etc.) are not allowed.
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                  <div className="w-full">
+                    <label className="block text-xs font-semibold mb-1">Industry Field</label>
+                    <select
+                      name="industryField"
+                      value={formData.industryField}
+                      onChange={handleChange}
+                      className="w-full p-2.5 text-sm rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select Industry</option>
+                      <option value="Technology">Technology</option>
+                      <option value="Healthcare">Healthcare</option>
+                      <option value="Finance">Finance</option>
+                      <option value="Education">Education</option>
+                      <option value="Manufacturing">Manufacturing</option>
+                      <option value="Retail">Retail</option>
+                      <option value="Real Estate">Real Estate</option>
+                      <option value="Legal">Legal</option>
+                      <option value="Consulting">Consulting</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                  <div className="w-full">
+                    <label className="block text-xs font-semibold mb-1">Employee Count</label>
+                    <select
+                      name="employeeCount"
+                      value={formData.employeeCount}
+                      onChange={handleChange}
+                      className="w-full p-2.5 text-sm rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select Size</option>
+                      <option value="1-10">1-10 employees</option>
+                      <option value="11-50">11-50 employees</option>
+                      <option value="51-200">51-200 employees</option>
+                      <option value="201-500">201-500 employees</option>
+                      <option value="501-1000">501-1000 employees</option>
+                      <option value="1000+">1000+ employees</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                  <div className="w-full">
+                    <label className="block text-xs font-semibold mb-1">Job Title</label>
+                    <input
+                      type="text"
+                      name="jobTitle"
+                      value={formData.jobTitle}
+                      onChange={handleChange}
+                      placeholder="e.g., Marketing Manager"
+                      className="w-full p-2.5 text-sm rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="w-full">
+                    <label className="block text-xs font-semibold mb-1">Department</label>
+                    <input
+                      type="text"
+                      name="department"
+                      value={formData.department}
+                      onChange={handleChange}
+                      placeholder="e.g., Marketing"
+                      className="w-full p-2.5 text-sm rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-xs font-semibold mb-1">Phone Number</label>
+                  <input
+                    type="tel"
+                    name="phoneNumber"
+                    value={formData.phoneNumber}
+                    onChange={handleChange}
+                    placeholder="Enter your phone number"
+                    className="w-full p-2.5 text-sm rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="mb-4">
+              <label className="block text-xs font-semibold mb-1">Password *</label>
+              <input
+                type="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                placeholder="Enter your password (min. 6 characters)"
+                className={`w-full p-2.5 text-sm rounded-md border ${validationErrors.password ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                required
+              />
+              {validationErrors.password && (
+                <p className="text-red-500 text-xs mt-1">{validationErrors.password}</p>
+              )}
+            </div>
+
+            <div className="mb-4">
+              <label className="block text-xs font-semibold mb-1">Confirm Password *</label>
+              <input
+                type="password"
+                name="confirmPassword"
+                value={formData.confirmPassword}
+                onChange={handleChange}
+                placeholder="Confirm your password"
+                className={`w-full p-2.5 text-sm rounded-md border ${validationErrors.confirmPassword ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                required
+              />
+              {validationErrors.confirmPassword && (
+                <p className="text-red-500 text-xs mt-1">{validationErrors.confirmPassword}</p>
+              )}
+            </div>
+
+            <div className="flex items-center mb-6">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="mr-2 w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <label className="text-xs">
+                I agree to the{' '}
+                <button
+                  type="button"
+                  className="text-blue-500 hover:underline"
+                  onClick={() => setTermsPopup(true)}
+                >
+                  Terms and Conditions
+                </button>
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              className="flex items-center justify-center bg-blue-600 text-white w-full py-3 rounded-md hover:bg-blue-700 transition-colors duration-200 mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={loading || (accountType === 'Corporate' && !!emailError)}
+            >
+              {loading ? 'Creating Account...' : 'Create Account'}
+            </button>
+          </form>
+
+          <p className="text-center text-sm text-gray-600">
+            Already have an account?{' '}
+            <Link href="/login" className="text-blue-600 hover:underline">
+              Sign in
+            </Link>
+          </p>
+        </div>
+
+        <div className="hidden lg:flex flex-col items-center justify-center w-3/6 bg-gray-100">
+          <div className="w-full h-full bg-gradient-to-br from-blue-600 to-purple-700 flex items-center justify-center">
+            <div className="text-center text-white p-8">
+              <h2 className="text-4xl font-bold mb-4">Welcome to SignTusk</h2>
+              <p className="text-xl opacity-90">Your digital signature platform</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {termsPopup && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white p-6 rounded-lg w-96 max-h-[80vh] overflow-y-auto">
+            <h3 className="text-lg font-bold mb-4">Terms and Conditions</h3>
+            <div className="text-sm text-gray-600 mb-4">
+              <p className="mb-2">Welcome to SignTusk. By using our service, you agree to the following terms:</p>
+
+              <h4 className="font-semibold mt-3 mb-1">1. Account Registration</h4>
+              <p>You must provide accurate and complete information when creating an account. You are responsible for maintaining the security of your account credentials.</p>
+
+              <h4 className="font-semibold mt-3 mb-1">2. Service Usage</h4>
+              <p>Our digital signature service is to be used for legal and legitimate purposes only. You agree not to use the service for any fraudulent or unauthorized activities.</p>
+
+              <h4 className="font-semibold mt-3 mb-1">3. Privacy</h4>
+              <p>We collect and process your data as described in our Privacy Policy. By using our service, you consent to such processing.</p>
+
+              <h4 className="font-semibold mt-3 mb-1">4. Security</h4>
+              <p>We implement security measures to protect your data, but you are responsible for maintaining the confidentiality of your account.</p>
+            </div>
+            <button
+              onClick={handleTermsAgree}
+              className="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 w-full"
+            >
+              I Agree
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
