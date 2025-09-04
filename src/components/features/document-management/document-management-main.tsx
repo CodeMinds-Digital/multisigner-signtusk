@@ -7,7 +7,7 @@ import { DocumentTemplate, DocumentManagementState, DocumentStatus } from '@/typ
 import { DocumentList } from './document-list'
 import { AddDocumentModal } from './add-document-modal'
 import { DocumentDesignerWrapper } from './document-designer-wrapper'
-import { DocumentStats } from './document-stats'
+import { DocumentStatsImproved } from './document-stats-improved'
 import { Plus, FileText, AlertCircle, Filter } from 'lucide-react'
 import { filterDocumentsByGroup } from '@/utils/document-status'
 
@@ -127,6 +127,38 @@ export function DocumentManagementMain() {
     }
   }
 
+  const handleArchiveDocument = async (documentId: string) => {
+    if (!user) return
+
+    try {
+      await DocumentManagementService.archiveDocumentTemplate(documentId, user.id)
+      setState(prev => ({
+        ...prev,
+        documents: prev.documents.map(doc =>
+          doc.id === documentId
+            ? { ...doc, status: 'archived' }
+            : doc
+        )
+      }))
+    } catch (error) {
+      console.error('Error archiving document:', error)
+      alert('Failed to archive document. Please try again.')
+    }
+  }
+
+  const handleUnarchiveDocument = async (documentId: string) => {
+    if (!user) return
+
+    try {
+      await DocumentManagementService.unarchiveDocumentTemplate(documentId, user.id)
+      // Reload documents to get the updated status
+      loadDocuments()
+    } catch (error) {
+      console.error('Error unarchiving document:', error)
+      alert('Failed to restore document from archive. Please try again.')
+    }
+  }
+
   const handleFilterChange = (filter: string) => {
     setStatusFilter(filter)
   }
@@ -185,7 +217,7 @@ export function DocumentManagementMain() {
       ) : (
         <>
           {/* Enhanced Stats with Filtering */}
-          <DocumentStats
+          <DocumentStatsImproved
             documents={state.documents}
             onFilterChange={handleFilterChange}
             activeFilter={statusFilter}
@@ -216,6 +248,8 @@ export function DocumentManagementMain() {
             documents={filteredDocuments}
             onEdit={handleEditDocument}
             onDelete={handleDeleteDocument}
+            onArchive={handleArchiveDocument}
+            onUnarchive={handleUnarchiveDocument}
             loading={state.loading}
           />
         </>

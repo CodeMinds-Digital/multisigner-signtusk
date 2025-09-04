@@ -3,18 +3,21 @@
 import React from 'react'
 import { DocumentTemplate } from '@/types/document-management'
 import { DocumentManagementService } from '@/lib/document-management-service'
-import { Edit, Trash2, Eye, FileText, Calendar, User } from 'lucide-react'
+import { FileText, Calendar, User, Eye, Edit } from 'lucide-react'
 import { getStatusConfig } from '@/utils/document-status'
 import { analyzeDocumentSignatureType } from '@/lib/signature-field-utils'
+import { DocumentActionsMenu } from '@/components/ui/document-actions-menu'
 
 interface DocumentListProps {
   documents: DocumentTemplate[]
   onEdit: (document: DocumentTemplate) => void
   onDelete: (documentId: string) => void
+  onArchive?: (documentId: string) => void
+  onUnarchive?: (documentId: string) => void
   loading: boolean
 }
 
-export function DocumentList({ documents, onEdit, onDelete, loading }: DocumentListProps) {
+export function DocumentList({ documents, onEdit, onDelete, onArchive, onUnarchive, loading }: DocumentListProps) {
   const handlePreview = async (document: DocumentTemplate) => {
     try {
       const url = await DocumentManagementService.getDocumentUrl(document.pdf_url)
@@ -106,75 +109,76 @@ export function DocumentList({ documents, onEdit, onDelete, loading }: DocumentL
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-200">
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
         <h2 className="text-lg font-medium text-gray-900">Documents</h2>
+        <p className="text-sm text-gray-500">{documents.length} document{documents.length !== 1 ? 's' : ''}</p>
       </div>
 
-      <div className="divide-y divide-gray-200">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {documents.map((document) => (
-          <div key={document.id} className="p-6 hover:bg-gray-50 transition-colors">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-4 flex-1">
-                {/* Document Icon */}
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <FileText className="w-6 h-6 text-blue-600" />
+          <div key={document.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-all">
+            {/* Document Header */}
+            <div className="flex items-center space-x-3 mb-4">
+              <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <FileText className="w-5 h-5 text-blue-600" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-medium text-gray-900 truncate" title={document.name}>
+                  {document.name}
+                </h3>
+                <div className="mt-1">
+                  <span className={getStatusBadge(document.status)}>
+                    {getStatusIcon(document.status)} {getStatusConfig(document.status as any).label}
+                  </span>
                 </div>
+              </div>
+            </div>
 
-                {/* Document Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center space-x-3 mb-1">
-                    <h3 className="text-lg font-medium text-gray-900 truncate">
-                      {document.name}
-                    </h3>
-                    <span className={getStatusBadge(document.status)}>
-                      {getStatusIcon(document.status)} {getStatusConfig(document.status as any).label}
-                    </span>
-                  </div>
+            {/* Document Details */}
+            <div className="space-y-2 mb-4">
+              <div className="flex items-center text-sm text-gray-600">
+                <FileText className="w-4 h-4 mr-2 flex-shrink-0" />
+                <span className="truncate">{document.type}</span>
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <User className="w-4 h-4 mr-2 flex-shrink-0" />
+                <span className="truncate">{getDocumentSignatureType(document)}</span>
+              </div>
+              <div className="flex items-center text-sm text-gray-600">
+                <Calendar className="w-4 h-4 mr-2 flex-shrink-0" />
+                <span className="truncate">{formatDate(document.created_at)}</span>
+              </div>
+            </div>
 
-                  <div className="flex items-center space-x-4 text-sm text-gray-600">
-                    <span className="flex items-center">
-                      <FileText className="w-4 h-4 mr-1" />
-                      {document.type}
+            {/* Schemas */}
+            {document.schemas.length > 0 && (
+              <div className="mb-4">
+                <p className="text-sm text-gray-600 mb-2">
+                  Schemas ({document.schemas.length}):
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {document.schemas.slice(0, 3).map((schema, index) => (
+                    <span
+                      key={index}
+                      className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-700"
+                    >
+                      {schema.type}
                     </span>
-                    <span className="flex items-center">
-                      <User className="w-4 h-4 mr-1" />
-                      {getDocumentSignatureType(document)}
+                  ))}
+                  {document.schemas.length > 3 && (
+                    <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
+                      +{document.schemas.length - 3} more
                     </span>
-                    <span className="flex items-center">
-                      <Calendar className="w-4 h-4 mr-1" />
-                      {formatDate(document.created_at)}
-                    </span>
-                  </div>
-
-                  {/* Schemas */}
-                  {document.schemas.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-600 mb-1">
-                        Schemas ({document.schemas.length}):
-                      </p>
-                      <div className="flex flex-wrap gap-1">
-                        {document.schemas.slice(0, 5).map((schema, index) => (
-                          <span
-                            key={index}
-                            className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-700"
-                          >
-                            {schema.type}
-                          </span>
-                        ))}
-                        {document.schemas.length > 5 && (
-                          <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
-                            +{document.schemas.length - 5} more
-                          </span>
-                        )}
-                      </div>
-                    </div>
                   )}
                 </div>
               </div>
+            )}
 
-              {/* Actions */}
-              <div className="flex items-center space-x-2 ml-4">
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+              <div className="flex items-center space-x-2">
+                {/* Preview Button */}
                 <button
                   onClick={() => handlePreview(document)}
                   className="inline-flex items-center px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
@@ -184,28 +188,33 @@ export function DocumentList({ documents, onEdit, onDelete, loading }: DocumentL
                   Preview
                 </button>
 
-                <button
-                  onClick={() => onEdit(document)}
-                  className="inline-flex items-center px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
-                  title="Edit Document"
-                >
-                  <Edit className="w-4 h-4 mr-1" />
-                  Edit
-                </button>
+                {/* Edit Button - only show if not archived */}
+                {document.status !== 'archived' && (
+                  <button
+                    onClick={() => onEdit(document)}
+                    className="inline-flex items-center px-3 py-1.5 text-sm text-blue-600 hover:text-blue-700 hover:bg-blue-50 rounded-md transition-colors"
+                    title="Edit Document"
+                  >
+                    <Edit className="w-4 h-4 mr-1" />
+                    Edit
+                  </button>
+                )}
 
-                <button
-                  onClick={() => onDelete(document.id)}
-                  className="inline-flex items-center px-3 py-1.5 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
-                  title="Delete Document"
-                >
-                  <Trash2 className="w-4 h-4 mr-1" />
-                  Delete
-                </button>
               </div>
+
+              {/* Three-dots Menu */}
+              <DocumentActionsMenu
+                documentItem={document}
+                onEdit={onEdit}
+                onDelete={onDelete}
+                onArchive={onArchive || (() => { })}
+                onUnarchive={onUnarchive || (() => { })}
+                onPreview={handlePreview}
+              />
             </div>
           </div>
         ))}
       </div>
-    </div>
+    </div >
   )
 }

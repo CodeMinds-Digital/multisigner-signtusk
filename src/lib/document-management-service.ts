@@ -581,6 +581,115 @@ export class DocumentManagementService {
   }
 
   /**
+   * Archive a document template
+   */
+  static async archiveDocumentTemplate(documentId: string, userId: string): Promise<void> {
+    try {
+      // Try updating in documents first
+      let { error } = await this.supabase
+        .from('documents')
+        .update({
+          status: 'archived',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', documentId)
+        .eq('user_id', userId)
+
+      if (error) {
+        // If not found in documents, try document_templates
+        const templateUpdate = await this.supabase
+          .from('document_templates')
+          .update({
+            status: 'archived',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', documentId)
+          .eq('user_id', userId)
+
+        if (templateUpdate.error) {
+          throw new Error(templateUpdate.error.message)
+        }
+      }
+    } catch (error) {
+      console.error('Error archiving document template:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Unarchive a document template (restore from archive)
+   */
+  static async unarchiveDocumentTemplate(documentId: string, userId: string): Promise<void> {
+    try {
+      // Get the document to determine what status to restore it to
+      let document = null
+      let isFromDocuments = false
+
+      // Try documents table first
+      const { data: docData, error: docError } = await this.supabase
+        .from('documents')
+        .select('schemas')
+        .eq('id', documentId)
+        .eq('user_id', userId)
+        .single()
+
+      if (!docError && docData) {
+        document = docData
+        isFromDocuments = true
+      } else {
+        // Try document_templates table
+        const { data: templateData, error: templateError } = await this.supabase
+          .from('document_templates')
+          .select('schemas')
+          .eq('id', documentId)
+          .eq('user_id', userId)
+          .single()
+
+        if (templateError) {
+          throw new Error(templateError.message)
+        }
+        document = templateData
+      }
+
+      // Determine the appropriate status based on schemas
+      const hasSchemas = document.schemas && Array.isArray(document.schemas) && document.schemas.length > 0
+      const newStatus = hasSchemas ? 'ready' : 'draft'
+
+      // Update the appropriate table
+      if (isFromDocuments) {
+        const { error } = await this.supabase
+          .from('documents')
+          .update({
+            status: newStatus,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', documentId)
+          .eq('user_id', userId)
+
+        if (error) {
+          throw new Error(error.message)
+        }
+      } else {
+        const { error } = await this.supabase
+          .from('document_templates')
+          .update({
+            status: newStatus,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', documentId)
+          .eq('user_id', userId)
+
+        if (error) {
+          throw new Error(error.message)
+        }
+      }
+    } catch (error) {
+      console.error('Error unarchiving document template:', error)
+      throw error
+    }
+  }
+
+  /**
    * Get a single document template
    */
   static async getDocumentTemplate(documentId: string, userId: string): Promise<DocumentTemplate | null> {

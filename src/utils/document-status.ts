@@ -1,9 +1,9 @@
-import { 
-  FileText, 
-  CheckCircle, 
-  Clock, 
-  AlertTriangle, 
-  XCircle, 
+import {
+  FileText,
+  CheckCircle,
+  Clock,
+  AlertTriangle,
+  XCircle,
   Edit3,
   Send,
   Users,
@@ -83,6 +83,16 @@ export const DOCUMENT_STATUS_CONFIG: Record<DocumentStatus, StatusConfig> = {
     borderColor: 'border-gray-200',
     textColor: 'text-gray-800',
     badgeVariant: 'outline'
+  },
+  archived: {
+    label: 'Archived',
+    description: 'Document has been archived',
+    icon: Archive,
+    color: 'text-gray-600',
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-200',
+    textColor: 'text-gray-800',
+    badgeVariant: 'secondary'
   }
 }
 
@@ -116,31 +126,13 @@ export const STATUS_GROUPS: StatusGroupConfig[] = [
     priority: 2
   },
   {
-    label: 'Awaiting Signatures',
-    description: 'Documents waiting for signatures',
-    icon: Users,
-    color: 'text-amber-600',
-    bgColor: 'bg-amber-50',
-    statuses: ['pending'],
-    priority: 3
-  },
-  {
-    label: 'Completed',
-    description: 'Fully signed documents',
-    icon: CheckCircle,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50',
-    statuses: ['completed'],
-    priority: 4
-  },
-  {
     label: 'Archived',
-    description: 'Expired or cancelled documents',
+    description: 'Archived documents',
     icon: Archive,
     color: 'text-gray-600',
     bgColor: 'bg-gray-50',
-    statuses: ['expired', 'cancelled'],
-    priority: 5
+    statuses: ['archived'],
+    priority: 3
   }
 ]
 
@@ -154,7 +146,7 @@ export function getStatusGroup(status: DocumentStatus): StatusGroupConfig | unde
 
 export function getDocumentCounts(documents: { status: DocumentStatus }[]) {
   const total = documents.length
-  
+
   const counts = STATUS_GROUPS.reduce((acc, group) => {
     const count = documents.filter(doc => group.statuses.includes(doc.status)).length
     acc[group.label.toLowerCase().replace(/\s+/g, '_')] = count
@@ -168,7 +160,7 @@ export function getDocumentCounts(documents: { status: DocumentStatus }[]) {
 }
 
 export function filterDocumentsByStatus(
-  documents: { status: DocumentStatus }[], 
+  documents: { status: DocumentStatus }[],
   statusFilter: DocumentStatus | 'all'
 ) {
   if (statusFilter === 'all') return documents
@@ -176,7 +168,7 @@ export function filterDocumentsByStatus(
 }
 
 export function filterDocumentsByGroup(
-  documents: { status: DocumentStatus }[], 
+  documents: { status: DocumentStatus }[],
   groupLabel: string
 ) {
   if (groupLabel === 'all') return documents

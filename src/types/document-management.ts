@@ -1,4 +1,4 @@
-export type DocumentStatus = 'draft' | 'ready' | 'pending' | 'completed' | 'expired' | 'cancelled'
+export type DocumentStatus = 'draft' | 'ready' | 'pending' | 'completed' | 'expired' | 'cancelled' | 'archived'
 
 export interface DocumentTemplate {
   id: string
