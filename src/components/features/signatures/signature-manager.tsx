@@ -24,36 +24,13 @@ export default function SignatureManager() {
     const [loading, setLoading] = useState(true)
 
     const loadSignatures = useCallback(async () => {
-        if (!user) return
-
-        // In development mode, use mock signatures data
-        if (process.env.NODE_ENV === 'development') {
-            console.log('Development mode: Using mock signatures data')
-
-            // Simulate loading delay
-            await new Promise(resolve => setTimeout(resolve, 500))
-
-            const mockSignatures: Signature[] = [
-                {
-                    id: 'mock-sig-1',
-                    name: 'Primary Signature',
-                    signature_data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-                    is_default: true,
-                    created_at: new Date(Date.now() - 86400000).toISOString()
-                },
-                {
-                    id: 'mock-sig-2',
-                    name: 'Initials',
-                    signature_data: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==',
-                    is_default: false,
-                    created_at: new Date(Date.now() - 172800000).toISOString()
-                }
-            ]
-
-            setSignatures(mockSignatures)
-            setLoading(false)
+        if (!user?.id) {
+            console.log('No user found, skipping signature load')
             return
         }
+
+        console.log('Loading signatures for user:', user.id)
+        setLoading(true)
 
         try {
             const { data, error } = await supabase
@@ -76,37 +53,8 @@ export default function SignatureManager() {
     }, [user, loadSignatures])
 
     const handleSaveSignature = async (signatureData: string) => {
-        if (!user) return
-
-        // In development mode, simulate saving signature
-        if (process.env.NODE_ENV === 'development') {
-            console.log('Development mode: Simulating signature save')
-
-            const signatureName = editingSignature
-                ? editingSignature.name
-                : `Signature ${signatures.length + 1}`
-
-            if (editingSignature) {
-                // Update existing signature in local state
-                setSignatures(prev => prev.map(sig =>
-                    sig.id === editingSignature.id
-                        ? { ...sig, signature_data: signatureData }
-                        : sig
-                ))
-            } else {
-                // Add new signature to local state
-                const newSignature: Signature = {
-                    id: `mock-sig-${Date.now()}`,
-                    name: signatureName,
-                    signature_data: signatureData,
-                    is_default: signatures.length === 0,
-                    created_at: new Date().toISOString()
-                }
-                setSignatures(prev => [newSignature, ...prev])
-            }
-
-            setShowSignaturePad(false)
-            setEditingSignature(null)
+        if (!user?.id) {
+            alert('User not authenticated. Please log in and try again.')
             return
         }
 
@@ -152,46 +100,65 @@ export default function SignatureManager() {
     const handleDeleteSignature = async (signatureId: string) => {
         if (!confirm('Are you sure you want to delete this signature?')) return
 
-        // In development mode, simulate deleting signature
-        if (process.env.NODE_ENV === 'development') {
-            console.log('Development mode: Simulating signature deletion')
-            setSignatures(prev => prev.filter(sig => sig.id !== signatureId))
-            return
-        }
-
         try {
+            if (!user?.id) {
+                alert('User not authenticated. Please log in and try again.')
+                return
+            }
+
             const { error } = await supabase
                 .from('signatures')
                 .delete()
                 .eq('id', signatureId)
+                .eq('user_id', user.id) // Add user_id check for security
 
             if (error) throw error
             loadSignatures()
         } catch (error) {
             console.error('Failed to delete signature:', error)
-            alert('Failed to delete signature. Please try again.')
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+            alert(`Failed to delete signature: ${errorMessage}. Please try again.`)
         }
     }
 
     const handleSetDefault = async (signatureId: string) => {
         try {
-            // First, unset all default signatures
-            await supabase
+            if (!user?.id) {
+                alert('User not authenticated. Please log in and try again.')
+                return
+            }
+
+            console.log('Setting default signature:', { signatureId, userId: user.id })
+
+            // First, unset all default signatures for this user
+            const { error: unsetError } = await supabase
                 .from('signatures')
                 .update({ is_default: false })
-                .eq('user_id', user?.id)
+                .eq('user_id', user.id)
+
+            if (unsetError) {
+                console.error('Error unsetting default signatures:', unsetError)
+                throw unsetError
+            }
 
             // Then set the selected signature as default
-            const { error } = await supabase
+            const { error: setError } = await supabase
                 .from('signatures')
                 .update({ is_default: true })
                 .eq('id', signatureId)
+                .eq('user_id', user.id) // Add user_id check for security
 
-            if (error) throw error
+            if (setError) {
+                console.error('Error setting default signature:', setError)
+                throw setError
+            }
+
+            console.log('Successfully set default signature')
             loadSignatures()
         } catch (error) {
             console.error('Failed to set default signature:', error)
-            alert('Failed to set default signature. Please try again.')
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
+            alert(`Failed to set default signature: ${errorMessage}. Please try again.`)
         }
     }
 
