@@ -140,6 +140,78 @@ export function determineSignatureType(schemas: any[]): 'single' | 'multi' {
 }
 
 /**
+ * Count total signature fields in schemas
+ */
+export function countSignatureFields(schemas: any[]): number {
+  const signatureFields = extractSignatureFields(schemas)
+  return signatureFields.length
+}
+
+/**
+ * Analyze document template and determine signature type from schemas
+ * This is the main function to use for determining signature type from PDFme template data
+ */
+export function analyzeDocumentSignatureType(templateData: any): {
+  signatureType: 'single' | 'multi'
+  signatureFieldsCount: number
+  uniqueSignersCount: number
+  analysis: string
+} {
+  console.log('🔍 Analyzing document signature type from template data:', templateData)
+
+  let schemas: any[] = []
+
+  // Extract schemas from different possible structures
+  if (templateData?.schemas) {
+    schemas = Array.isArray(templateData.schemas) ? templateData.schemas : []
+  } else if (templateData?.template_data?.schemas) {
+    schemas = Array.isArray(templateData.template_data.schemas) ? templateData.template_data.schemas : []
+  } else if (Array.isArray(templateData)) {
+    schemas = templateData
+  }
+
+  const signatureFields = extractSignatureFields(schemas)
+  const signatureFieldsCount = signatureFields.length
+
+  // Count unique signers based on field assignments
+  const uniqueSignerIds = new Set<string>()
+  signatureFields.forEach(field => {
+    const signerId = field.properties?._originalConfig?.signerId ||
+      field.properties?.signerId ||
+      field.signerId ||
+      field.assignedTo?.signerIds?.[0] ||
+      'signer_1' // default
+    uniqueSignerIds.add(signerId)
+  })
+
+  const uniqueSignersCount = uniqueSignerIds.size
+  const signatureType = signatureFieldsCount > 1 ? 'multi' : 'single'
+
+  let analysis = ''
+  if (signatureFieldsCount === 0) {
+    analysis = 'No signature fields found'
+  } else if (signatureFieldsCount === 1) {
+    analysis = 'Single signature field detected'
+  } else {
+    analysis = `${signatureFieldsCount} signature fields detected (${uniqueSignersCount} unique signers)`
+  }
+
+  console.log('🔍 Signature analysis result:', {
+    signatureType,
+    signatureFieldsCount,
+    uniqueSignersCount,
+    analysis
+  })
+
+  return {
+    signatureType,
+    signatureFieldsCount,
+    uniqueSignersCount,
+    analysis
+  }
+}
+
+/**
  * Sync signers with signature fields
  * This ensures that the number of signers matches the number of signature fields
  */

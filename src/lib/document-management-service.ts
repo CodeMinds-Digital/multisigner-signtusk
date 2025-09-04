@@ -5,6 +5,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { DocumentTemplate, DocumentUploadData } from '@/types/document-management'
+import { generateSignersFromSchemas, analyzeDocumentSignatureType } from './signature-field-utils'
 
 export class DocumentManagementService {
   private static supabase = createClient(
@@ -487,6 +488,13 @@ export class DocumentManagementService {
         updatePayload.template_url = templatePath
       }
 
+      // Analyze signature fields and determine signature type automatically
+      const signatureAnalysis = analyzeDocumentSignatureType({ schemas: serializedSchemas })
+      console.log('🔍 Signature analysis for document update:', signatureAnalysis)
+
+      // Always update signature_type based on actual signature fields in schemas
+      updatePayload.signature_type = signatureAnalysis.signatureType
+
       // Auto-generate signers from signature fields if not provided
       let finalSigners = signers
       if (!signers || signers.length === 0) {
@@ -495,8 +503,6 @@ export class DocumentManagementService {
 
       if (finalSigners && Array.isArray(finalSigners)) {
         updatePayload.signers = finalSigners
-        // Automatically determine signature type based on signers count
-        updatePayload.signature_type = finalSigners.length > 1 ? 'multi' : 'single'
       }
 
       console.log('🔍 Updating document with payload:', updatePayload)

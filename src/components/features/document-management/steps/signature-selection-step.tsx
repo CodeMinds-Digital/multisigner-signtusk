@@ -22,11 +22,11 @@ interface SignatureSelectionStepProps {
   canProceed?: boolean
 }
 
-export function SignatureSelectionStep({ 
-  data = {}, 
+export function SignatureSelectionStep({
+  data = {},
   onDataChange,
   onNext,
-  canProceed 
+  canProceed
 }: SignatureSelectionStepProps) {
   const [newSigner, setNewSigner] = useState({ name: '', email: '', role: '' })
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
@@ -104,65 +104,41 @@ export function SignatureSelectionStep({
     }
   }, [errors])
 
-  const isFormValid = signatureType === 'single' || (signatureType === 'multi' && signers.length > 0)
+  // Always allow proceeding since signature type will be determined automatically
+  const isFormValid = true
 
   return (
     <div className="space-y-6">
-      {/* Signature Type Selection */}
+      {/* Information Section */}
       <div>
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Choose Signature Type</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Single Signature */}
-          <div
-            className={`relative border-2 rounded-lg p-6 cursor-pointer transition-all ${
-              signatureType === 'single'
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
-            onClick={() => handleSignatureTypeChange('single')}
-          >
-            <div className="flex items-center">
-              <User className="h-8 w-8 text-blue-600 mr-4" />
-              <div>
-                <h4 className="text-lg font-medium text-gray-900">Single Signature</h4>
-                <p className="text-sm text-gray-500">Only you will sign this document</p>
-              </div>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Configure Signers</h3>
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <Users className="h-5 w-5 text-blue-600 mt-0.5" />
             </div>
-            {signatureType === 'single' && (
-              <CheckCircle className="absolute top-4 right-4 h-6 w-6 text-blue-600" />
-            )}
-          </div>
-
-          {/* Multi Signature */}
-          <div
-            className={`relative border-2 rounded-lg p-6 cursor-pointer transition-all ${
-              signatureType === 'multi'
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-200 hover:border-gray-300'
-            }`}
-            onClick={() => handleSignatureTypeChange('multi')}
-          >
-            <div className="flex items-center">
-              <Users className="h-8 w-8 text-blue-600 mr-4" />
-              <div>
-                <h4 className="text-lg font-medium text-gray-900">Multi Signature</h4>
-                <p className="text-sm text-gray-500">Multiple people will sign this document</p>
-              </div>
+            <div className="ml-3">
+              <h4 className="text-sm font-medium text-blue-900">Automatic Signature Type Detection</h4>
+              <p className="text-sm text-blue-800 mt-1">
+                The signature type (single or multi-signature) will be automatically determined based on the number of signature fields you add in the PDF designer.
+                You can optionally add signers here, or they will be generated automatically from your signature fields.
+              </p>
             </div>
-            {signatureType === 'multi' && (
-              <CheckCircle className="absolute top-4 right-4 h-6 w-6 text-blue-600" />
-            )}
           </div>
         </div>
       </div>
 
-      {/* Multi Signature Configuration */}
-      {signatureType === 'multi' && (
+      {/* Signer Configuration (Optional) */}
+      <div className="space-y-6">
+        <h4 className="text-lg font-medium text-gray-900">Add Signers (Optional)</h4>
+        <p className="text-sm text-gray-600 mb-4">
+          You can pre-configure signers here, or they will be automatically generated based on the signature fields you add in the designer.
+        </p>
         <div className="space-y-6">
           {/* Add Signer Form */}
           <div className="border border-gray-200 rounded-lg p-6">
             <h4 className="text-lg font-medium text-gray-900 mb-4">Add Signers</h4>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -227,7 +203,7 @@ export function SignatureSelectionStep({
               <h4 className="text-lg font-medium text-gray-900 mb-4">
                 Signers ({signers.length})
               </h4>
-              
+
               <div className="space-y-3">
                 {signers.map((signer, index) => (
                   <div
@@ -252,7 +228,7 @@ export function SignatureSelectionStep({
                         </div>
                       </div>
                     </div>
-                    
+
                     <Button
                       variant="ghost"
                       size="sm"
@@ -267,25 +243,18 @@ export function SignatureSelectionStep({
             </div>
           )}
         </div>
-      )}
+      </div>
 
       {/* Instructions */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="text-sm font-medium text-blue-900 mb-2">Instructions:</h4>
-        <ul className="text-sm text-blue-800 space-y-1">
-          {signatureType === 'single' ? (
-            <>
-              <li>• You have selected single signature mode</li>
-              <li>• Only you will be able to sign this document</li>
-              <li>• Proceed to the next step to configure signature fields</li>
-            </>
-          ) : (
-            <>
-              <li>• Add all people who need to sign this document</li>
-              <li>• Each signer will receive an email invitation</li>
-              <li>• Signers will sign in the order they are listed</li>
-              <li>• You can reorder signers by removing and re-adding them</li>
-            </>
+      <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+        <h4 className="text-sm font-medium text-green-900 mb-2">Next Steps:</h4>
+        <ul className="text-sm text-green-800 space-y-1">
+          <li>• Proceed to the PDF designer to add signature fields</li>
+          <li>• The document type (single/multi-signature) will be automatically determined</li>
+          <li>• Add one signature field for single signature documents</li>
+          <li>• Add multiple signature fields for multi-signature documents</li>
+          {signers.length > 0 && (
+            <li>• Your pre-configured signers will be assigned to signature fields</li>
           )}
         </ul>
       </div>

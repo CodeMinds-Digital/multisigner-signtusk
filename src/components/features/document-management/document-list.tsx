@@ -5,6 +5,7 @@ import { DocumentTemplate } from '@/types/document-management'
 import { DocumentManagementService } from '@/lib/document-management-service'
 import { Edit, Trash2, Eye, FileText, Calendar, User } from 'lucide-react'
 import { getStatusConfig } from '@/utils/document-status'
+import { analyzeDocumentSignatureType } from '@/lib/signature-field-utils'
 
 interface DocumentListProps {
   documents: DocumentTemplate[]
@@ -25,6 +26,26 @@ export function DocumentList({ documents, onEdit, onDelete, loading }: DocumentL
     } catch (error) {
       console.error('Error previewing document:', error)
       alert('Error previewing document. Please try again.')
+    }
+  }
+
+  // Get dynamic signature type based on actual signature fields in schemas
+  const getDocumentSignatureType = (document: DocumentTemplate): string => {
+    try {
+      // Analyze the document's schemas to determine actual signature type
+      const analysis = analyzeDocumentSignatureType(document)
+
+      if (analysis.signatureFieldsCount === 0) {
+        return 'No signatures'
+      } else if (analysis.signatureFieldsCount === 1) {
+        return 'Single signature'
+      } else {
+        return 'Multi signature'
+      }
+    } catch (error) {
+      console.warn('Error analyzing signature type for document:', document.id, error)
+      // Fallback to stored signature_type if analysis fails
+      return document.signature_type ? `${document.signature_type} signature` : 'Unknown'
     }
   }
 
@@ -118,7 +139,7 @@ export function DocumentList({ documents, onEdit, onDelete, loading }: DocumentL
                     </span>
                     <span className="flex items-center">
                       <User className="w-4 h-4 mr-1" />
-                      {document.signature_type} signature
+                      {getDocumentSignatureType(document)}
                     </span>
                     <span className="flex items-center">
                       <Calendar className="w-4 h-4 mr-1" />
