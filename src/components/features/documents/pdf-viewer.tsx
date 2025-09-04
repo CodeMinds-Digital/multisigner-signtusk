@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { text, image, barcodes, dateTime, Designer } from 'pdfme-complete'
+import { text, image, barcodes, dateTime, Designer } from '@codeminds-digital/pdfme-complete'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {

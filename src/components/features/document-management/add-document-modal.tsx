@@ -1,8 +1,9 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/components/providers/auth-provider'
 import { DocumentManagementService } from '@/lib/document-management-service'
+import { DocumentMetadataService, DocumentType, DocumentCategory } from '@/lib/document-metadata-service'
 import { DocumentTemplate, DocumentUploadData } from '@/types/document-management'
 import { X, Upload, FileText, Eye, CheckCircle } from 'lucide-react'
 
@@ -18,12 +19,38 @@ export function AddDocumentModal({ onClose, onDocumentCreated }: AddDocumentModa
   const [formData, setFormData] = useState({
     name: '',
     type: '',
-    signature_type: 'single' as 'single' | 'multi'
+    category: ''
   })
+  const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([])
+  const [documentCategories, setDocumentCategories] = useState<DocumentCategory[]>([])
+  const [loadingMetadata, setLoadingMetadata] = useState(true)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [uploadedDocument, setUploadedDocument] = useState<DocumentTemplate | null>(null)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [errors, setErrors] = useState<Record<string, string>>({})
+
+  // Load document types and categories
+  useEffect(() => {
+    const loadMetadata = async () => {
+      if (!user?.id) return
+
+      setLoadingMetadata(true)
+      try {
+        const [types, categories] = await Promise.all([
+          DocumentMetadataService.getDocumentTypes(user.id),
+          DocumentMetadataService.getDocumentCategories(user.id)
+        ])
+        setDocumentTypes(types)
+        setDocumentCategories(categories)
+      } catch (error) {
+        console.error('Error loading metadata:', error)
+      } finally {
+        setLoadingMetadata(false)
+      }
+    }
+
+    loadMetadata()
+  }, [user?.id])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -43,6 +70,10 @@ export function AddDocumentModal({ onClose, onDocumentCreated }: AddDocumentModa
 
     if (!formData.type.trim()) {
       newErrors.type = 'Document type is required'
+    }
+
+    if (!formData.category.trim()) {
+      newErrors.category = 'Document category is required'
     }
 
     setErrors(newErrors)
@@ -90,7 +121,7 @@ export function AddDocumentModal({ onClose, onDocumentCreated }: AddDocumentModa
       const documentData: DocumentUploadData = {
         name: formData.name,
         type: formData.type,
-        signature_type: formData.signature_type,
+        category: formData.category,
         file: selectedFile
       }
 
@@ -186,31 +217,46 @@ export function AddDocumentModal({ onClose, onDocumentCreated }: AddDocumentModa
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Document Type *
                 </label>
-                <input
-                  type="text"
+                <select
                   name="type"
                   value={formData.type}
                   onChange={handleInputChange}
                   className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.type ? 'border-red-500' : 'border-gray-300'
                     }`}
-                  placeholder="e.g., Contract, Invoice, Form"
-                />
+                  disabled={loadingMetadata}
+                >
+                  <option value="">Select document type</option>
+                  {documentTypes.map((type) => (
+                    <option key={type.id} value={type.name}>
+                      {type.name}
+                    </option>
+                  ))}
+                </select>
                 {errors.type && <p className="text-red-500 text-sm mt-1">{errors.type}</p>}
+                {loadingMetadata && <p className="text-gray-500 text-sm mt-1">Loading document types...</p>}
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Signature Type
+                  Document Category *
                 </label>
                 <select
-                  name="signature_type"
-                  value={formData.signature_type}
+                  name="category"
+                  value={formData.category}
                   onChange={handleInputChange}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${errors.category ? 'border-red-500' : 'border-gray-300'
+                    }`}
+                  disabled={loadingMetadata}
                 >
-                  <option value="single">Single Signature</option>
-                  <option value="multi">Multi Signature</option>
+                  <option value="">Select document category</option>
+                  {documentCategories.map((category) => (
+                    <option key={category.id} value={category.name}>
+                      {category.name}
+                    </option>
+                  ))}
                 </select>
+                {errors.category && <p className="text-red-500 text-sm mt-1">{errors.category}</p>}
+                {loadingMetadata && <p className="text-gray-500 text-sm mt-1">Loading document categories...</p>}
               </div>
             </div>
           ) : uploadedDocument ? (

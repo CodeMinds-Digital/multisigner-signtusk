@@ -63,7 +63,7 @@ export interface Schema {
 export interface DocumentUploadData {
   name: string
   type: string
-  signature_type: 'single' | 'multi'
+  category: string
   file: File
 }
 
