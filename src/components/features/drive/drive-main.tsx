@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/components/providers/auth-provider'
-import { DocumentManagementService } from '@/lib/document-management-service'
-import { DocumentTemplate, DocumentManagementState, DocumentStatus } from '@/types/document-management'
+import { DriveService } from '@/lib/drive-service'
+import { DocumentTemplate, DocumentManagementState, DocumentStatus } from '@/types/drive'
 import { DocumentList } from './document-list'
 import { AddDocumentModal } from './add-document-modal'
 import { DocumentDesignerWrapper } from './document-designer-wrapper'
@@ -11,7 +11,7 @@ import { DocumentStatsImproved } from './document-stats-improved'
 import { Plus, FileText, AlertCircle, Filter } from 'lucide-react'
 import { filterDocumentsByGroup } from '@/utils/document-status'
 
-export function DocumentManagementMain() {
+export function DriveMain() {
   const { user } = useAuth()
   const [state, setState] = useState<DocumentManagementState>({
     documents: [],
@@ -47,7 +47,7 @@ export function DocumentManagementMain() {
     setState(prev => ({ ...prev, loading: true, error: null }))
 
     try {
-      const documents = await DocumentManagementService.getDocumentTemplates(user.id)
+      const documents = await DriveService.getDocumentTemplates(user.id)
       setState(prev => ({
         ...prev,
         documents,
@@ -111,7 +111,7 @@ export function DocumentManagementMain() {
 
     if (confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
       try {
-        const success = await DocumentManagementService.deleteDocumentTemplate(documentId, user.id)
+        const success = await DriveService.deleteDocumentTemplate(documentId, user.id)
         if (success) {
           setState(prev => ({
             ...prev,
@@ -131,7 +131,7 @@ export function DocumentManagementMain() {
     if (!user) return
 
     try {
-      await DocumentManagementService.archiveDocumentTemplate(documentId, user.id)
+      await DriveService.archiveDocumentTemplate(documentId, user.id)
       setState(prev => ({
         ...prev,
         documents: prev.documents.map(doc =>
@@ -150,7 +150,7 @@ export function DocumentManagementMain() {
     if (!user) return
 
     try {
-      await DocumentManagementService.unarchiveDocumentTemplate(documentId, user.id)
+      await DriveService.unarchiveDocumentTemplate(documentId, user.id)
       // Reload documents to get the updated status
       loadDocuments()
     } catch (error) {
@@ -181,7 +181,7 @@ export function DocumentManagementMain() {
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Document Management</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Drive</h1>
           <p className="text-gray-600 mt-1">
             Create and manage PDF templates with interactive schemas
           </p>

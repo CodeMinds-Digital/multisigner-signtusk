@@ -1,650 +1,725 @@
-import { supabase } from './supabase'
-import { DocumentTemplate, DocumentUploadData, Schema, SupabaseStorageResponse } from '@/types/document-management'
-import { AuthRecovery, handleApiError } from './auth-recovery'
-import { DataPersistenceManager } from './data-persistence-manager'
-import { PerformanceMonitor } from './performance-monitor'
+/**
+ * Drive Service
+ * Handles document template operations for the unified signature system
+ */
+
+import { createClient } from '@supabase/supabase-js'
+import { DocumentTemplate, DocumentUploadData } from '@/types/drive'
+import { generateSignersFromSchemas, analyzeDocumentSignatureType } from './signature-field-utils'
 
 export class DriveService {
-  private static readonly DOCUMENTS_BUCKET = 'documents'
-  private static readonly TEMPLATES_BUCKET = 'templates'
-  private static readonly TABLE_NAME = 'document_templates'
+  private static supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
 
   /**
-   * Upload PDF document to Supabase storage
+   * Get document templates for a user
    */
-  static async uploadDocument(file: File, userId: string): Promise<SupabaseStorageResponse> {
+  static async getDocumentTemplates(userId: string): Promise<DocumentTemplate[]> {
+    try {
+      // Get from both documents and document_templates tables
+      const [documentsResult, templatesResult] = await Promise.all([
+        this.supabase
+          .from('documents')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false }),
+        this.supabase
+          .from('document_templates')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+      ])
+
+      const documents = documentsResult.data || []
+      const templates = templatesResult.data || []
+
+      if (documentsResult.error && templatesResult.error) {
+        console.warn('Database queries failed, using mock data:', documentsResult.error, templatesResult.error)
+        return this.getMockDocuments()
+      }
+
+      // Transform both documents and templates to DocumentTemplate format
+      const allDocuments = [...documents, ...templates]
+
+      return allDocuments?.map(doc => {
+        // Calculate status based on schema availability
+        const metadata = doc.metadata || {}
+        const schemas = metadata.schemas || doc.schemas || []
+        const hasSchemas = Array.isArray(schemas) && schemas.length > 0
+
+        // For multi-signature documents, check if all signers have schemas
+        let isComplete = hasSchemas
+        if (metadata.signatureType === 'multi' && metadata.signers) {
+          const signers = metadata.signers || []
+          isComplete = hasSchemas && signers.every((signer: any, index: number) => {
+            const signerId = `signer_${index + 1}`
+            return schemas.some((s: any) => s.signerId === signerId)
+          })
+        }
+
+        // Normalize status to our allowed set
+        const rawStatus: string = doc.status || (isComplete ? 'ready' : 'draft')
+        const allowedStatuses = ['draft', 'ready', 'published', 'archived'] as const
+        const normalizedStatus = rawStatus === 'complete'
+          ? 'ready'
+          : rawStatus === 'completed'
+            ? 'ready'
+            : rawStatus === 'incomplete'
+              ? 'draft'
+              : (allowedStatuses as readonly string[]).includes(rawStatus)
+                ? (rawStatus as typeof allowedStatuses[number])
+                : 'draft'
+
+        return {
+          id: doc.id,
+          name: doc.name || doc.title || doc.file_name || 'Untitled Document',
+          type: doc.type || doc.document_type || 'template',
+          signature_type: doc.signature_type || 'single',
+          status: normalizedStatus,
+          pdf_url: doc.pdf_url || doc.file_url, // Handle both table structures
+          template_url: doc.template_url,
+          schemas: schemas,
+          signers: doc.signers || [],
+          created_at: doc.created_at,
+          updated_at: doc.updated_at,
+          user_id: doc.user_id,
+          // Additional fields
+          description: doc.description,
+          template_data: doc.template_data,
+          category: doc.category,
+          is_public: doc.is_public || false,
+          is_system_template: doc.is_system_template || false,
+          usage_count: doc.usage_count || 0,
+          completion_percentage: doc.completion_percentage || 0
+        }
+      }) || []
+
+    } catch (error) {
+      console.error('Error fetching document templates:', error)
+      return this.getMockDocuments()
+    }
+  }
+
+  /**
+   * Upload document to Supabase storage
+   */
+  static async uploadDocument(file: File, userId: string): Promise<{ data?: { path: string }, error?: any }> {
     try {
       const fileExt = file.name.split('.').pop()
-      const fileName = `${userId}/${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`
+      const fileName = `${userId}/${Date.now()}.${fileExt}`
 
-      const { data, error } = await supabase.storage
-        .from(this.DOCUMENTS_BUCKET)
-        .upload(fileName, file, {
-          cacheControl: '3600',
-          upsert: false
-        })
-
-      return { data, error }
-    } catch (error) {
-      console.error('Error uploading document:', error)
-      return { data: null, error }
-    }
-  }
-
-  /**
-   * Get signed URL for document preview
-   */
-  static async getDocumentUrl(path: string): Promise<string | null> {
-    try {
-      const { data, error } = await supabase.storage
-        .from(this.DOCUMENTS_BUCKET)
-        .createSignedUrl(path, 3600) // 1 hour expiry
+      const { data, error } = await this.supabase.storage
+        .from('documents')
+        .upload(fileName, file)
 
       if (error) {
-        console.error('Error getting signed URL:', error)
-        return null
+        console.error('Upload error:', error)
+        return { error }
       }
 
-      return data.signedUrl
+      return { data: { path: data.path } }
     } catch (error) {
-      console.error('Error getting document URL:', error)
-      return null
+      console.error('Upload error:', error)
+      return { error }
     }
   }
 
-  /**
-   * Test storage access for current user
-   */
-  static async testStorageAccess(userId: string): Promise<{ success: boolean, error?: string }> {
-    try {
-      console.log('Testing storage access for user:', userId)
 
-      // Test creating a simple file
-      const testFileName = `${userId}/test-${Date.now()}.json`
-      const testData = { test: true, timestamp: Date.now() }
-      const testBlob = new Blob([JSON.stringify(testData)], { type: 'application/json' })
-
-      console.log('Testing upload to templates bucket with file:', testFileName)
-
-      const { data, error } = await supabase.storage
-        .from(this.TEMPLATES_BUCKET)
-        .upload(testFileName, testBlob, { upsert: true })
-
-      if (error) {
-        console.error('Storage test failed:', error)
-        return { success: false, error: error.message }
-      }
-
-      console.log('Storage test successful:', data)
-
-      // Clean up test file
-      await supabase.storage.from(this.TEMPLATES_BUCKET).remove([testFileName])
-
-      return { success: true }
-    } catch (error) {
-      console.error('Storage test exception:', error)
-      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
-    }
-  }
 
   /**
-   * Ensure storage buckets exist
-   */
-  static async ensureBucketsExist(): Promise<void> {
-    try {
-      // Check if buckets exist
-      const { data: buckets, error: listError } = await supabase.storage.listBuckets()
-
-      if (listError) {
-        console.error('Error listing buckets:', listError)
-        return
-      }
-
-      const existingBuckets = buckets?.map(b => b.id) || []
-      console.log('Existing buckets:', existingBuckets)
-
-      // Create documents bucket if it doesn't exist
-      if (!existingBuckets.includes(this.DOCUMENTS_BUCKET)) {
-        console.log('Creating documents bucket...')
-        const { error: createError } = await supabase.storage.createBucket(this.DOCUMENTS_BUCKET, {
-          public: false,
-          fileSizeLimit: 52428800, // 50MB
-          allowedMimeTypes: ['application/pdf']
-        })
-        if (createError) {
-          console.error('Error creating documents bucket:', createError)
-        }
-      }
-
-      // Create templates bucket if it doesn't exist
-      if (!existingBuckets.includes(this.TEMPLATES_BUCKET)) {
-        console.log('Creating templates bucket...')
-        const { error: createError } = await supabase.storage.createBucket(this.TEMPLATES_BUCKET, {
-          public: false,
-          fileSizeLimit: 10485760, // 10MB
-          allowedMimeTypes: ['application/json']
-        })
-        if (createError) {
-          console.error('Error creating templates bucket:', createError)
-        }
-      }
-    } catch (error) {
-      console.error('Error ensuring buckets exist:', error)
-    }
-  }
-
-  /**
-   * Save template JSON to storage
-   */
-  static async saveTemplate(templateData: any, userId: string, documentId: string): Promise<SupabaseStorageResponse> {
-    try {
-      // Ensure buckets exist
-      await this.ensureBucketsExist()
-
-      // Validate inputs
-      if (!userId || !documentId) {
-        console.error('Invalid userId or documentId:', { userId, documentId })
-        return { data: null, error: new Error('Invalid userId or documentId') }
-      }
-
-      // Validate user ID format (should be UUID)
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      if (!uuidRegex.test(userId)) {
-        console.error('Invalid userId format (not UUID):', userId)
-        return { data: null, error: new Error('Invalid userId format') }
-      }
-
-      const fileName = `${userId}/${documentId}-template.json`
-      console.log('Saving template with filename:', fileName)
-      console.log('Template data:', templateData)
-      console.log('Template data type:', typeof templateData)
-      console.log('Template data schemas:', templateData.schemas)
-      console.log('Template data schemas structure:', JSON.stringify(templateData.schemas, null, 2))
-
-      const templateBlob = new Blob([JSON.stringify(templateData, null, 2)], {
-        type: 'application/json'
-      })
-
-      // Try upload with retry for RLS errors
-      let uploadResult = await supabase.storage
-        .from(this.TEMPLATES_BUCKET)
-        .upload(fileName, templateBlob, {
-          cacheControl: '3600',
-          upsert: true // Allow overwriting
-        })
-
-      // If RLS error, try to refresh auth and retry once
-      if (uploadResult.error && uploadResult.error.message?.includes('row-level security policy')) {
-        console.log('RLS error detected, refreshing auth and retrying...')
-
-        try {
-          // Refresh the session
-          const { error: refreshError } = await supabase.auth.refreshSession()
-          if (refreshError) {
-            console.error('Auth refresh failed:', refreshError)
-          } else {
-            console.log('Auth refreshed, retrying upload...')
-            // Retry the upload
-            uploadResult = await supabase.storage
-              .from(this.TEMPLATES_BUCKET)
-              .upload(fileName, templateBlob, {
-                cacheControl: '3600',
-                upsert: true
-              })
-          }
-        } catch (refreshErr) {
-          console.error('Error during auth refresh:', refreshErr)
-        }
-      }
-
-      if (uploadResult.error) {
-        console.error('Storage upload error:', uploadResult.error)
-        console.error('Error details:', {
-          message: uploadResult.error.message,
-          statusCode: uploadResult.error.statusCode,
-          error: uploadResult.error.error,
-          fileName: fileName,
-          bucket: this.TEMPLATES_BUCKET,
-          userId: userId
-        })
-      } else {
-        console.log('Template uploaded successfully:', uploadResult.data)
-      }
-
-      return { data: uploadResult.data, error: uploadResult.error }
-    } catch (error) {
-      console.error('Error saving template:', error)
-      return { data: null, error }
-    }
-  }
-
-  /**
-   * Create document template with file upload (unified workflow)
-   */
-  static async createDocumentTemplateWithFile(
-    documentData: {
-      name: string
-      type: string
-      category: string
-      description?: string
-      signature_type: 'single' | 'multi'
-    },
-    file: File,
-    userId: string
-  ): Promise<DocumentTemplate | null> {
-    try {
-      console.log('Creating document template with file upload for user:', userId)
-
-      // First upload the PDF file
-      const uploadResult = await this.uploadDocument(file, userId)
-
-      if (!uploadResult.success || !uploadResult.path) {
-        console.error('Failed to upload document:', uploadResult.error)
-        return null
-      }
-
-      // Create the template data structure
-      const templateData: DocumentUploadData = {
-        name: documentData.name,
-        type: documentData.type,
-        category: documentData.category,
-        description: documentData.description,
-        signature_type: documentData.signature_type
-      }
-
-      // Create the template record
-      return await this.createDocumentTemplate(templateData, uploadResult.path, userId)
-    } catch (error) {
-      console.error('Error in createDocumentTemplateWithFile:', error)
-      return null
-    }
-  }
-
-  /**
-   * Create document template record in database
+   * Create a new document template with upload data
    */
   static async createDocumentTemplate(
     documentData: DocumentUploadData,
     pdfPath: string,
-    userId: string
-  ): Promise<DocumentTemplate | null> {
+    userId: string,
+    userEmail?: string
+  ): Promise<DocumentTemplate> {
     try {
-      console.log('Creating document template for user:', userId)
-      console.log('PDF path:', pdfPath)
-      console.log('Document data:', documentData)
-      // Create document template with required fields
-      const documentTemplate = {
-        name: documentData.name,
-        type: documentData.type, // Add type as direct column (required by database)
-        category: documentData.category || 'General', // Add category field
-        template_data: {
-          // Store our document management data in template_data
-          signature_type: documentData.signature_type,
-          status: 'incomplete',
-          pdf_url: pdfPath,
-          schemas: []
-        },
-        user_id: userId
+      // Prepare the document data with only the fields that exist in the database
+      const documentInsertData: any = {
+        title: documentData.name,
+        file_name: documentData.name,
+        user_id: userId,
+        user_email: userEmail || 'user@example.com',
+        status: 'draft',
+        document_type: documentData.type,
+        category: documentData.category || 'Other',
+        signature_type: 'single', // Default to single, will be updated based on signers
+        description: `${documentData.type} - ${documentData.category || 'Other'}`,
+        completion_percentage: 0
       }
 
-      console.log('Creating document template with data:', documentTemplate)
+      // Add optional fields if they exist in the database schema
+      if (pdfPath) {
+        documentInsertData.file_url = pdfPath
+      }
 
-      const { data, error } = await supabase
-        .from(this.TABLE_NAME)
-        .insert([documentTemplate])
+      const { data: document, error } = await this.supabase
+        .from('documents')
+        .insert(documentInsertData)
         .select()
         .single()
 
       if (error) {
-        console.error('Error creating document template:', error)
-        console.error('Error details:', error)
-        console.error('Error message:', error.message)
-        console.error('Error code:', error.code)
-        console.error('Error hint:', error.hint)
-        console.error('Attempted to insert:', documentTemplate)
-        return null
+        throw new Error(error.message)
       }
 
-      // Invalidate cache
-      DataPersistenceManager.invalidateCache(`document_templates_${userId}`)
-
-      // Transform the response to match our DocumentTemplate interface
       return {
-        id: data.id,
-        name: data.name,
-        type: data.type || data.template_data?.type || data.category || 'Document', // Use direct type column first
-        signature_type: data.template_data?.signature_type || 'single',
-        status: data.template_data?.status || 'incomplete',
-        pdf_url: data.template_data?.pdf_url || '',
-        template_url: data.template_data?.template_url,
-        schemas: data.template_data?.schemas || [],
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        user_id: data.user_id,
-        description: data.description,
-        template_data: data.template_data,
-        category: data.category,
-        is_public: data.is_public,
-        is_system_template: data.is_system_template,
-        usage_count: data.usage_count
+        id: document.id,
+        name: document.title,
+        type: documentData.type,
+        category: documentData.category,
+        signature_type: 'single', // Will be determined by signers count
+        status: document.status,
+        pdf_url: document.file_url || pdfPath,
+        template_url: undefined,
+        schemas: [],
+        created_at: document.created_at,
+        updated_at: document.updated_at,
+        user_id: document.user_id,
+        description: document.description,
+        template_data: null,
+        is_public: false,
+        is_system_template: false,
+        usage_count: 0
       }
+
     } catch (error) {
-      console.error('Error creating document template:', error)
-      return null
+      console.error('Error creating document template with upload data:', error)
+      throw error
     }
   }
 
   /**
-   * Test database access and RLS policies
+   * Update a document template with partial updates
    */
-  static async testDatabaseAccess(documentId: string): Promise<any> {
+  static async updateDocumentTemplateFields(
+    documentId: string,
+    userId: string,
+    updates: Partial<DocumentTemplate>
+  ): Promise<DocumentTemplate> {
     try {
-      console.log('🧪 TESTING DATABASE ACCESS')
-
-      // Test 1: Check if we can read the document
-      const { data: readTest, error: readError } = await supabase
-        .from(this.TABLE_NAME)
-        .select('*')
+      const { data: document, error } = await this.supabase
+        .from('documents')
+        .update({
+          title: updates.name,
+          status: updates.status,
+          description: updates.description,
+          completion_percentage: updates.completion_percentage,
+          metadata: updates.metadata,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', documentId)
-        .single()
-
-      console.log('🧪 Read test result:', { data: readTest, error: readError })
-
-      // Test 2: Check current user
-      const { data: { user }, error: authError } = await supabase.auth.getUser()
-      console.log('🧪 Current user:', { user, authError })
-
-      // Test 3: Try a simple update (just updated_at)
-      const { data: updateTest, error: updateError } = await supabase
-        .from(this.TABLE_NAME)
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', documentId)
+        .eq('user_id', userId)
         .select()
         .single()
 
-      console.log('🧪 Simple update test:', { data: updateTest, error: updateError })
+      if (error) {
+        throw new Error(error.message)
+      }
 
       return {
-        readTest: { data: readTest, error: readError },
-        authTest: { user, authError },
-        updateTest: { data: updateTest, error: updateError }
+        id: document.id,
+        name: document.title,
+        status: document.status,
+        created_at: document.created_at,
+        updated_at: document.updated_at,
+        file_name: document.file_name,
+        file_url: document.file_url,
+        user_id: document.user_id,
+        metadata: document.metadata || {},
+        description: document.description,
+        document_type: document.document_type,
+        completion_percentage: document.completion_percentage
       }
+
     } catch (error) {
-      console.error('🧪 Database access test failed:', error)
+      console.error('Error updating document template:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Save a template JSON to storage (templates bucket) and return its path
+   */
+  static async saveTemplate(template: any, userId: string, documentId: string): Promise<{ data?: { path: string }, error?: any }> {
+    try {
+      // Get document info to ensure correct metadata
+      const { data: document } = await this.supabase
+        .from('documents')
+        .select('signature_type, title, category, document_type')
+        .eq('id', documentId)
+        .single()
+
+      if (!document) {
+        throw new Error('Document not found')
+      }
+
+      // Preserve complete PDFme template structure
+      const completeTemplate = {
+        basePdf: template.basePdf || null, // Preserve basePdf if exists
+        schemas: template.schemas || [],
+        // ✅ CRITICAL: Preserve signers array
+        signers: template.signers || [],
+        // ✅ CRITICAL: Preserve multiSignature flag
+        multiSignature: template.multiSignature || (template.signers && template.signers.length > 1) || document.signature_type === 'multi',
+        // Add metadata for compatibility
+        metadata: {
+          signature_type: document.signature_type,
+          document_type: document.document_type,
+          category: document.category,
+          title: document.title,
+          is_multi_signature: document.signature_type === 'multi',
+          created_at: new Date().toISOString(),
+          version: '1.0',
+          // Preserve any existing metadata
+          ...template.metadata
+        }
+      }
+
+      const fileName = `templates/${userId}/${documentId}/template.json`
+      const json = JSON.stringify(completeTemplate, null, 2)
+
+      // Upload to 'files' bucket (no MIME type restrictions)
+      const { data, error } = await this.supabase.storage
+        .from('files')
+        .upload(fileName, new Blob([json], { type: 'application/json' }), {
+          upsert: true
+        })
+
+      if (error) {
+        return { error }
+      }
+
+      return { data: { path: data!.path } }
+    } catch (error) {
+      console.error('Error saving template JSON to storage:', error)
       return { error }
     }
   }
 
   /**
-   * Update document template with schemas and template URL
+   * Quick storage access test: upload and delete a tiny file under the user folder in files bucket
+   */
+  static async testStorageAccess(userId: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const testPath = `test/${userId}/${Date.now()}.json`
+      const payload = new Blob([JSON.stringify({ ok: true, t: Date.now() })], { type: 'application/json' })
+
+      const upload = await this.supabase.storage
+        .from('files')
+        .upload(testPath, payload, { upsert: true })
+
+      if (upload.error) {
+        return { success: false, error: upload.error.message }
+      }
+
+      // Clean up
+      await this.supabase.storage.from('files').remove([testPath])
+      return { success: true }
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Unknown storage error' }
+    }
+  }
+
+  /**
+   * Validate template completion and return status
+   */
+  static validateTemplateCompletion(document: any): { status: string; completion_percentage: number } {
+    const hasSchemas = document.schemas && document.schemas.length > 0
+    const hasPdf = !!document.file_url || !!document.pdf_url
+
+    console.log('🔍 Validating template completion:', {
+      hasSchemas,
+      hasPdf,
+      schemasLength: document.schemas?.length,
+      signatureType: document.signature_type
+    })
+
+    if (!hasPdf) {
+      return { status: 'draft', completion_percentage: 0 }
+    }
+
+    if (!hasSchemas) {
+      return { status: 'draft', completion_percentage: 25 }
+    }
+
+    // Check for required signature fields
+    const hasSignatureField = document.schemas.some((schema: any) =>
+      schema.type === 'signature' || schema.properties?.type === 'signature'
+    )
+
+    console.log('🔍 Has signature field:', hasSignatureField)
+
+    if (!hasSignatureField) {
+      return { status: 'draft', completion_percentage: 75 }
+    }
+
+    // For single signature, having schemas + signature field = ready
+    if (document.signature_type === 'single') {
+      return { status: 'ready', completion_percentage: 100 }
+    }
+
+    // For multi-signature, for now just check if we have schemas and signature fields
+    // TODO: Later enhance to check signer assignments
+    if (document.signature_type === 'multi') {
+      // Count signature fields - should have at least 2 for multi-signature
+      const signatureFields = document.schemas.filter((schema: any) =>
+        schema.type === 'signature' || schema.properties?.type === 'signature'
+      )
+
+      console.log('🔍 Multi-signature validation:', {
+        signatureFieldsCount: signatureFields.length,
+        totalSchemas: document.schemas.length
+      })
+
+      if (signatureFields.length >= 2) {
+        return { status: 'ready', completion_percentage: 100 }
+      } else {
+        return { status: 'draft', completion_percentage: 85 }
+      }
+    }
+
+    return { status: 'ready', completion_percentage: 100 }
+  }
+
+  /**
+   * Generate signers from signature fields in schemas
+   */
+  private static generateSignersFromSchemas(schemas: any[]): any[] {
+    const signatureFields: any[] = []
+
+    // Extract all signature fields from schemas
+    schemas.forEach((pageSchemas, pageIndex) => {
+      if (Array.isArray(pageSchemas)) {
+        pageSchemas.forEach((field, fieldIndex) => {
+          if (field.type === 'signature' || field.type === 'initial') {
+            signatureFields.push({
+              ...field,
+              page: pageIndex + 1,
+              fieldIndex
+            })
+          }
+        })
+      }
+    })
+
+    // Create signers based on unique signature fields
+    const signers: any[] = []
+    signatureFields.forEach((field, index) => {
+      signers.push({
+        id: `signer-${Date.now()}-${index}`,
+        order: index + 1,
+        name: field.name || `Signer ${index + 1}`,
+        email: '',
+        role: field.role || 'Signer',
+        is_required: true
+      })
+    })
+
+    return signers
+  }
+
+  /**
+   * Update document template with schemas and template path (overload for wrapper compatibility)
    */
   static async updateDocumentTemplate(
     documentId: string,
-    schemas: Schema[],
+    schemas: any[],
     templatePath?: string
-  ): Promise<DocumentTemplate | null> {
-    try {
-      // First get the current document to preserve existing template_data
-      const { data: currentDoc, error: fetchError } = await supabase
-        .from(this.TABLE_NAME)
-        .select('template_data')
-        .eq('id', documentId)
-        .single()
-
-      if (fetchError) {
-        console.error('Error fetching current document:', fetchError)
-        return null
-      }
-
-      // Update the template_data with new schemas and status
-      // Preserve existing status if already completed, or set to completed if has schemas
-      const currentStatus = currentDoc.template_data?.status || 'incomplete'
-      let newStatus = currentStatus
-
-      // Only change status in these cases:
-      // 1. If was incomplete and now has schemas -> completed
-      // 2. If was completed and now has no schemas -> incomplete (edge case)
-      if (currentStatus === 'incomplete' && schemas.length > 0) {
-        newStatus = 'completed'
-      } else if (currentStatus === 'completed' && schemas.length === 0) {
-        newStatus = 'incomplete'
-      }
-      // Otherwise preserve existing status (completed stays completed)
-
-      console.log('Status update:', { currentStatus, newStatus, schemasCount: schemas.length })
-
-      // Debug schema types being saved
-      console.log('🔍 SCHEMAS BEING SAVED TO DATABASE:')
-      schemas.forEach((schema, index) => {
-        console.log(`🔍 Schema ${index}:`, {
-          id: schema.id,
-          name: schema.name,
-          type: schema.type,
-          properties: schema.properties
-        })
-      })
-
-      const updatedTemplateData = {
-        ...currentDoc.template_data,
-        schemas,
-        status: newStatus,
-        template_url: templatePath || currentDoc.template_data?.template_url
-      }
-
-      const updateData = {
-        template_data: updatedTemplateData,
-        status: newStatus, // Also update the direct status column
-        updated_at: new Date().toISOString()
-      }
-
-      console.log('🔍 ATTEMPTING DATABASE UPDATE:')
-      console.log('🔍 Document ID:', documentId)
-      console.log('🔍 Update data:', JSON.stringify(updateData, null, 2))
-      console.log('🔍 Table name:', this.TABLE_NAME)
-      console.log('🔍 Schemas being saved:', schemas.length)
-
-      const { data, error } = await supabase
-        .from(this.TABLE_NAME)
-        .update(updateData)
-        .eq('id', documentId)
-        .select()
-        .single()
-
-      if (error) {
-        console.error('🚨 DATABASE UPDATE ERROR:', error)
-        console.error('🚨 Error details:', {
-          message: error.message,
-          code: error.code,
-          hint: error.hint,
-          details: error.details,
-          documentId: documentId,
-          updateData: updateData,
-          tableName: this.TABLE_NAME,
-          schemasCount: schemas.length
-        })
-
-        // Check if it's an auth-related error
-        if (AuthRecovery.isAuthError(error)) {
-          console.error('🚨 AUTH ERROR DETECTED - attempting recovery')
-          try {
-            await handleApiError(error, async () => {
-              // Retry the update operation
-              const { data: retryData, error: retryError } = await supabase
-                .from(this.TABLE_NAME)
-                .update(updateData)
-                .eq('id', documentId)
-                .select()
-                .single()
-
-              if (retryError) throw retryError
-              return retryData
-            })
-          } catch (recoveryError) {
-            console.error('🚨 Auth recovery failed:', recoveryError)
-            return null
-          }
-        }
-
-        // Check if it's an RLS error specifically
-        if (error.message && error.message.includes('row-level security policy')) {
-          console.error('🚨 RLS POLICY VIOLATION DETECTED')
-          console.error('🚨 This suggests an authentication or permission issue')
-
-          // Try to get current user info
-          const { data: { user }, error: authError } = await supabase.auth.getUser()
-          console.error('🚨 Current user:', user)
-          console.error('🚨 Auth error:', authError)
-
-          // If user is null, it's definitely an auth issue
-          if (!user) {
-            console.error('🚨 No authenticated user found - triggering auth recovery')
-            await AuthRecovery.forceRedirectToLogin('Authentication required to save document')
-            return null
-          }
-        }
-
-        return null
-      }
-
-      // Transform the response to match our interface
-      return {
-        id: data.id,
-        name: data.name,
-        type: data.type || data.template_data?.type || data.category || 'Document', // Use direct type column first
-        signature_type: data.template_data?.signature_type || 'single',
-        status: data.template_data?.status || 'incomplete',
-        pdf_url: data.template_data?.pdf_url || '',
-        template_url: data.template_data?.template_url,
-        schemas: data.template_data?.schemas || [],
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-        user_id: data.user_id,
-        description: data.description,
-        template_data: data.template_data,
-        category: data.category,
-        is_public: data.is_public,
-        is_system_template: data.is_system_template,
-        usage_count: data.usage_count
-      }
-    } catch (error) {
-      console.error('Error updating document template:', error)
-      return null
-    }
+  ): Promise<DocumentTemplate> {
+    return this.updateDocumentWithSchemas(documentId, schemas, templatePath)
   }
 
   /**
-   * Get all document templates for a user
+   * Update document with schemas, signers, and template path
    */
-  static async getDocumentTemplates(userId: string): Promise<DocumentTemplate[]> {
+  static async updateDocumentWithSchemas(
+    documentId: string,
+    schemas: any[],
+    templatePath?: string,
+    signers?: any[]
+  ): Promise<DocumentTemplate> {
     try {
-      const cacheKey = `document_templates_${userId}`
-
-      const data = await DataPersistenceManager.getDataWithCache(
-        cacheKey,
-        async () => {
-          return await PerformanceMonitor.measureAsync(
-            'fetch_document_templates',
-            async () => {
-              console.log('Fetching document templates for user:', userId)
-
-              const { data, error } = await supabase
-                .from(this.TABLE_NAME)
-                .select('*')
-                .eq('user_id', userId)
-                .order('created_at', { ascending: false })
-
-              if (error) {
-                console.error('Error fetching document templates:', error)
-                console.error('Error details:', error.message, error.code)
-                throw error
-              }
-
-              console.log('Found document templates:', data?.length || 0)
-              return data || []
-            },
-            { userId, cached: false }
-          )
-        },
-        5 * 60 * 1000 // 5 minutes cache
-      )
-
-      // Transform the data to match our DocumentTemplate interface
-      console.log('Raw database data:', data) // Debug all data
-      const templates = (data || []).map(item => {
-        console.log('Raw database item:', item) // Debug logging
-        console.log('Item template_data:', item.template_data)
-        console.log('Item template_data schemas:', item.template_data?.schemas)
-
-        const transformedItem = {
-          id: item.id,
-          name: item.name,
-          type: item.type || item.template_data?.type || item.category || 'Document', // Use direct type column first
-          signature_type: item.template_data?.signature_type || 'single',
-          status: item.template_data?.status || 'incomplete',
-          // Try multiple sources for PDF URL
-          pdf_url: item.template_data?.pdf_url ||
-            item.pdf_url ||
-            (item.template_data && typeof item.template_data === 'object' &&
-              Object.values(item.template_data).find((val: any) =>
-                typeof val === 'string' && val.includes('.pdf'))) || '',
-          template_url: item.template_data?.template_url || item.template_url,
-          schemas: item.template_data?.schemas || [],
-          created_at: item.created_at,
-          updated_at: item.updated_at,
-          user_id: item.user_id,
-          description: item.description,
-          template_data: item.template_data,
-          category: item.category,
-          is_public: item.is_public,
-          is_system_template: item.is_system_template,
-          usage_count: item.usage_count
-        }
-
-        console.log('Transformed item schemas:', transformedItem.schemas)
-        console.log('Transformed item status:', transformedItem.status)
-        console.log('Transformed item template_url:', transformedItem.template_url)
-
-        // Debug schema types being loaded
-        if (transformedItem.schemas && Array.isArray(transformedItem.schemas)) {
-          console.log('🔍 SCHEMAS LOADED FROM DATABASE:')
-          transformedItem.schemas.forEach((schema: any, index: number) => {
-            console.log(`🔍 Loaded Schema ${index}:`, {
-              id: schema.id,
-              name: schema.name,
-              type: schema.type,
-              properties: schema.properties
-            })
-          })
-        }
-
-        return transformedItem
-      })
-
-      console.log('Transformed templates:', templates)
-      return templates
-    } catch (error) {
-      console.error('Error fetching document templates:', error)
-      return []
-    }
-  }
-
-  /**
-   * Get single document template
-   */
-  static async getDocumentTemplate(documentId: string): Promise<DocumentTemplate | null> {
-    try {
-      const { data, error } = await supabase
-        .from(this.TABLE_NAME)
+      // Get current document to validate completion
+      const { data: currentDoc } = await this.supabase
+        .from('documents')
         .select('*')
         .eq('id', documentId)
         .single()
 
+      if (!currentDoc) {
+        throw new Error('Document not found')
+      }
+
+      // Validate completion and determine status
+      const documentWithSchemas = { ...currentDoc, schemas }
+      const { status, completion_percentage } = this.validateTemplateCompletion(documentWithSchemas)
+
+      console.log('🔍 Status validation result:', {
+        documentId,
+        currentStatus: currentDoc.status,
+        newStatus: status,
+        currentCompletion: currentDoc.completion_percentage,
+        newCompletion: completion_percentage,
+        schemasCount: schemas.length
+      })
+
+      // Ensure schemas is properly serialized for JSONB column
+      console.log('🔍 Raw schemas input:', schemas)
+      console.log('🔍 Schemas type:', typeof schemas)
+      console.log('🔍 Schemas is array:', Array.isArray(schemas))
+      console.log('🔍 Schemas length:', schemas?.length)
+
+      const serializedSchemas = Array.isArray(schemas) ? schemas : []
+      console.log('🔍 Serialized schemas:', serializedSchemas)
+
+      const updatePayload: any = {
+        schemas: serializedSchemas,
+        status,
+        completion_percentage,
+        updated_at: new Date().toISOString()
+      }
+
+      if (templatePath) {
+        updatePayload.template_url = templatePath
+      }
+
+      // Analyze signature fields and determine signature type automatically
+      const signatureAnalysis = analyzeDocumentSignatureType({ schemas: serializedSchemas })
+      console.log('🔍 Signature analysis for document update:', signatureAnalysis)
+
+      // Always update signature_type based on actual signature fields in schemas
+      updatePayload.signature_type = signatureAnalysis.signatureType
+
+      // Auto-generate signers from signature fields if not provided
+      let finalSigners = signers
+      if (!signers || signers.length === 0) {
+        finalSigners = this.generateSignersFromSchemas(schemas)
+      }
+
+      if (finalSigners && Array.isArray(finalSigners)) {
+        updatePayload.signers = finalSigners
+      }
+
+      console.log('🔍 Updating document with payload:', updatePayload)
+
+      const { data: document, error } = await this.supabase
+        .from('documents')
+        .update(updatePayload)
+        .eq('id', documentId)
+        .select('*')
+        .single()
+
+      console.log('🔍 Database update result:', { document, error })
+
       if (error) {
-        console.error('Error fetching document template:', error)
+        console.error('🔍 Database update error:', error)
+        throw new Error(error.message)
+      }
+
+      return {
+        id: document.id,
+        name: document.title || document.file_name || 'Untitled Document',
+        type: document.document_type || 'template',
+        signature_type: document.signature_type || 'single',
+        status: document.status,
+        pdf_url: document.file_url || document.pdf_url,
+        template_url: document.template_url,
+        schemas: document.schemas || [],
+        signers: document.signers || [],
+        created_at: document.created_at,
+        updated_at: document.updated_at,
+        user_id: document.user_id,
+        description: document.description,
+        template_data: document.template_data,
+        category: document.category,
+        is_public: document.is_public || false,
+        is_system_template: document.is_system_template || false,
+        usage_count: document.usage_count || 0,
+        completion_percentage: document.completion_percentage || 0
+      }
+
+    } catch (error) {
+      console.error('Error updating document with schemas:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Delete a document template
+   */
+  static async deleteDocumentTemplate(documentId: string, userId: string): Promise<void> {
+    try {
+      // Try deleting from documents first
+      let { error } = await this.supabase
+        .from('documents')
+        .delete()
+        .eq('id', documentId)
+        .eq('user_id', userId)
+
+      if (error) {
+        // If not found in documents, try document_templates
+        const templateDelete = await this.supabase
+          .from('document_templates')
+          .delete()
+          .eq('id', documentId)
+          .eq('user_id', userId)
+
+        if (templateDelete.error) {
+          throw new Error(templateDelete.error.message)
+        }
+      }
+
+    } catch (error) {
+      console.error('Error deleting document template:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Archive a document template
+   */
+  static async archiveDocumentTemplate(documentId: string, userId: string): Promise<void> {
+    try {
+      // Try updating in documents first
+      let { error } = await this.supabase
+        .from('documents')
+        .update({
+          status: 'archived',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', documentId)
+        .eq('user_id', userId)
+
+      if (error) {
+        // If not found in documents, try document_templates
+        const templateUpdate = await this.supabase
+          .from('document_templates')
+          .update({
+            status: 'archived',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', documentId)
+          .eq('user_id', userId)
+
+        if (templateUpdate.error) {
+          throw new Error(templateUpdate.error.message)
+        }
+      }
+    } catch (error) {
+      console.error('Error archiving document template:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Unarchive a document template (restore from archive)
+   */
+  static async unarchiveDocumentTemplate(documentId: string, userId: string): Promise<void> {
+    try {
+      // Get the document to determine what status to restore it to
+      let document = null
+      let isFromDocuments = false
+
+      // Try documents table first
+      const { data: docData, error: docError } = await this.supabase
+        .from('documents')
+        .select('schemas')
+        .eq('id', documentId)
+        .eq('user_id', userId)
+        .single()
+
+      if (!docError && docData) {
+        document = docData
+        isFromDocuments = true
+      } else {
+        // Try document_templates table
+        const { data: templateData, error: templateError } = await this.supabase
+          .from('document_templates')
+          .select('schemas')
+          .eq('id', documentId)
+          .eq('user_id', userId)
+          .single()
+
+        if (templateError) {
+          throw new Error(templateError.message)
+        }
+        document = templateData
+      }
+
+      // Determine the appropriate status based on schemas
+      const hasSchemas = document.schemas && Array.isArray(document.schemas) && document.schemas.length > 0
+      const newStatus = hasSchemas ? 'ready' : 'draft'
+
+      // Update the appropriate table
+      if (isFromDocuments) {
+        const { error } = await this.supabase
+          .from('documents')
+          .update({
+            status: newStatus,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', documentId)
+          .eq('user_id', userId)
+
+        if (error) {
+          throw new Error(error.message)
+        }
+      } else {
+        const { error } = await this.supabase
+          .from('document_templates')
+          .update({
+            status: newStatus,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', documentId)
+          .eq('user_id', userId)
+
+        if (error) {
+          throw new Error(error.message)
+        }
+      }
+    } catch (error) {
+      console.error('Error unarchiving document template:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Get a single document template
+   */
+  static async getDocumentTemplate(documentId: string, userId: string): Promise<DocumentTemplate | null> {
+    try {
+      const { data: document, error } = await this.supabase
+        .from('documents')
+        .select('*')
+        .eq('id', documentId)
+        .eq('user_id', userId)
+        .single()
+
+      if (error || !document) {
         return null
       }
 
-      return data
+      return {
+        id: document.id,
+        name: document.title,
+        status: document.status,
+        created_at: document.created_at,
+        updated_at: document.updated_at,
+        file_name: document.file_name,
+        file_url: document.file_url,
+        user_id: document.user_id,
+        metadata: document.metadata || {},
+        description: document.description,
+        document_type: document.document_type,
+        completion_percentage: document.completion_percentage
+      }
+
     } catch (error) {
       console.error('Error fetching document template:', error)
       return null
@@ -652,122 +727,227 @@ export class DriveService {
   }
 
   /**
-   * Delete document template and associated files
+   * Mock documents for development/fallback
    */
-  static async deleteDocumentTemplate(documentId: string, userId: string): Promise<boolean> {
+  private static getMockDocuments(): DocumentTemplate[] {
+    return [
+      {
+        id: 'mock-1',
+        name: 'Sample Contract Template',
+        type: 'contract',
+        signature_type: 'single',
+        status: 'completed',
+        pdf_url: '/mock/sample-contract.pdf',
+        template_url: undefined,
+        schemas: [],
+        created_at: new Date(Date.now() - 86400000).toISOString(),
+        updated_at: new Date(Date.now() - 86400000).toISOString(),
+        user_id: 'mock-user',
+        description: 'A sample contract template for testing'
+      },
+      {
+        id: 'mock-2',
+        name: 'NDA Template',
+        type: 'nda',
+        signature_type: 'single',
+        status: 'completed',
+        pdf_url: '/mock/nda-template.pdf',
+        template_url: undefined,
+        schemas: [],
+        created_at: new Date(Date.now() - 172800000).toISOString(),
+        updated_at: new Date(Date.now() - 172800000).toISOString(),
+        user_id: 'mock-user',
+        description: 'Non-disclosure agreement template'
+      },
+      {
+        id: 'mock-3',
+        name: 'Service Agreement Draft',
+        type: 'service_agreement',
+        signature_type: 'single',
+        status: 'draft',
+        pdf_url: '/mock/service-agreement.pdf',
+        template_url: undefined,
+        schemas: [],
+        created_at: new Date(Date.now() - 259200000).toISOString(),
+        updated_at: new Date(Date.now() - 259200000).toISOString(),
+        user_id: 'mock-user',
+        description: 'Service agreement template in progress'
+      }
+    ]
+  }
+
+  /**
+   * Get document statistics
+   */
+  static async getDocumentStats(userId: string): Promise<{
+    total: number
+    completed: number
+    draft: number
+    pending: number
+    expired: number
+    cancelled: number
+  }> {
     try {
-      // First get the document to know which files to delete
-      const document = await this.getDocumentTemplate(documentId)
-      if (!document) return false
+      const documents = await this.getDocumentTemplates(userId)
 
-      // Delete files from storage
-      const filesToDelete = [document.pdf_url]
-      if (document.template_url) {
-        filesToDelete.push(document.template_url)
+      return {
+        total: documents.length,
+        completed: documents.filter(doc => doc.status === 'completed').length,
+        draft: documents.filter(doc => doc.status === 'draft').length,
+        pending: documents.filter(doc => doc.status === 'pending').length,
+        expired: documents.filter(doc => doc.status === 'expired').length,
+        cancelled: documents.filter(doc => doc.status === 'cancelled').length
       }
 
-      await supabase.storage
-        .from(this.DOCUMENTS_BUCKET)
-        .remove(filesToDelete)
-
-      // Delete database record
-      const { error } = await supabase
-        .from(this.TABLE_NAME)
-        .delete()
-        .eq('id', documentId)
-        .eq('user_id', userId)
-
-      if (error) {
-        console.error('Error deleting document template:', error)
-        return false
-      }
-
-      return true
     } catch (error) {
-      console.error('Error deleting document template:', error)
-      return false
+      console.error('Error getting document stats:', error)
+      return { total: 0, completed: 0, incomplete: 0, pending: 0 }
     }
   }
 
   /**
-   * Get template JSON from storage
+   * Get document URL from path
    */
-  static async getTemplateJson(templatePath: string): Promise<any | null> {
+  static async getDocumentUrl(pdfPath: string): Promise<string | null> {
     try {
-      console.log('=== TEMPLATE JSON DOWNLOAD ===')
-      console.log('Downloading template from path:', templatePath)
-      console.log('Template path type:', typeof templatePath)
-      console.log('Template path length:', templatePath.length)
-      console.log('Using bucket:', this.TEMPLATES_BUCKET)
+      if (!pdfPath) return null
 
-      const { data, error } = await supabase.storage
-        .from(this.TEMPLATES_BUCKET)
-        .download(templatePath)
-
-      if (error) {
-        console.error('Storage download error:', error)
-        console.error('Error details:', {
-          message: error.message,
-          statusCode: error.statusCode,
-          error: error.error
-        })
-        return null
+      // If it's an absolute HTTP(S) URL, return as is
+      if (pdfPath.startsWith('http')) {
+        return pdfPath
       }
 
-      if (!data) {
-        console.error('No data returned from storage download')
-        return null
-      }
-
-      console.log('Download successful, data type:', typeof data)
-      console.log('Data size:', data.size)
-
-      const text = await data.text()
-      console.log('Template JSON text length:', text.length)
-      console.log('Template JSON text preview:', text.substring(0, 200))
-
-      if (!text || text.trim() === '') {
-        console.error('Template JSON is empty')
-        return null
-      }
-
-      let parsed
-      try {
-        parsed = JSON.parse(text)
-        console.log('JSON parsing successful')
-        console.log('Parsed template type:', typeof parsed)
-        console.log('Parsed template keys:', Object.keys(parsed))
-
-        if (parsed.schemas) {
-          console.log('Template has schemas:', Array.isArray(parsed.schemas))
-          console.log('Schemas length:', parsed.schemas.length)
-
-          if (Array.isArray(parsed.schemas)) {
-            let totalFields = 0
-            parsed.schemas.forEach((pageSchemas: any[], pageIndex: number) => {
-              if (Array.isArray(pageSchemas)) {
-                console.log(`Downloaded template page ${pageIndex}: ${pageSchemas.length} fields`)
-                totalFields += pageSchemas.length
-              }
-            })
-            console.log('Total fields in downloaded template:', totalFields)
-          }
-        } else {
-          console.warn('Downloaded template has no schemas property')
+      // If it's an app-relative path like "/mock/sample.pdf", build a full URL
+      if (pdfPath.startsWith('/')) {
+        if (typeof window !== 'undefined') {
+          return `${window.location.origin}${pdfPath}`
         }
-
-        console.log('Parsed template JSON:', parsed)
-        console.log('=== END TEMPLATE JSON DOWNLOAD ===')
-        return parsed
-      } catch (parseError) {
-        console.error('JSON parsing failed:', parseError)
-        console.error('Text that failed to parse:', text)
         return null
       }
+
+      // Prefer a signed URL (works for private buckets too)
+      const signed = await this.supabase.storage
+        .from('documents')
+        .createSignedUrl(pdfPath, 60 * 10) // 10 minutes
+
+      if (signed.data?.signedUrl) {
+        return signed.data.signedUrl
+      }
+
+      // Fallback to public URL (if bucket is public)
+      const { data } = this.supabase.storage
+        .from('documents')
+        .getPublicUrl(pdfPath)
+
+      return data.publicUrl || null
+
     } catch (error) {
-      console.error('=== TEMPLATE JSON DOWNLOAD FAILED ===')
-      console.error('Error in getTemplateJson:', error)
-      console.error('Template path:', templatePath)
+      console.error('Error getting document URL:', error)
+      return null
+    }
+  }
+
+  /**
+   * Get PDF data as ArrayBuffer for PDFme
+   */
+  static async getPdfData(pdfPath: string): Promise<ArrayBuffer | null> {
+    try {
+      if (!pdfPath) throw new Error('Empty PDF path')
+
+      // If it's an absolute URL or app-relative path (e.g. /mock/foo.pdf), resolve and fetch directly
+      if (pdfPath.startsWith('http') || pdfPath.startsWith('/')) {
+        const url = await this.getDocumentUrl(pdfPath)
+        if (!url) throw new Error('Unable to resolve PDF URL')
+        const noCacheUrl = url.includes('?') ? `${url}&_=${Date.now()}` : `${url}?_=${Date.now()}`
+        const response = await fetch(noCacheUrl, { cache: 'no-store' })
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`)
+        }
+        return await response.arrayBuffer()
+      }
+
+      // Otherwise, treat as a storage object path and use Supabase SDK download (auth-aware)
+      const { data, error } = await this.supabase.storage
+        .from('documents')
+        .download(pdfPath)
+
+      if (error || !data) {
+        throw new Error(error?.message || 'Failed to download PDF from storage')
+      }
+
+      return await data.arrayBuffer()
+
+    } catch (error) {
+      console.error('Error getting PDF data for path:', pdfPath, error)
+      return null
+    }
+  }
+
+  /**
+   * Get template JSON from URL
+   */
+  static async getTemplateJson(templateUrl: string): Promise<any> {
+    try {
+      if (!templateUrl) {
+        console.log('No template URL provided, returning null')
+        return null
+      }
+
+      console.log('Fetching template from URL:', templateUrl)
+      console.log('Template URL type:', typeof templateUrl)
+      console.log('Template URL length:', templateUrl?.length)
+      console.log('Template URL starts with templates/:', templateUrl?.startsWith('templates/'))
+
+      // Convert the template URL to use our API route
+      // Get the current origin (handles different ports dynamically)
+      const currentOrigin = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3001'
+
+      // Handle both relative and absolute URLs
+      let apiUrl = templateUrl
+      if (templateUrl.startsWith('http://localhost:3000/') || templateUrl.startsWith('http://localhost:3001/')) {
+        // Absolute URL: http://localhost:XXXX/user_id/doc_id/template.json
+        const pathPart = templateUrl.replace(/^http:\/\/localhost:\d+\//, '')
+        apiUrl = `${currentOrigin}/api/templates/${pathPart}`
+      } else {
+        // templateUrl is like: "templates/userId/documentId/template.json"
+        // API route expects: "/api/templates/templates/userId/documentId/template.json"
+        // So we need to pass the templateUrl as-is to the API route
+        apiUrl = `${currentOrigin}/api/templates/${templateUrl}`
+      }
+
+      // Add cache busting to ensure fresh template loading
+      const cacheBuster = `?t=${Date.now()}&r=${Math.random()}`
+      const finalUrl = `${apiUrl}${cacheBuster}`
+
+      console.log('Using API route with cache busting:', finalUrl)
+      const response = await fetch(finalUrl, {
+        cache: 'no-store',
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        }
+      })
+
+      if (!response.ok) {
+        if (response.status === 404) {
+          console.log('Template not found (404), this is normal for new documents')
+          return null
+        }
+        if (response.status === 400) {
+          console.log('Template request failed (400 Bad Request), likely storage issue - falling back to database schemas')
+          return null
+        }
+        console.warn(`Template fetch failed with status ${response.status}: ${response.statusText}`)
+        return null
+      }
+
+      const templateData = await response.json()
+      console.log('Successfully loaded template JSON:', templateData)
+      return templateData
+
+    } catch (error) {
+      console.error('Error getting template JSON:', error)
       return null
     }
   }

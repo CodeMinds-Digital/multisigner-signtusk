@@ -1,3 +1,8 @@
+/**
+ * Drive Types
+ * Type definitions for document templates and drive operations
+ */
+
 export type DocumentStatus = 'draft' | 'ready' | 'pending' | 'completed' | 'expired' | 'cancelled' | 'archived'
 
 export interface DocumentTemplate {

@@ -74,12 +74,12 @@ export function Sidebar({
           </li>
           <li>
             <Link
-              href="/document-management"
-              className={`flex items-center px-3 py-2 rounded-md ${isActive('/document-management') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
+              href="/drive"
+              className={`flex items-center px-3 py-2 rounded-md ${isActive('/drive') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
                 }`}
             >
               <Workflow className="w-5 h-5 mr-3" />
-              Document Management
+              Drive
             </Link>
           </li>
           <li>

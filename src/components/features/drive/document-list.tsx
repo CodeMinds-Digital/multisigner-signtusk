@@ -1,8 +1,8 @@
 'use client'
 
 import React from 'react'
-import { DocumentTemplate } from '@/types/document-management'
-import { DocumentManagementService } from '@/lib/document-management-service'
+import { DocumentTemplate } from '@/types/drive'
+import { DriveService } from '@/lib/drive-service'
 import { FileText, Calendar, User, Eye, Edit } from 'lucide-react'
 import { getStatusConfig } from '@/utils/document-status'
 import { analyzeDocumentSignatureType } from '@/lib/signature-field-utils'

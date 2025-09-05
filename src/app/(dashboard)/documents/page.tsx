@@ -31,7 +31,7 @@ export default function DocumentsPage() {
           className="bg-blue-600 hover:bg-blue-700"
         >
           <Upload className="w-4 h-4 mr-2" />
-          Upload Document
+          Request Signature
         </Button>
       </div>
 

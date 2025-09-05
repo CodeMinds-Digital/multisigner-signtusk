@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/components/providers/auth-provider'
-import { DocumentManagementService } from '@/lib/document-management-service'
+import { DriveService } from '@/lib/drive-service'
 import { DocumentMetadataService, DocumentType, DocumentCategory } from '@/lib/document-metadata-service'
-import { DocumentTemplate, DocumentUploadData } from '@/types/document-management'
+import { DocumentTemplate, DocumentUploadData } from '@/types/drive'
 import { X, Upload, FileText, Eye, CheckCircle } from 'lucide-react'
 
 interface AddDocumentModalProps {
@@ -108,7 +108,7 @@ export function AddDocumentModal({ onClose, onDocumentCreated }: AddDocumentModa
     setLoading(true)
     try {
       // Upload PDF to Supabase storage
-      const uploadResult = await DocumentManagementService.uploadDocument(selectedFile, user.id)
+      const uploadResult = await DriveService.uploadDocument(selectedFile, user.id)
 
       console.log('Upload result:', uploadResult)
 
@@ -131,7 +131,7 @@ export function AddDocumentModal({ onClose, onDocumentCreated }: AddDocumentModa
         userId: user.id
       })
 
-      const document = await DocumentManagementService.createDocumentTemplate(
+      const document = await DriveService.createDocumentTemplate(
         documentData,
         uploadResult.data.path,
         user.id
@@ -144,7 +144,7 @@ export function AddDocumentModal({ onClose, onDocumentCreated }: AddDocumentModa
       }
 
       // Get preview URL
-      const url = await DocumentManagementService.getDocumentUrl(document.pdf_url)
+      const url = await DriveService.getDocumentUrl(document.pdf_url)
 
       setUploadedDocument(document)
       setPreviewUrl(url)

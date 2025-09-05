@@ -1,7 +1,7 @@
 'use client'
 
 import { FileText, BarChart3 } from 'lucide-react'
-import { DocumentTemplate } from '@/types/document-management'
+import { DocumentTemplate } from '@/types/drive'
 import { STATUS_GROUPS, getDocumentCounts } from '@/utils/document-status'
 
 interface DocumentStatsImprovedProps {
@@ -86,12 +86,11 @@ export function DocumentStatsImproved({ documents, onFilterChange, activeFilter 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {/* Total Documents Card */}
-        <div 
-          className={`bg-white rounded-2xl border-2 p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-2 ${
-            activeFilter === 'all' 
-              ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg' 
+        <div
+          className={`bg-white rounded-2xl border-2 p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-2 ${activeFilter === 'all'
+              ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg'
               : 'border-gray-200 hover:border-blue-300'
-          }`}
+            }`}
           onClick={() => handleFilterClick('all')}
         >
           <div className="flex items-center justify-between mb-4">
@@ -125,9 +124,8 @@ export function DocumentStatsImproved({ documents, onFilterChange, activeFilter 
           return (
             <div
               key={group.label}
-              className={`bg-white rounded-2xl border-2 p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-2 ${colors.border} ${
-                isActive ? `${colors.bg} shadow-lg` : ''
-              }`}
+              className={`bg-white rounded-2xl border-2 p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-2 ${colors.border} ${isActive ? `${colors.bg} shadow-lg` : ''
+                }`}
               onClick={() => handleFilterClick(filterKey)}
             >
               <div className="flex items-center justify-between mb-4">
@@ -154,12 +152,12 @@ export function DocumentStatsImproved({ documents, onFilterChange, activeFilter 
                 <p className="text-sm font-semibold text-gray-700 mb-1">{group.label}</p>
                 <p className="text-xs text-gray-500">{group.description}</p>
               </div>
-              
+
               {/* Enhanced Progress bar */}
               {counts.total > 0 && count > 0 && (
                 <div className="mt-4">
                   <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
-                    <div 
+                    <div
                       className={`h-2 rounded-full transition-all duration-1000 ease-out ${colors.progressBar} relative`}
                       style={{ width: `${percentage}%` }}
                     >
@@ -195,7 +193,7 @@ export function DocumentStatsImproved({ documents, onFilterChange, activeFilter 
                 const count = counts[group.label.toLowerCase().replace(/\s+/g, '_')] || 0
                 const percentage = counts.total > 0 ? (count / counts.total) * 100 : 0
                 const colors = getColorClasses(group.label, false)
-                
+
                 return percentage > 0 ? (
                   <div
                     key={group.label}

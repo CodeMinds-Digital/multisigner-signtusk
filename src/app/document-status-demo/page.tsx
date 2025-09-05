@@ -1,7 +1,7 @@
 'use client'
 
-import { DocumentStats, DocumentStatsCompact } from '@/components/features/document-management/document-stats'
-import { DocumentTemplate } from '@/types/document-management'
+import { DocumentStats, DocumentStatsCompact } from '@/components/features/drive/document-stats'
+import { DocumentTemplate } from '@/types/drive'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { DOCUMENT_STATUS_CONFIG, STATUS_GROUPS } from '@/utils/document-status'
 

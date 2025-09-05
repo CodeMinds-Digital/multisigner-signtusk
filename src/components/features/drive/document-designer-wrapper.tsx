@@ -2,8 +2,8 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuth } from '@/components/providers/auth-provider'
-import { DocumentManagementService } from '@/lib/document-management-service'
-import { DocumentTemplate, Schema } from '@/types/document-management'
+import { DriveService } from '@/lib/drive-service'
+import { DocumentTemplate, Schema } from '@/types/drive'
 import { supabase } from '@/lib/supabase'
 import { ArrowLeft, Save, Eye, Download } from 'lucide-react'
 import { AntdWarningSuppressor } from '@/components/ui/antd-warning-suppressor'
@@ -151,7 +151,7 @@ export function DocumentDesignerWrapper({
       // Force refresh document data to get latest template_url
       console.log('🔄 Refreshing document data to ensure latest template_url...')
       try {
-        const refreshedDoc = await DocumentManagementService.getDocumentTemplate(document.id, user?.id || '')
+        const refreshedDoc = await DriveService.getDocumentTemplate(document.id, user?.id || '')
         if (refreshedDoc && refreshedDoc.template_url !== document.template_url) {
           console.log('🔄 Document template_url updated:', {
             old: document.template_url,
@@ -273,7 +273,7 @@ export function DocumentDesignerWrapper({
         throw new Error('No PDF path found in document')
       }
 
-      const pdfUrl = await DocumentManagementService.getDocumentUrl(pdfPath)
+      const pdfUrl = await DriveService.getDocumentUrl(pdfPath)
       console.log('Generated PDF URL:', pdfUrl)
       if (!pdfUrl) {
         throw new Error('Unable to load PDF document')
@@ -362,7 +362,7 @@ export function DocumentDesignerWrapper({
           console.log('🔄 Cache cleared, loading fresh template data...')
 
           // Force fresh template loading (cache already cleared above)
-          const existingTemplate = await DocumentManagementService.getTemplateJson(document.template_url)
+          const existingTemplate = await DriveService.getTemplateJson(document.template_url)
           console.log('Loaded existing template:', existingTemplate)
           console.log('Existing template type:', typeof existingTemplate)
           console.log('Existing template keys:', existingTemplate ? Object.keys(existingTemplate) : 'none')
@@ -1389,7 +1389,7 @@ export function DocumentDesignerWrapper({
       // Save template JSON to storage
       // Test storage access first
       console.log('Testing storage access...')
-      const storageTest = await DocumentManagementService.testStorageAccess(user.id)
+      const storageTest = await DriveService.testStorageAccess(user.id)
       console.log('Storage test result:', storageTest)
 
       if (!storageTest.success) {
@@ -1404,7 +1404,7 @@ export function DocumentDesignerWrapper({
       console.log('User ID:', user.id)
       console.log('Document ID:', document.id)
 
-      const templateResult = await DocumentManagementService.saveTemplate(
+      const templateResult = await DriveService.saveTemplate(
         currentTemplate,
         user.id,
         document.id
@@ -1427,7 +1427,7 @@ export function DocumentDesignerWrapper({
       console.log('Schemas to save:', schemas)
       console.log('Template path:', templatePath)
 
-      const updatedDocument = await DocumentManagementService.updateDocumentTemplate(
+      const updatedDocument = await DriveService.updateDocumentTemplate(
         document.id,
         schemas,
         templatePath
@@ -1468,7 +1468,7 @@ export function DocumentDesignerWrapper({
   // Preview document
   const handlePreview = async () => {
     try {
-      const url = await DocumentManagementService.getDocumentUrl(document.pdf_url)
+      const url = await DriveService.getDocumentUrl(document.pdf_url)
       if (url) {
         window.open(url, '_blank')
       } else {

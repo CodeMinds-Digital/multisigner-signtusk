@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect } from 'react'
 import { MoreVertical, Archive, Trash2, Eye, Edit, ArchiveRestore } from 'lucide-react'
-import { DocumentTemplate } from '@/types/document-management'
+import { DocumentTemplate } from '@/types/drive'
 
 interface DocumentActionsMenuProps {
   documentItem: DocumentTemplate

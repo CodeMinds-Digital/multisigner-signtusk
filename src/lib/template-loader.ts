@@ -1,5 +1,5 @@
-import { DocumentManagementService } from './document-management-service'
-import { DocumentTemplate, Schema } from '@/types/document-management'
+import { DriveService } from './drive-service'
+import { DocumentTemplate, Schema } from '@/types/drive'
 
 export interface LoadedTemplate {
   basePdf: ArrayBuffer
@@ -18,7 +18,7 @@ export class TemplateLoader {
 
     // Get PDF data first
     const pdfData = await this.loadPdfData(document)
-    
+
     // Try to load from template JSON first
     if (document.template_url) {
       const templateResult = await this.loadFromTemplateJson(document.template_url, pdfData)
@@ -50,7 +50,7 @@ export class TemplateLoader {
    */
   private static async loadPdfData(document: DocumentTemplate): Promise<ArrayBuffer> {
     console.log('Loading PDF data...')
-    
+
     let pdfPath = document.pdf_url ||
       document.template_data?.pdf_url ||
       (document.template_data && typeof document.template_data === 'object' &&
@@ -61,8 +61,8 @@ export class TemplateLoader {
       throw new Error('No PDF path found in document')
     }
 
-    const pdfData = await DocumentManagementService.getPdfData(pdfPath)
-    
+    const pdfData = await DriveService.getPdfData(pdfPath)
+
     if (!pdfData || !(pdfData instanceof ArrayBuffer)) {
       throw new Error('Invalid PDF data - must be ArrayBuffer')
     }
@@ -75,14 +75,14 @@ export class TemplateLoader {
    * Load template from JSON file
    */
   private static async loadFromTemplateJson(
-    templateUrl: string, 
+    templateUrl: string,
     pdfData: ArrayBuffer
   ): Promise<LoadedTemplate | null> {
     try {
       console.log('Loading from template JSON:', templateUrl)
-      
-      const existingTemplate = await DocumentManagementService.getTemplateJson(templateUrl)
-      
+
+      const existingTemplate = await DriveService.getTemplateJson(templateUrl)
+
       if (!existingTemplate?.schemas || !Array.isArray(existingTemplate.schemas)) {
         console.log('Template JSON invalid or missing schemas')
         return null
@@ -117,11 +117,11 @@ export class TemplateLoader {
    * Load template from database schemas
    */
   private static async loadFromDatabase(
-    document: DocumentTemplate, 
+    document: DocumentTemplate,
     pdfData: ArrayBuffer
   ): Promise<LoadedTemplate> {
     console.log('Loading from database schemas...')
-    
+
     let pdfmeSchemas: any[][] = [[]] // Start with empty page 0
     let fieldCount = 0
 
@@ -195,7 +195,7 @@ export class TemplateLoader {
    * Validate and fix field properties for PDFme compatibility
    */
   static validateAndFixFields(schemas: any[][]): any[][] {
-    return schemas.map(pageSchemas => 
+    return schemas.map(pageSchemas =>
       pageSchemas.map(field => {
         // Ensure required properties exist
         field.position = field.position || { x: 0, y: 0 }
