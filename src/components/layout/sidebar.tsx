@@ -6,7 +6,6 @@ import {
   FileText,
   Pen,
   BarChart2,
-  LogOut,
   File,
   Clock,
   CheckCircle,
@@ -19,7 +18,6 @@ import {
   Workflow,
   Settings
 } from 'lucide-react'
-import { useAuth } from '@/components/providers/auth-provider'
 
 interface SidebarProps {
   waitingCount?: number
@@ -35,14 +33,9 @@ export function Sidebar({
   pendingCount = 0
 }: SidebarProps) {
   const pathname = usePathname()
-  const { signOut } = useAuth()
 
   // Function to determine if a link is active
   const isActive = (path: string) => pathname === path
-
-  const handleLogout = async () => {
-    await signOut()
-  }
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -224,15 +217,7 @@ export function Sidebar({
         </div>
       </nav>
 
-      <div className="p-4 border-t border-gray-200">
-        <button
-          onClick={handleLogout}
-          className="flex items-center text-gray-700 hover:text-gray-900 mt-4"
-        >
-          <LogOut className="w-5 h-5 mr-3" />
-          Logout
-        </button>
-      </div>
+
     </div>
   )
 }

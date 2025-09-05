@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
-import { Bell, User, LogOut, Settings, CheckCircle, Clock, AlertTriangle, X, ChevronRight, FileText, Pen, HandCoins } from 'lucide-react'
+import { Bell, User, LogOut, Settings, CheckCircle, Clock, AlertTriangle, X, ChevronRight, FileText, Pen } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/providers/auth-provider'
 import { Button } from '@/components/ui/button'
@@ -32,6 +32,8 @@ export function Header({ userName, userSignature }: HeaderProps) {
   const userMenuRef = useRef<HTMLDivElement>(null)
   const notificationsRef = useRef<HTMLDivElement>(null)
   const { user, signOut } = useAuth()
+
+
 
   // Fetch notifications from Supabase
   useEffect(() => {
@@ -208,7 +210,10 @@ export function Header({ userName, userSignature }: HeaderProps) {
       <div className="px-4 py-3 flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold text-gray-800">
-            Welcome back, {userName || user?.firstName || 'User'}
+            Welcome back, {userName ||
+              user?.full_name ||
+              (user?.first_name && user?.last_name ? `${user.first_name} ${user.last_name}` :
+                user?.first_name || 'User')}
           </h2>
         </div>
         <div className="flex items-center space-x-4">
@@ -324,7 +329,7 @@ export function Header({ userName, userSignature }: HeaderProps) {
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-medium border-2 border-white shadow-sm">
-                  {getInitials(userName || user?.firstName)}
+                  {getInitials(userName || user?.full_name || user?.first_name)}
                 </div>
               )}
             </button>
@@ -342,11 +347,11 @@ export function Header({ userName, userSignature }: HeaderProps) {
                       />
                     ) : (
                       <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center text-lg font-medium border-2 border-white shadow">
-                        {getInitials(userName || user?.firstName)}
+                        {getInitials(userName || user?.full_name || user?.first_name)}
                       </div>
                     )}
                     <div className="ml-3">
-                      <div className="font-medium text-gray-900">{userName || user?.firstName || "User"}</div>
+                      <div className="font-medium text-gray-900">{userName || user?.full_name || user?.first_name || "User"}</div>
                       <div className="text-sm text-gray-500">{user?.email}</div>
                     </div>
                   </div>
@@ -375,21 +380,14 @@ export function Header({ userName, userSignature }: HeaderProps) {
                     Profile
                   </Link>
                   <Link
-                    href="/sign-1"
+                    href="/signatures"
                     className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                     onClick={() => setIsUserMenuOpen(false)}
                   >
                     <Pen className="w-4 h-4 mr-2 text-gray-500" />
                     Signatures
                   </Link>
-                  <Link
-                    href="/pricing-plans"
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    onClick={() => setIsUserMenuOpen(false)}
-                  >
-                    <HandCoins className="w-4 h-4 mr-2 text-gray-500" />
-                    Pricing Plans
-                  </Link>
+
                   <button
                     onClick={() => {
                       setIsUserMenuOpen(false)

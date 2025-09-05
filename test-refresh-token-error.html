@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Refresh Token Error</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .test-section h3 {
+            color: #2563eb;
+            margin-top: 0;
+        }
+        button {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #1d4ed8;
+        }
+        .danger {
+            background-color: #dc2626;
+        }
+        .danger:hover {
+            background-color: #b91c1c;
+        }
+        .success {
+            background-color: #16a34a;
+        }
+        .success:hover {
+            background-color: #15803d;
+        }
+        .log {
+            background-color: #1f2937;
+            color: #f3f4f6;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.success {
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        .status.error {
+            background-color: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        .status.warning {
+            background-color: #fefce8;
+            color: #a16207;
+            border: 1px solid #fde68a;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Refresh Token Error Testing</h1>
+        <p>This page helps test the refresh token error handling in the SignTusk application.</p>
+        
+        <div class="test-section">
+            <h3>📋 Test Instructions</h3>
+            <ol>
+                <li>Open browser developer tools (F12)</li>
+                <li>Go to the Console tab to see error handling logs</li>
+                <li>Use the buttons below to simulate different error scenarios</li>
+                <li>Navigate to <a href="http://localhost:3000/dashboard" target="_blank">Dashboard</a> to test redirects</li>
+                <li>Check that errors are handled gracefully without infinite loops</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Storage Manipulation</h3>
+            <button onclick="corruptAuthStorage()">Corrupt Auth Storage</button>
+            <button onclick="addInvalidRefreshToken()">Add Invalid Refresh Token</button>
+            <button onclick="clearAllAuthStorage()" class="danger">Clear All Auth Storage</button>
+            <button onclick="viewAuthStorage()" class="success">View Auth Storage</button>
+            <div id="storageLog" class="log" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>🚀 Navigation Tests</h3>
+            <button onclick="testDashboardAccess()">Test Dashboard Access</button>
+            <button onclick="testDocumentsAccess()">Test Documents Access</button>
+            <button onclick="testProfileAccess()">Test Profile Access</button>
+            <button onclick="goToLogin()" class="success">Go to Login</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <div id="testResults"></div>
+        </div>
+    </div>
+
+    <script>
+        let testResults = [];
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            console.log(`[${timestamp}] ${message}`);
+            
+            const resultsDiv = document.getElementById('testResults');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            resultsDiv.appendChild(statusDiv);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function corruptAuthStorage() {
+            try {
+                // Add corrupted Supabase auth data
+                localStorage.setItem('supabase.auth.token', '{"invalid": "json"');
+                localStorage.setItem('supabase.auth.refresh_token', 'invalid_refresh_token_12345');
+                sessionStorage.setItem('supabase.auth.session', '{"corrupted": true}');
+                
+                log('✅ Auth storage corrupted successfully', 'warning');
+                log('Navigate to dashboard to test error handling', 'info');
+            } catch (error) {
+                log(`❌ Error corrupting storage: ${error.message}`, 'error');
+            }
+        }
+
+        function addInvalidRefreshToken() {
+            try {
+                const fakeSession = {
+                    access_token: 'fake_access_token_12345',
+                    refresh_token: 'fake_refresh_token_67890',
+                    expires_at: Date.now() - 1000, // Expired
+                    user: {
+                        id: 'fake_user_id',
+                        email: 'test@example.com'
+                    }
+                };
+                
+                localStorage.setItem('supabase.auth.token', JSON.stringify(fakeSession));
+                log('✅ Invalid refresh token added', 'warning');
+                log('This should trigger refresh token errors', 'info');
+            } catch (error) {
+                log(`❌ Error adding invalid token: ${error.message}`, 'error');
+            }
+        }
+
+        function clearAllAuthStorage() {
+            try {
+                // Clear all Supabase auth keys
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('supabase.')) {
+                        keysToRemove.push(key);
+                    }
+                }
+                keysToRemove.forEach(key => localStorage.removeItem(key));
+
+                // Clear session storage
+                const sessionKeysToRemove = [];
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
+                    if (key && key.startsWith('supabase.')) {
+                        sessionKeysToRemove.push(key);
+                    }
+                }
+                sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
+
+                log('✅ All auth storage cleared', 'success');
+            } catch (error) {
+                log(`❌ Error clearing storage: ${error.message}`, 'error');
+            }
+        }
+
+        function viewAuthStorage() {
+            const storageLog = document.getElementById('storageLog');
+            let content = 'LocalStorage:\n';
+            
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('supabase.')) {
+                    const value = localStorage.getItem(key);
+                    content += `${key}: ${value}\n`;
+                }
+            }
+            
+            content += '\nSessionStorage:\n';
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && key.startsWith('supabase.')) {
+                    const value = sessionStorage.getItem(key);
+                    content += `${key}: ${value}\n`;
+                }
+            }
+            
+            if (content === 'LocalStorage:\n\nSessionStorage:\n') {
+                content = 'No Supabase auth data found in storage';
+            }
+            
+            storageLog.textContent = content;
+            storageLog.style.display = 'block';
+            log('📋 Auth storage contents displayed', 'info');
+        }
+
+        function testDashboardAccess() {
+            log('🔄 Testing dashboard access...', 'info');
+            window.open('http://localhost:3000/dashboard', '_blank');
+        }
+
+        function testDocumentsAccess() {
+            log('🔄 Testing documents access...', 'info');
+            window.open('http://localhost:3000/documents', '_blank');
+        }
+
+        function testProfileAccess() {
+            log('🔄 Testing profile access...', 'info');
+            window.open('http://localhost:3000/profile', '_blank');
+        }
+
+        function goToLogin() {
+            log('🔄 Navigating to login...', 'info');
+            window.open('http://localhost:3000/login', '_blank');
+        }
+
+        // Initialize
+        log('🚀 Refresh Token Error Testing Tool Loaded', 'success');
+        log('Open browser console to see detailed error handling logs', 'info');
+    </script>
+</body>
+</html>

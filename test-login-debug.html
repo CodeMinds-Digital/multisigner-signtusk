@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login Debug Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .debug-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .debug-section h3 {
+            color: #2563eb;
+            margin-top: 0;
+        }
+        .console-output {
+            background-color: #1f2937;
+            color: #f3f4f6;
+            padding: 15px;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-top: 10px;
+            white-space: pre-wrap;
+        }
+        .instructions {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .instructions h4 {
+            margin-top: 0;
+            color: #92400e;
+        }
+        .test-credentials {
+            background: #dcfce7;
+            border: 1px solid #16a34a;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .test-credentials h4 {
+            margin-top: 0;
+            color: #166534;
+        }
+        code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐛 Login Debug Test</h1>
+        <p>This page helps debug the login functionality with detailed console logging.</p>
+        
+        <div class="test-credentials">
+            <h4>🔑 Test Credentials Available</h4>
+            <p>Based on the database query, these users are available for testing:</p>
+            <ul>
+                <li><strong>ramalai13@gmail.com</strong> - Created: 2025-08-23, Email confirmed ✅</li>
+                <li><strong>testuser@gmail.com</strong> - Created: 2025-09-04, Email confirmed ✅</li>
+                <li><strong>test@example.com</strong> - Created: 2025-09-04, Email confirmed ✅</li>
+                <li><strong>cmd@codeminds.digital</strong> - Created: 2025-08-23, Email confirmed ✅</li>
+                <li><strong>ram@codeminds.digital</strong> - Created: 2025-08-25, Email confirmed ✅</li>
+            </ul>
+            <p><em>Note: You'll need to know the actual passwords for these accounts to test.</em></p>
+        </div>
+
+        <div class="instructions">
+            <h4>📋 Debug Testing Steps</h4>
+            <ol>
+                <li><strong>Open the login page:</strong> <a href="http://localhost:3000/login?redirectTo=%2Fdocuments" target="_blank">http://localhost:3000/login?redirectTo=%2Fdocuments</a></li>
+                <li><strong>Open Developer Tools:</strong> Press F12 and go to the Console tab</li>
+                <li><strong>Enter test credentials:</strong> Use one of the emails above with the correct password</li>
+                <li><strong>Click Login:</strong> Watch the console for detailed debug logs</li>
+                <li><strong>Analyze the output:</strong> Look for error messages and authentication flow</li>
+            </ol>
+        </div>
+
+        <div class="debug-section">
+            <h3>🔍 What to Look For in Console</h3>
+            <p>The debug logs will show the following flow:</p>
+            <div class="console-output">🔄 Login attempt started: {email: "test@example.com", redirectTo: "/documents"}
+🔄 Auth Provider: signIn started {email: "test@example.com", redirectTo: "/documents"}
+🔄 Auth Provider: Attempting Supabase signInWithPassword...
+🔄 Auth Provider: Supabase response: {data: true, error: undefined}
+✅ Auth Provider: Supabase auth successful, checking user profile...
+🔄 Auth Provider: Fetching user profile for: test@example.com
+🔄 Auth Provider: Profile query result: {profile: true, error: undefined}
+✅ Auth Provider: Profile found, setting user and redirecting
+🔄 Auth Provider: Redirecting to: /documents
+✅ Login successful!</div>
+        </div>
+
+        <div class="debug-section">
+            <h3>❌ Common Error Patterns</h3>
+            <h4>1. Invalid Credentials:</h4>
+            <div class="console-output">❌ Auth Provider: Supabase auth error: AuthApiError: Invalid login credentials</div>
+            
+            <h4>2. No User Profile:</h4>
+            <div class="console-output">❌ Auth Provider: No profile found, signing out
+❌ Login error details: Error: Account not found. Please sign up first.</div>
+            
+            <h4>3. Database Connection Error:</h4>
+            <div class="console-output">❌ Auth Provider: Database error during login: [database error details]</div>
+            
+            <h4>4. Refresh Token Error:</h4>
+            <div class="console-output">❌ Auth Provider: Supabase auth error: AuthApiError: Invalid Refresh Token</div>
+        </div>
+
+        <div class="debug-section">
+            <h3>🛠️ Quick Fixes</h3>
+            <h4>If you see "Invalid login credentials":</h4>
+            <ul>
+                <li>Verify the email and password are correct</li>
+                <li>Check if the user exists in auth.users table</li>
+                <li>Ensure the user's email is confirmed</li>
+            </ul>
+            
+            <h4>If you see "Account not found":</h4>
+            <ul>
+                <li>User exists in auth.users but not in user_profiles table</li>
+                <li>Run the database trigger to create the profile</li>
+                <li>Check the user_profiles table for the email</li>
+            </ul>
+            
+            <h4>If you see refresh token errors:</h4>
+            <ul>
+                <li>Clear browser storage (localStorage and sessionStorage)</li>
+                <li>Try in incognito mode</li>
+                <li>Check for corrupted auth tokens</li>
+            </ul>
+        </div>
+
+        <div class="debug-section">
+            <h3>🧪 Test Different Scenarios</h3>
+            <p>Test these URLs to verify different redirect scenarios:</p>
+            <ul>
+                <li><a href="http://localhost:3000/login?redirectTo=%2Fdashboard" target="_blank">Dashboard Redirect</a></li>
+                <li><a href="http://localhost:3000/login?redirectTo=%2Fdocuments" target="_blank">Documents Redirect</a></li>
+                <li><a href="http://localhost:3000/login?redirectTo=%2Fprofile" target="_blank">Profile Redirect</a></li>
+                <li><a href="http://localhost:3000/login" target="_blank">Default Login (no redirect)</a></li>
+            </ul>
+        </div>
+
+        <div class="debug-section">
+            <h3>📊 Expected vs Actual Behavior</h3>
+            <table style="width: 100%; border-collapse: collapse;">
+                <tr style="background: #f3f4f6;">
+                    <th style="border: 1px solid #ddd; padding: 8px;">Scenario</th>
+                    <th style="border: 1px solid #ddd; padding: 8px;">Expected</th>
+                    <th style="border: 1px solid #ddd; padding: 8px;">Current Issue</th>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px;">Valid credentials + redirectTo</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">Redirect to specified page</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">Shows "Logging in..." then reverts to "Login"</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px;">Invalid credentials</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">Show error message</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">May be working correctly</td>
+                </tr>
+                <tr>
+                    <td style="border: 1px solid #ddd; padding: 8px;">Network/DB error</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">Show error message</td>
+                    <td style="border: 1px solid #ddd; padding: 8px;">May be silent failure</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        console.log('🚀 Login Debug Test Page Loaded');
+        console.log('📋 Open http://localhost:3000/login?redirectTo=%2Fdocuments to test');
+        console.log('🔍 Watch this console for detailed debug logs during login');
+        
+        // Monitor for auth storage changes
+        const originalSetItem = localStorage.setItem;
+        localStorage.setItem = function(key, value) {
+            if (key.startsWith('supabase.')) {
+                console.log('📝 LocalStorage updated:', key, value.substring(0, 100) + '...');
+            }
+            return originalSetItem.apply(this, arguments);
+        };
+        
+        const originalRemoveItem = localStorage.removeItem;
+        localStorage.removeItem = function(key) {
+            if (key.startsWith('supabase.')) {
+                console.log('🗑️ LocalStorage removed:', key);
+            }
+            return originalRemoveItem.apply(this, arguments);
+        };
+    </script>
+</body>
+</html>

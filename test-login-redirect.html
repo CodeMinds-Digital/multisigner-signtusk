@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Login Redirect Functionality</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            background-color: #f9f9f9;
+        }
+        .test-section h3 {
+            color: #2563eb;
+            margin-top: 0;
+        }
+        button {
+            background-color: #2563eb;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+            font-size: 14px;
+        }
+        button:hover {
+            background-color: #1d4ed8;
+        }
+        .success {
+            background-color: #16a34a;
+        }
+        .success:hover {
+            background-color: #15803d;
+        }
+        .warning {
+            background-color: #d97706;
+        }
+        .warning:hover {
+            background-color: #b45309;
+        }
+        .danger {
+            background-color: #dc2626;
+        }
+        .danger:hover {
+            background-color: #b91c1c;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.success {
+            background-color: #dcfce7;
+            color: #166534;
+            border: 1px solid #bbf7d0;
+        }
+        .status.error {
+            background-color: #fef2f2;
+            color: #991b1b;
+            border: 1px solid #fecaca;
+        }
+        .status.info {
+            background-color: #dbeafe;
+            color: #1e40af;
+            border: 1px solid #93c5fd;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .test-card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+        }
+        .test-card h4 {
+            margin-top: 0;
+            color: #374151;
+        }
+        .url-display {
+            background: #f3f4f6;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+            word-break: break-all;
+            margin: 10px 0;
+        }
+        .instructions {
+            background: #fef3c7;
+            border: 1px solid #f59e0b;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .instructions h4 {
+            margin-top: 0;
+            color: #92400e;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Login Redirect Testing Tool</h1>
+        <p>This tool helps test the login redirect functionality after the recent fixes.</p>
+        
+        <div class="instructions">
+            <h4>📋 Testing Instructions</h4>
+            <ol>
+                <li><strong>Open Developer Tools</strong> (F12) and go to the Console tab</li>
+                <li><strong>Test each scenario</strong> using the buttons below</li>
+                <li><strong>Use test credentials:</strong>
+                    <ul>
+                        <li>Email: <code>ramalai13@gmail.com</code> or <code>testuser@gmail.com</code></li>
+                        <li>Password: <em>(use actual password from your test setup)</em></li>
+                    </ul>
+                </li>
+                <li><strong>Verify redirects</strong> work correctly after login</li>
+                <li><strong>Check console logs</strong> for any errors</li>
+            </ol>
+        </div>
+
+        <div class="test-section">
+            <h3>🎯 Redirect Test Scenarios</h3>
+            <div class="test-grid">
+                <div class="test-card">
+                    <h4>Dashboard Redirect</h4>
+                    <p>Test login with redirect to dashboard</p>
+                    <div class="url-display">http://localhost:3000/login?redirectTo=%2Fdashboard</div>
+                    <button onclick="testDashboardRedirect()">Test Dashboard</button>
+                </div>
+                
+                <div class="test-card">
+                    <h4>Documents Redirect</h4>
+                    <p>Test login with redirect to documents</p>
+                    <div class="url-display">http://localhost:3000/login?redirectTo=%2Fdocuments</div>
+                    <button onclick="testDocumentsRedirect()">Test Documents</button>
+                </div>
+                
+                <div class="test-card">
+                    <h4>Profile Redirect</h4>
+                    <p>Test login with redirect to profile</p>
+                    <div class="url-display">http://localhost:3000/login?redirectTo=%2Fprofile</div>
+                    <button onclick="testProfileRedirect()">Test Profile</button>
+                </div>
+                
+                <div class="test-card">
+                    <h4>Upload Redirect</h4>
+                    <p>Test login with redirect to upload</p>
+                    <div class="url-display">http://localhost:3000/login?redirectTo=%2Fupload</div>
+                    <button onclick="testUploadRedirect()">Test Upload</button>
+                </div>
+                
+                <div class="test-card">
+                    <h4>Default Login</h4>
+                    <p>Test login without redirect parameter</p>
+                    <div class="url-display">http://localhost:3000/login</div>
+                    <button onclick="testDefaultLogin()">Test Default</button>
+                </div>
+                
+                <div class="test-card">
+                    <h4>Invalid Redirect</h4>
+                    <p>Test with invalid redirect parameter</p>
+                    <div class="url-display">http://localhost:3000/login?redirectTo=%2Finvalid</div>
+                    <button onclick="testInvalidRedirect()">Test Invalid</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h3>🔧 Utility Functions</h3>
+            <button onclick="clearAuthStorage()" class="danger">Clear Auth Storage</button>
+            <button onclick="checkAuthStorage()" class="warning">Check Auth Storage</button>
+            <button onclick="testProtectedRoute()" class="warning">Test Protected Route Access</button>
+            <button onclick="goToHome()" class="success">Go to Home</button>
+        </div>
+
+        <div class="test-section">
+            <h3>📊 Test Results</h3>
+            <div id="testResults"></div>
+        </div>
+
+        <div class="test-section">
+            <h3>✅ Expected Behavior</h3>
+            <ul>
+                <li><strong>With redirectTo parameter:</strong> After successful login, user should be redirected to the specified page</li>
+                <li><strong>Without redirectTo parameter:</strong> After successful login, user should be redirected to dashboard</li>
+                <li><strong>Invalid redirectTo:</strong> Should still redirect to dashboard as fallback</li>
+                <li><strong>Loading state:</strong> Should show "Logging in..." during authentication</li>
+                <li><strong>Error handling:</strong> Should show appropriate error messages</li>
+                <li><strong>No infinite loops:</strong> Should not get stuck in loading state</li>
+            </ul>
+        </div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            console.log(`[${timestamp}] ${message}`);
+            
+            const resultsDiv = document.getElementById('testResults');
+            const statusDiv = document.createElement('div');
+            statusDiv.className = `status ${type}`;
+            statusDiv.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            resultsDiv.appendChild(statusDiv);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function testDashboardRedirect() {
+            log('🔄 Testing dashboard redirect...', 'info');
+            window.open('http://localhost:3000/login?redirectTo=%2Fdashboard', '_blank');
+        }
+
+        function testDocumentsRedirect() {
+            log('🔄 Testing documents redirect...', 'info');
+            window.open('http://localhost:3000/login?redirectTo=%2Fdocuments', '_blank');
+        }
+
+        function testProfileRedirect() {
+            log('🔄 Testing profile redirect...', 'info');
+            window.open('http://localhost:3000/login?redirectTo=%2Fprofile', '_blank');
+        }
+
+        function testUploadRedirect() {
+            log('🔄 Testing upload redirect...', 'info');
+            window.open('http://localhost:3000/login?redirectTo=%2Fupload', '_blank');
+        }
+
+        function testDefaultLogin() {
+            log('🔄 Testing default login (no redirect parameter)...', 'info');
+            window.open('http://localhost:3000/login', '_blank');
+        }
+
+        function testInvalidRedirect() {
+            log('🔄 Testing invalid redirect parameter...', 'info');
+            window.open('http://localhost:3000/login?redirectTo=%2Finvalid', '_blank');
+        }
+
+        function clearAuthStorage() {
+            try {
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && key.startsWith('supabase.')) {
+                        keysToRemove.push(key);
+                    }
+                }
+                keysToRemove.forEach(key => localStorage.removeItem(key));
+
+                const sessionKeysToRemove = [];
+                for (let i = 0; i < sessionStorage.length; i++) {
+                    const key = sessionStorage.key(i);
+                    if (key && key.startsWith('supabase.')) {
+                        sessionKeysToRemove.push(key);
+                    }
+                }
+                sessionKeysToRemove.forEach(key => sessionStorage.removeItem(key));
+
+                log('✅ Auth storage cleared successfully', 'success');
+            } catch (error) {
+                log(`❌ Error clearing storage: ${error.message}`, 'error');
+            }
+        }
+
+        function checkAuthStorage() {
+            let authKeys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('supabase.')) {
+                    authKeys.push(key);
+                }
+            }
+            
+            for (let i = 0; i < sessionStorage.length; i++) {
+                const key = sessionStorage.key(i);
+                if (key && key.startsWith('supabase.')) {
+                    authKeys.push(key);
+                }
+            }
+
+            if (authKeys.length === 0) {
+                log('📋 No auth storage found (clean state)', 'info');
+            } else {
+                log(`📋 Found ${authKeys.length} auth storage keys: ${authKeys.join(', ')}`, 'info');
+            }
+        }
+
+        function testProtectedRoute() {
+            log('🔄 Testing protected route access without auth...', 'info');
+            window.open('http://localhost:3000/dashboard', '_blank');
+        }
+
+        function goToHome() {
+            log('🔄 Navigating to home page...', 'info');
+            window.open('http://localhost:3000/', '_blank');
+        }
+
+        // Initialize
+        log('🚀 Login Redirect Testing Tool Loaded', 'success');
+        log('Use the buttons above to test different redirect scenarios', 'info');
+        checkAuthStorage();
+    </script>
+</body>
+</html>

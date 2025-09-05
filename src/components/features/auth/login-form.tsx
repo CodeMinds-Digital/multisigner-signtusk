@@ -1,12 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { FcGoogle } from 'react-icons/fc'
 import { useAuth } from '@/components/providers/auth-provider'
 import { supabase } from '@/lib/supabase'
 
 export function LoginForm() {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const redirectTo = searchParams.get('redirectTo')
+
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -14,17 +19,38 @@ export function LoginForm() {
   const [localError, setLocalError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
-  const { signIn, error, clearError } = useAuth()
+  const { user, signIn, error, clearError } = useAuth()
+
+  // Handle already authenticated users
+  useEffect(() => {
+    if (user && !error) {
+      console.log('🔍 useEffect: User is already authenticated, redirecting...')
+      const destination = redirectTo || '/dashboard'
+      console.log('🔄 useEffect: Redirecting to:', destination)
+      
+      // Small delay to ensure auth state is stable
+      setTimeout(() => {
+        try {
+          router.push(destination)
+          console.log('🔄 useEffect: router.push called successfully')
+        } catch (error) {
+          console.error('❌ useEffect: router.push error:', error)
+          window.location.href = destination
+        }
+      }, 100)
+    }
+  }, [user, error, redirectTo, router])
 
   const handleGoogleLogin = async () => {
     try {
       setIsLoading(true)
       clearError()
 
+      const destination = redirectTo || '/dashboard'
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/dashboard`,
+          redirectTo: `${window.location.origin}${destination}`,
         },
       })
 
@@ -52,6 +78,7 @@ export function LoginForm() {
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
+    console.log('🚀 Login form submitted')
     e.preventDefault()
 
     // Validate form data
@@ -70,11 +97,18 @@ export function LoginForm() {
     clearError()
 
     try {
+      console.log('🔄 Login attempt started:', { email: formData.email, redirectTo })
+      console.log('🔄 Current user state:', user)
+
+      console.log('🔄 Proceeding with authentication...')
+
       // Use the auth hook for consistent authentication
       await signIn({
         email: formData.email,
         password: formData.password,
-      })
+      }, redirectTo || undefined)
+
+      console.log('✅ Login successful!')
 
       // Store remember me preference
       if (rememberMe) {
@@ -85,7 +119,10 @@ export function LoginForm() {
 
       // Success - redirect will be handled by auth hook
     } catch (error) {
-      console.error('Login error:', error)
+      console.error('❌ Login error details:', error)
+      console.error('❌ Error type:', typeof error)
+      console.error('❌ Error message:', error instanceof Error ? error.message : String(error))
+
       const errorMessage = error instanceof Error ? error.message : 'Login failed. Please try again.'
 
       // Provide helpful guidance for common issues
@@ -93,9 +130,13 @@ export function LoginForm() {
         setLocalError('Account not found. Please sign up first or check your email address.')
       } else if (errorMessage.includes('Invalid login credentials')) {
         setLocalError('Invalid email or password. Please check your credentials and try again.')
+      } else if (errorMessage.includes('Database connection error')) {
+        setLocalError('Database connection error. Please try again in a moment.')
       } else {
         setLocalError(errorMessage)
       }
+
+      console.log('🔴 Error set to user:', errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -106,10 +147,19 @@ export function LoginForm() {
       <div className="flex flex-col lg:flex-row min-h-screen max-w-7xl mx-auto">
         <div className="w-full lg:w-2/5 flex flex-col p-4 sm:p-6 md:p-8 bg-white">
           <div className="max-w-md w-full mx-auto flex flex-col flex-grow">
-            <div className="flex justify-start mb-6">
+            <div className="flex justify-between items-center mb-6">
               <div className="w-16 h-16 sm:w-24 sm:h-24 bg-blue-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xl">ST</span>
               </div>
+              <Link
+                href="/"
+                className="text-blue-600 hover:text-blue-700 font-medium transition-colors duration-200 flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                Back to Home
+              </Link>
             </div>
 
             <div className="mb-8">
@@ -141,7 +191,7 @@ export function LoginForm() {
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-6">
+            <form onSubmit={handleSubmit} className="space-y-6" noValidate>
               <div>
                 <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="email">
                   Email/Phone Number
@@ -175,6 +225,7 @@ export function LoginForm() {
               <button
                 type="submit"
                 disabled={isLoading}
+                onClick={() => console.log('🔘 Submit button clicked!')}
                 className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center ${isLoading ? 'opacity-70 cursor-not-allowed' : ''
                   }`}
               >
@@ -209,7 +260,7 @@ export function LoginForm() {
                 <p className="text-sm text-yellow-800 font-medium mb-2">Development Test Credentials:</p>
                 <p className="text-xs text-yellow-700">Email: test@example.com</p>
                 <p className="text-xs text-yellow-700">Password: password123</p>
-                <div className="mt-2 space-x-2">
+                <div className="mt-2 space-x-2 flex flex-wrap gap-2">
                   <button
                     type="button"
                     onClick={() => {
@@ -237,6 +288,34 @@ export function LoginForm() {
                     className="text-xs text-yellow-800 underline hover:text-yellow-900"
                   >
                     Create Test User
+                  </button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      try {
+                        // Clear all auth storage
+                        const keysToRemove = []
+                        for (let i = 0; i < localStorage.length; i++) {
+                          const key = localStorage.key(i)
+                          if (key && key.startsWith('supabase.')) {
+                            keysToRemove.push(key)
+                          }
+                        }
+                        keysToRemove.forEach(key => localStorage.removeItem(key))
+                        
+                        // Sign out from Supabase
+                        await supabase.auth.signOut()
+                        
+                        // Reload the page
+                        window.location.reload()
+                      } catch (error) {
+                        console.error('Clear session error:', error)
+                        alert('Session cleared, please refresh the page')
+                      }
+                    }}
+                    className="text-xs text-red-800 underline hover:text-red-900"
+                  >
+                    Clear Session
                   </button>
                 </div>
               </div>
