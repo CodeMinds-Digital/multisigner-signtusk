@@ -169,12 +169,8 @@ export async function validateRefreshToken(
     return false
   }
 
-  // In development, direct comparison
-  // In production, compare hashed tokens
-  return session.refreshToken === refreshToken
-
-  // In production:
-  // return await compareTokens(refreshToken, session.refreshToken)
+  // Compare hashed tokens properly
+  return await compareTokens(refreshToken, session.refreshToken)
 }
 
 /**

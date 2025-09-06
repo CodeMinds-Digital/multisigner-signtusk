@@ -3,84 +3,30 @@ import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
-// Ensure signatures table exists
+// Check if signatures table exists by trying to query it (v2)
 async function ensureSignaturesTable() {
   try {
-    // Check if table exists
-    const { data: tables, error: checkError } = await supabaseAdmin
-      .from('information_schema.tables')
-      .select('table_name')
-      .eq('table_schema', 'public')
-      .eq('table_name', 'signatures')
+    // Simply try to query the signatures table
+    // If it exists, this will work; if not, we'll get an error
+    const { error } = await supabaseAdmin
+      .from('signatures')
+      .select('id')
+      .limit(1)
 
-    if (checkError) {
-      console.log('Error checking for signatures table:', checkError)
-    }
-
-    if (!tables || tables.length === 0) {
-      console.log('Signatures table does not exist, creating it...')
-      
-      // Create the signatures table
-      const createTableSQL = `
-        CREATE TABLE IF NOT EXISTS public.signatures (
-          id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-          user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
-          name TEXT NOT NULL,
-          signature_data TEXT NOT NULL,
-          is_default BOOLEAN DEFAULT false,
-          created_at TIMESTAMPTZ DEFAULT NOW(),
-          updated_at TIMESTAMPTZ DEFAULT NOW()
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_signatures_user_id ON public.signatures(user_id);
-        CREATE INDEX IF NOT EXISTS idx_signatures_is_default ON public.signatures(user_id, is_default);
-
-        ALTER TABLE public.signatures ENABLE ROW LEVEL SECURITY;
-
-        DROP POLICY IF EXISTS "Users can view their own signatures" ON public.signatures;
-        DROP POLICY IF EXISTS "Users can insert their own signatures" ON public.signatures;
-        DROP POLICY IF EXISTS "Users can update their own signatures" ON public.signatures;
-        DROP POLICY IF EXISTS "Users can delete their own signatures" ON public.signatures;
-
-        CREATE POLICY "Users can view their own signatures" ON public.signatures
-          FOR SELECT USING (auth.uid() = user_id);
-
-        CREATE POLICY "Users can insert their own signatures" ON public.signatures
-          FOR INSERT WITH CHECK (auth.uid() = user_id);
-
-        CREATE POLICY "Users can update their own signatures" ON public.signatures
-          FOR UPDATE USING (auth.uid() = user_id);
-
-        CREATE POLICY "Users can delete their own signatures" ON public.signatures
-          FOR DELETE USING (auth.uid() = user_id);
-
-        GRANT ALL ON public.signatures TO authenticated;
-      `
-
-      const { error: createError } = await supabaseAdmin.rpc('exec_sql', { sql: createTableSQL })
-      
-      if (createError) {
-        console.error('Error creating signatures table:', createError)
-        // Try alternative approach
-        const { error: altError } = await supabaseAdmin
-          .from('signatures')
-          .select('id')
-          .limit(1)
-        
-        if (altError && altError.code === 'PGRST116') {
-          // Table exists but is empty, that's fine
-          console.log('Signatures table exists but is empty')
-        } else if (altError) {
-          console.error('Signatures table creation failed:', altError)
-        }
+    if (error) {
+      if (error.code === 'PGRST116') {
+        // Table exists but is empty, that's fine
+        console.log('Signatures table exists and is ready')
       } else {
-        console.log('Signatures table created successfully')
+        console.log('Signatures table might not exist or has access issues:', error.message)
+        // Table might not exist, but we can't create it via API
+        // The table should be created manually in Supabase SQL Editor
       }
     } else {
-      console.log('Signatures table already exists')
+      console.log('Signatures table exists and is accessible')
     }
   } catch (error) {
-    console.error('Error ensuring signatures table:', error)
+    console.error('Error checking signatures table:', error)
   }
 }
 
@@ -124,7 +70,7 @@ export async function GET(request: NextRequest) {
     )
   } catch (error) {
     console.error('Error fetching signatures:', error)
-    
+
     if (error instanceof Error && error.message.includes('token')) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
@@ -202,7 +148,7 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error('Error creating signature:', error)
-    
+
     if (error instanceof Error && error.message.includes('token')) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),

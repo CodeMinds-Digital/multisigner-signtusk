@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate refresh token against stored session
+    // Validate refresh token against stored session (v2)
     const isValidSession = await validateRefreshToken(payload.sessionId, refreshToken)
     if (!isValidSession) {
       return new Response(
