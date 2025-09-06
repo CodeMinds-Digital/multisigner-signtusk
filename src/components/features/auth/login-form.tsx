@@ -6,6 +6,8 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { FcGoogle } from 'react-icons/fc'
 import { useAuth } from '@/components/providers/auth-provider'
 import { supabase } from '@/lib/supabase'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 
 export function LoginForm() {
   const searchParams = useSearchParams()
@@ -27,7 +29,10 @@ export function LoginForm() {
       console.log('🔍 useEffect: User is already authenticated, redirecting...')
       const destination = redirectTo || '/dashboard'
       console.log('🔄 useEffect: Redirecting to:', destination)
-      
+
+      // Clear loading state since login was successful
+      setIsLoading(false)
+
       // Small delay to ensure auth state is stable
       setTimeout(() => {
         try {
@@ -40,6 +45,14 @@ export function LoginForm() {
       }, 100)
     }
   }, [user, error, redirectTo, router])
+
+  // Clear loading state when user changes (additional safety net)
+  useEffect(() => {
+    if (user) {
+      console.log('🔄 Login form: User detected, clearing loading state')
+      setIsLoading(false)
+    }
+  }, [user])
 
   const handleGoogleLogin = async () => {
     try {
@@ -138,6 +151,7 @@ export function LoginForm() {
 
       console.log('🔴 Error set to user:', errorMessage)
     } finally {
+      console.log('🔄 Login form: finally block - setting isLoading to false')
       setIsLoading(false)
     }
   }
@@ -196,13 +210,12 @@ export function LoginForm() {
                 <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="email">
                   Email/Phone Number
                 </label>
-                <input
+                <Input
                   type="email"
                   id="email"
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                   placeholder="Enter your Email/Phone Number"
                 />
               </div>
@@ -211,26 +224,25 @@ export function LoginForm() {
                 <label className="block text-gray-700 text-sm font-semibold mb-2" htmlFor="password">
                   Password
                 </label>
-                <input
+                <Input
                   type="password"
                   id="password"
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all duration-200"
                   placeholder="Enter your Password"
                 />
               </div>
 
-              <button
+              <Button
                 type="submit"
                 disabled={isLoading}
                 onClick={() => console.log('🔘 Submit button clicked!')}
-                className={`w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center ${isLoading ? 'opacity-70 cursor-not-allowed' : ''
-                  }`}
+                className="w-full"
+                size="lg"
               >
                 {isLoading ? 'Logging in...' : 'Login'}
-              </button>
+              </Button>
 
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
                 <div className="flex items-center">
@@ -302,10 +314,10 @@ export function LoginForm() {
                           }
                         }
                         keysToRemove.forEach(key => localStorage.removeItem(key))
-                        
+
                         // Sign out from Supabase
                         await supabase.auth.signOut()
-                        
+
                         // Reload the page
                         window.location.reload()
                       } catch (error) {

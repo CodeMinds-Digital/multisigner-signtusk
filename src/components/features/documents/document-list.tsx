@@ -6,6 +6,9 @@ import { useAuth } from '@/components/providers/auth-provider'
 import { SigningWorkflowService, type SigningRequestListItem } from '@/lib/signing-workflow-service'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { LoadingSpinner } from '@/components/ui/loading'
+import { EmptyState } from '@/components/ui/empty-state'
+import { ErrorAlert } from '@/components/ui/alert'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -126,8 +129,8 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
         return (
             <Card>
                 <CardContent className="flex items-center justify-center py-8">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    <span className="ml-2 text-gray-600">Loading documents...</span>
+                    <LoadingSpinner size="lg" />
+                    <span className="ml-3 text-gray-600">Loading documents...</span>
                 </CardContent>
             </Card>
         )
@@ -143,17 +146,25 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
             </CardHeader>
             <CardContent>
                 {error && (
-                    <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md">
-                        {error}
+                    <div className="mb-4">
+                        <ErrorAlert
+                            error={error}
+                            onRetry={() => loadSigningRequests()}
+                            onClose={() => setError('')}
+                        />
                     </div>
                 )}
 
                 {signingRequests.length === 0 ? (
-                    <div className="text-center py-8">
-                        <File className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">No signing requests yet</h3>
-                        <p className="text-gray-500">Create your first signing request to get started</p>
-                    </div>
+                    <EmptyState
+                        icon={File}
+                        title="No signing requests yet"
+                        description="Create your first signing request to get started"
+                        action={{
+                            label: 'Request Signature',
+                            onClick: () => onRefresh?.()
+                        }}
+                    />
                 ) : (
                     <Table>
                         <TableHeader>

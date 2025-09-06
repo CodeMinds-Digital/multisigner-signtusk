@@ -215,7 +215,7 @@ export class SigningWorkflowService {
     try {
       const { error } = await supabase
         .from('signing_requests')
-        .update({ 
+        .update({
           status: 'cancelled',
           updated_at: new Date().toISOString()
         })
@@ -264,12 +264,12 @@ export class SigningWorkflowService {
    */
   private static calculateDaysRemaining(expiresAt?: string): number | undefined {
     if (!expiresAt) return undefined
-    
+
     const now = new Date()
     const expiry = new Date(expiresAt)
     const diffTime = expiry.getTime() - now.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
+
     return diffDays > 0 ? diffDays : 0
   }
 

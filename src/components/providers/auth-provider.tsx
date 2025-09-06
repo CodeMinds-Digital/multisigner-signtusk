@@ -179,6 +179,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             console.log('🔄 Auth Provider: Falling back to window.location.href')
             window.location.href = destination
           }
+          console.log('🔄 Auth Provider: Navigation completed, exiting signIn function')
         } catch (dbError) {
           console.error('❌ Auth Provider: Database error during login:', dbError)
           await supabase.auth.signOut()
@@ -190,6 +191,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setError(error instanceof Error ? error.message : 'An error occurred')
       throw error
     } finally {
+      console.log('🔄 Auth Provider: signIn finally block - clearing loading states')
       setIsSigningIn(false) // Clear the signing in flag
       setLoading(false)
     }
