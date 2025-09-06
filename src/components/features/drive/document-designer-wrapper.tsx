@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { DriveService } from '@/lib/drive-service'
 import { DocumentTemplate, Schema } from '@/types/drive'
 import { supabase } from '@/lib/supabase'

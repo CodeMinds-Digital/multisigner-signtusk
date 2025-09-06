@@ -5,8 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Plus, Edit, Trash2, Check } from 'lucide-react'
 import SignaturePad from './signature-pad'
-import { useAuth } from '@/components/providers/auth-provider'
-import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 
 interface Signature {
     id: string
@@ -33,16 +32,25 @@ export default function SignatureManager() {
         setLoading(true)
 
         try {
-            const { data, error } = await supabase
-                .from('signatures')
-                .select('*')
-                .eq('user_id', user.id)
-                .order('created_at', { ascending: false })
+            const response = await fetch('/api/signatures', {
+                method: 'GET',
+                credentials: 'include',
+            })
 
-            if (error) throw error
-            setSignatures(data || [])
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+            }
+
+            const result = await response.json()
+
+            if (result.success) {
+                setSignatures(result.data || [])
+            } else {
+                throw new Error(result.error || 'Failed to load signatures')
+            }
         } catch (error) {
             console.error('Failed to load signatures:', error)
+            setSignatures([])
         } finally {
             setLoading(false)
         }
@@ -65,27 +73,46 @@ export default function SignatureManager() {
 
             if (editingSignature) {
                 // Update existing signature
-                const { error } = await supabase
-                    .from('signatures')
-                    .update({
-                        signature_data: signatureData,
-                        updated_at: new Date().toISOString()
-                    })
-                    .eq('id', editingSignature.id)
+                const response = await fetch(`/api/signatures/${editingSignature.id}`, {
+                    method: 'PATCH',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ signature_data: signatureData })
+                })
 
-                if (error) throw error
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`)
+                }
+
+                const result = await response.json()
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to update signature')
+                }
             } else {
                 // Create new signature
-                const { error } = await supabase
-                    .from('signatures')
-                    .insert({
-                        user_id: user.id,
+                const response = await fetch('/api/signatures', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
                         name: signatureName,
                         signature_data: signatureData,
                         is_default: signatures.length === 0 // First signature is default
                     })
+                })
 
-                if (error) throw error
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`)
+                }
+
+                const result = await response.json()
+                if (!result.success) {
+                    throw new Error(result.error || 'Failed to create signature')
+                }
             }
 
             setShowSignaturePad(false)
@@ -106,13 +133,20 @@ export default function SignatureManager() {
                 return
             }
 
-            const { error } = await supabase
-                .from('signatures')
-                .delete()
-                .eq('id', signatureId)
-                .eq('user_id', user.id) // Add user_id check for security
+            const response = await fetch(`/api/signatures/${signatureId}`, {
+                method: 'DELETE',
+                credentials: 'include',
+            })
 
-            if (error) throw error
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
+            }
+
+            const result = await response.json()
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to delete signature')
+            }
+
             loadSignatures()
         } catch (error) {
             console.error('Failed to delete signature:', error)
@@ -130,27 +164,22 @@ export default function SignatureManager() {
 
             console.log('Setting default signature:', { signatureId, userId: user.id })
 
-            // First, unset all default signatures for this user
-            const { error: unsetError } = await supabase
-                .from('signatures')
-                .update({ is_default: false })
-                .eq('user_id', user.id)
+            const response = await fetch(`/api/signatures/${signatureId}`, {
+                method: 'PATCH',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ is_default: true })
+            })
 
-            if (unsetError) {
-                console.error('Error unsetting default signatures:', unsetError)
-                throw unsetError
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`)
             }
 
-            // Then set the selected signature as default
-            const { error: setError } = await supabase
-                .from('signatures')
-                .update({ is_default: true })
-                .eq('id', signatureId)
-                .eq('user_id', user.id) // Add user_id check for security
-
-            if (setError) {
-                console.error('Error setting default signature:', setError)
-                throw setError
+            const result = await response.json()
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to set default signature')
             }
 
             console.log('Successfully set default signature')

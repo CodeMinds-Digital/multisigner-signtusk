@@ -1,10 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Clock, CheckCircle, AlertTriangle, RefreshCw, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { getDashboardStats, getDocuments, type Document as DocumentType } from '@/lib/document-store'
 import { UploadDocument } from '@/components/features/documents/upload-document'
 import { getStatusConfig } from '@/utils/document-status'
@@ -23,7 +23,7 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     if (!user) return
 
     setLoading(true)
@@ -46,11 +46,11 @@ export default function DashboardPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
 
   useEffect(() => {
     loadDashboardData()
-  }, [user])
+  }, [loadDashboardData])
 
   const getActivityText = (status: string) => {
     switch (status) {

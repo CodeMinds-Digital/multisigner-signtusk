@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { DriveService } from '@/lib/drive-service'
 import { DocumentMetadataService, DocumentType, DocumentCategory } from '@/lib/document-metadata-service'
 import { DocumentTemplate, DocumentUploadData } from '@/types/drive'

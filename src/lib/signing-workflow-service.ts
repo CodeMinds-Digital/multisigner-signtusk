@@ -1,5 +1,4 @@
 import { supabase } from './supabase'
-import { createAuthenticatedSupabaseCall } from './auth-interceptor'
 
 export interface SigningRequestSigner {
   id: string
@@ -62,7 +61,9 @@ export class SigningWorkflowService {
    * Get all signing requests initiated by a user (sent requests)
    */
   static async getSigningRequests(userId: string): Promise<SigningRequestListItem[]> {
-    return createAuthenticatedSupabaseCall(async () => {
+    try {
+      // For now, use direct Supabase calls but with error handling
+      // TODO: Move to secure API endpoints
       const { data: requests, error } = await supabase
         .from('signing_requests')
         .select(`
@@ -78,14 +79,20 @@ export class SigningWorkflowService {
       }
 
       return (requests || []).map((request: any) => this.transformToListItem(request))
-    })
+    } catch (error) {
+      console.error('Error in getSigningRequests:', error)
+      return []
+    }
   }
 
   /**
    * Get all signing requests received by a user (where they are a signer)
    */
   static async getReceivedSigningRequests(userEmail: string): Promise<SigningRequestListItem[]> {
-    return createAuthenticatedSupabaseCall(async () => {
+    try {
+      // For now, use direct Supabase calls but with error handling
+      // TODO: Move to secure API endpoints
+
       // First, get signing request signers for this user
       const { data: signerRecords, error: signerError } = await supabase
         .from('signing_request_signers')
@@ -132,7 +139,10 @@ export class SigningWorkflowService {
 
         return listItem
       })
-    })
+    } catch (error) {
+      console.error('Error in getReceivedSigningRequests:', error)
+      return []
+    }
   }
 
   /**

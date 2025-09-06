@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { File, Clock, CheckCircle, AlertTriangle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Calendar, Send, Inbox, Filter } from 'lucide-react'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { SigningWorkflowService, type SigningRequestListItem } from '@/lib/signing-workflow-service'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -74,7 +74,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         }
     }
 
-    const loadAllRequests = async () => {
+    const loadAllRequests = useCallback(async () => {
         if (!user?.id || !user?.email) return
 
         setLoading(true)
@@ -133,17 +133,16 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                 received: filteredReceived.length
             })
         } catch (err) {
-            // Only set error for unexpected errors
             console.error('Unexpected error loading signing requests:', err)
             setError('Failed to load signing requests')
         } finally {
             setLoading(false)
         }
-    }
+    }, [user, timeRange])
 
     useEffect(() => {
         loadAllRequests()
-    }, [user, timeRange])
+    }, [loadAllRequests])
 
     const getStatusBadge = (request: UnifiedSigningRequest) => {
         const status = request.type === 'received' ? request.user_status || request.status : request.status

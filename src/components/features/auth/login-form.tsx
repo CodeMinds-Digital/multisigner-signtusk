@@ -4,8 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { FcGoogle } from 'react-icons/fc'
-import { useAuth } from '@/components/providers/auth-provider'
-import { supabase } from '@/lib/supabase'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 
@@ -55,28 +54,8 @@ export function LoginForm() {
   }, [user])
 
   const handleGoogleLogin = async () => {
-    try {
-      setIsLoading(true)
-      clearError()
-
-      const destination = redirectTo || '/dashboard'
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}${destination}`,
-        },
-      })
-
-      if (error) {
-        throw new Error(error.message)
-      }
-
-    } catch (error) {
-      console.error('Google login error:', error)
-      setLocalError(error instanceof Error ? error.message : 'An error occurred')
-    } finally {
-      setIsLoading(false)
-    }
+    // Google OAuth not implemented in secure auth system yet
+    setLocalError('Google login not available. Please use email/password.')
   }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -116,10 +95,7 @@ export function LoginForm() {
       console.log('🔄 Proceeding with authentication...')
 
       // Use the auth hook for consistent authentication
-      await signIn({
-        email: formData.email,
-        password: formData.password,
-      }, redirectTo || undefined)
+      await signIn(formData.email, formData.password)
 
       console.log('✅ Login successful!')
 
@@ -303,27 +279,11 @@ export function LoginForm() {
                   </button>
                   <button
                     type="button"
-                    onClick={async () => {
-                      try {
-                        // Clear all auth storage
-                        const keysToRemove = []
-                        for (let i = 0; i < localStorage.length; i++) {
-                          const key = localStorage.key(i)
-                          if (key && key.startsWith('supabase.')) {
-                            keysToRemove.push(key)
-                          }
-                        }
-                        keysToRemove.forEach(key => localStorage.removeItem(key))
-
-                        // Sign out from Supabase
-                        await supabase.auth.signOut()
-
-                        // Reload the page
-                        window.location.reload()
-                      } catch (error) {
-                        console.error('Clear session error:', error)
-                        alert('Session cleared, please refresh the page')
-                      }
+                    onClick={() => {
+                      // Clear any remaining localStorage data
+                      localStorage.clear()
+                      // Reload the page
+                      window.location.reload()
                     }}
                     className="text-xs text-red-800 underline hover:text-red-900"
                   >

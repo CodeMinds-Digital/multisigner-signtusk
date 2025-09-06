@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { File, Clock, CheckCircle, AlertTriangle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Calendar } from 'lucide-react'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { SigningWorkflowService, type SigningRequestListItem } from '@/lib/signing-workflow-service'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -182,11 +182,10 @@ export function ReceivedRequestsList({ onRefresh }: ReceivedRequestsListProps) {
                                         </span>
                                     </TableCell>
                                     <TableCell>
-                                        <span className={`text-sm ${
-                                            getTimeRemaining(request.expires_at).includes('Expired') 
-                                                ? 'text-red-600' 
+                                        <span className={`text-sm ${getTimeRemaining(request.expires_at).includes('Expired')
+                                                ? 'text-red-600'
                                                 : 'text-gray-600'
-                                        }`}>
+                                            }`}>
                                             {getTimeRemaining(request.expires_at)}
                                         </span>
                                     </TableCell>

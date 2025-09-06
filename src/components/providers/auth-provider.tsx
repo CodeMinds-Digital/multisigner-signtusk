@@ -14,6 +14,7 @@ interface AuthContextType {
   signIn: (credentials: LoginCredentials, redirectTo?: string) => Promise<void>
   signOut: () => Promise<void>
   clearError: () => void
+  ensureValidSession: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -235,6 +236,55 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [clearAuthStorage, router])
 
+  // Ensure valid session before making API calls
+  const ensureValidSession = useCallback(async (): Promise<boolean> => {
+    try {
+      console.log('🔄 Ensuring valid session...')
+
+      // Check if we have a user
+      if (!user) {
+        console.log('❌ No user found')
+        return false
+      }
+
+      // Check current session
+      const { data: { session }, error } = await supabase.auth.getSession()
+
+      if (error) {
+        console.error('❌ Session check error:', error)
+        return false
+      }
+
+      if (!session) {
+        console.log('❌ No session found')
+        return false
+      }
+
+      // Check if token needs refresh
+      const expiryTime = new Date(session.expires_at! * 1000).getTime()
+      const currentTime = Date.now()
+      const timeUntilExpiry = expiryTime - currentTime
+
+      // If token expires within 5 minutes, refresh it
+      if (timeUntilExpiry <= 5 * 60 * 1000) {
+        console.log('🔄 Token expires soon, refreshing...')
+        const { data, error: refreshError } = await supabase.auth.refreshSession()
+
+        if (refreshError || !data.session) {
+          console.error('❌ Token refresh failed:', refreshError)
+          return false
+        }
+
+        console.log('✅ Token refreshed successfully')
+      }
+
+      return true
+    } catch (error) {
+      console.error('❌ Error ensuring valid session:', error)
+      return false
+    }
+  }, [user])
+
   // Clear expired session and redirect to login
   const handleExpiredSession = useCallback((reason: string) => {
     console.warn('🧹 Session expired:', reason)
@@ -420,6 +470,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     signIn,
     signOut,
     clearError,
+    ensureValidSession,
   }
 
   return (

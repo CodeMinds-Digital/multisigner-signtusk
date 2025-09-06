@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Token Information Inspector</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .info-box { background: #f5f5f5; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .expired { background: #ffebee; border-left: 4px solid #f44336; }
+        .warning { background: #fff3e0; border-left: 4px solid #ff9800; }
+        .good { background: #e8f5e8; border-left: 4px solid #4caf50; }
+        .code { font-family: monospace; background: #f0f0f0; padding: 2px 4px; border-radius: 3px; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        .refresh-btn { background: #2196f3; color: white; border: none; border-radius: 4px; }
+        .monitor-btn { background: #4caf50; color: white; border: none; border-radius: 4px; }
+        .stop-btn { background: #f44336; color: white; border: none; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Token Information Inspector</h1>
+    <p>This page shows current Supabase token information and expiry times.</p>
+    
+    <div>
+        <button class="refresh-btn" onclick="loadTokenInfo()">🔄 Refresh Token Info</button>
+        <button class="monitor-btn" onclick="startMonitoring()">📊 Start Monitoring</button>
+        <button class="stop-btn" onclick="stopMonitoring()">🛑 Stop Monitoring</button>
+        <button onclick="openConsole()">🔍 Open Console</button>
+    </div>
+
+    <div id="token-info">
+        <p>Click "Refresh Token Info" to load current token information...</p>
+    </div>
+
+    <div class="info-box">
+        <h3>📖 Supabase Token Defaults</h3>
+        <ul>
+            <li><strong>Access Token Lifetime:</strong> <span class="code">1 hour (3600 seconds)</span></li>
+            <li><strong>Refresh Token Lifetime:</strong> <span class="code">30 days (2592000 seconds)</span></li>
+            <li><strong>Supabase Auto-Refresh:</strong> <span class="code">10 minutes before expiry</span></li>
+            <li><strong>Our App Refresh:</strong> <span class="code">5 minutes before expiry</span></li>
+        </ul>
+        <p><em>Note: These can be configured in Supabase Dashboard → Authentication → Settings</em></p>
+    </div>
+
+    <div class="info-box">
+        <h3>🔧 How Our Token Refresh Works</h3>
+        <ol>
+            <li><strong>Proactive Check:</strong> Before every API call, check if token expires within 5 minutes</li>
+            <li><strong>Silent Refresh:</strong> If needed, refresh token automatically in background</li>
+            <li><strong>Retry Logic:</strong> If API call fails with 401, refresh token and retry</li>
+            <li><strong>Event Notification:</strong> Notify components when token is refreshed</li>
+            <li><strong>Session Validation:</strong> Ensure session is valid before loading data</li>
+        </ol>
+    </div>
+
+    <script>
+        let monitoringInterval = null;
+
+        async function loadTokenInfo() {
+            const infoDiv = document.getElementById('token-info');
+            infoDiv.innerHTML = '<p>Loading token information...</p>';
+
+            try {
+                // This would need to be called from the actual app context
+                // For now, we'll show instructions
+                infoDiv.innerHTML = `
+                    <div class="info-box warning">
+                        <h3>⚠️ To View Token Information</h3>
+                        <p>Open the browser console on your SignTusk app and run:</p>
+                        <pre class="code">
+// Import the token inspector (in app context)
+import { logTokenInfo, inspectTokenInfo } from '/src/utils/token-inspector'
+
+// Log comprehensive token info
+await logTokenInfo()
+
+// Or get token info object
+const tokenInfo = await inspectTokenInfo()
+console.log(tokenInfo)
+                        </pre>
+                    </div>
+                    
+                    <div class="info-box">
+                        <h3>🔍 Manual Console Commands</h3>
+                        <p>You can also run these commands in the browser console on your app:</p>
+                        <pre class="code">
+// Check current session
+const { data: { session } } = await supabase.auth.getSession()
+console.log('Session:', session)
+
+// Check token expiry
+if (session) {
+    const expiresAt = new Date(session.expires_at * 1000)
+    const timeUntilExpiry = expiresAt.getTime() - Date.now()
+    console.log('Token expires at:', expiresAt.toLocaleString())
+    console.log('Time until expiry:', Math.round(timeUntilExpiry / 1000 / 60), 'minutes')
+}
+
+// Force token refresh
+const { data, error } = await supabase.auth.refreshSession()
+console.log('Refresh result:', { data, error })
+                        </pre>
+                    </div>
+                `;
+            } catch (error) {
+                infoDiv.innerHTML = `<div class="info-box expired"><h3>❌ Error</h3><p>${error.message}</p></div>`;
+            }
+        }
+
+        function startMonitoring() {
+            if (monitoringInterval) {
+                stopMonitoring();
+            }
+
+            const infoDiv = document.getElementById('token-info');
+            let checkCount = 0;
+
+            monitoringInterval = setInterval(() => {
+                checkCount++;
+                const now = new Date().toLocaleTimeString();
+                
+                infoDiv.innerHTML = `
+                    <div class="info-box good">
+                        <h3>📊 Token Monitoring Active</h3>
+                        <p><strong>Check #${checkCount}</strong> at ${now}</p>
+                        <p>Monitoring is active. Open the browser console on your SignTusk app to see token status logs.</p>
+                        <p><em>In a real implementation, this would show live token status.</em></p>
+                    </div>
+                `;
+            }, 60000); // Check every minute
+
+            console.log('🔍 Started token monitoring simulation');
+        }
+
+        function stopMonitoring() {
+            if (monitoringInterval) {
+                clearInterval(monitoringInterval);
+                monitoringInterval = null;
+                console.log('🛑 Stopped token monitoring');
+                
+                const infoDiv = document.getElementById('token-info');
+                infoDiv.innerHTML = '<div class="info-box"><h3>🛑 Monitoring Stopped</h3><p>Token monitoring has been stopped.</p></div>';
+            }
+        }
+
+        function openConsole() {
+            alert('Press F12 or right-click → Inspect Element → Console tab to open the browser console');
+        }
+
+        // Load initial info
+        loadTokenInfo();
+    </script>
+</body>
+</html>

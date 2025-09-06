@@ -34,6 +34,8 @@ const nextConfig: NextConfig = {
     config.ignoreWarnings = [
       /canvas/,
       /Package canvas can't be external/,
+      /The request canvas matches serverExternalPackages/,
+      /Make sure to install the same version of the package in both locations/,
     ];
 
     return config;

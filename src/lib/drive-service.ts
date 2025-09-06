@@ -3,123 +3,64 @@
  * Handles document template operations for the unified signature system
  */
 
-import { createClient } from '@supabase/supabase-js'
 import { DocumentTemplate, DocumentUploadData } from '@/types/drive'
 import { generateSignersFromSchemas, analyzeDocumentSignatureType } from './signature-field-utils'
 
 export class DriveService {
-  private static supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-  )
+  // Note: Admin operations moved to API routes for security
 
   /**
-   * Get document templates for a user
+   * Get document templates for a user (client-side function that calls API)
    */
   static async getDocumentTemplates(userId: string): Promise<DocumentTemplate[]> {
     try {
-      // Get from both documents and document_templates tables
-      const [documentsResult, templatesResult] = await Promise.all([
-        this.supabase
-          .from('documents')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false }),
-        this.supabase
-          .from('document_templates')
-          .select('*')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-      ])
+      const response = await fetch('/api/drive/templates', {
+        method: 'GET',
+        credentials: 'include', // Include cookies for authentication
+      })
 
-      const documents = documentsResult.data || []
-      const templates = templatesResult.data || []
-
-      if (documentsResult.error && templatesResult.error) {
-        console.warn('Database queries failed, using mock data:', documentsResult.error, templatesResult.error)
-        return this.getMockDocuments()
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      // Transform both documents and templates to DocumentTemplate format
-      const allDocuments = [...documents, ...templates]
+      const result = await response.json()
 
-      return allDocuments?.map(doc => {
-        // Calculate status based on schema availability
-        const metadata = doc.metadata || {}
-        const schemas = metadata.schemas || doc.schemas || []
-        const hasSchemas = Array.isArray(schemas) && schemas.length > 0
-
-        // For multi-signature documents, check if all signers have schemas
-        let isComplete = hasSchemas
-        if (metadata.signatureType === 'multi' && metadata.signers) {
-          const signers = metadata.signers || []
-          isComplete = hasSchemas && signers.every((signer: any, index: number) => {
-            const signerId = `signer_${index + 1}`
-            return schemas.some((s: any) => s.signerId === signerId)
-          })
-        }
-
-        // Normalize status to our allowed set
-        const rawStatus: string = doc.status || (isComplete ? 'ready' : 'draft')
-        const allowedStatuses = ['draft', 'ready', 'published', 'archived'] as const
-        const normalizedStatus = rawStatus === 'complete'
-          ? 'ready'
-          : rawStatus === 'completed'
-            ? 'ready'
-            : rawStatus === 'incomplete'
-              ? 'draft'
-              : (allowedStatuses as readonly string[]).includes(rawStatus)
-                ? (rawStatus as typeof allowedStatuses[number])
-                : 'draft'
-
-        return {
-          id: doc.id,
-          name: doc.name || doc.title || doc.file_name || 'Untitled Document',
-          type: doc.type || doc.document_type || 'template',
-          signature_type: doc.signature_type || 'single',
-          status: normalizedStatus,
-          pdf_url: doc.pdf_url || doc.file_url, // Handle both table structures
-          template_url: doc.template_url,
-          schemas: schemas,
-          signers: doc.signers || [],
-          created_at: doc.created_at,
-          updated_at: doc.updated_at,
-          user_id: doc.user_id,
-          // Additional fields
-          description: doc.description,
-          template_data: doc.template_data,
-          category: doc.category,
-          is_public: doc.is_public || false,
-          is_system_template: doc.is_system_template || false,
-          usage_count: doc.usage_count || 0,
-          completion_percentage: doc.completion_percentage || 0
-        }
-      }) || []
-
+      if (result.success) {
+        return result.data || []
+      } else {
+        throw new Error(result.error || 'Failed to fetch document templates')
+      }
     } catch (error) {
-      console.error('Error fetching document templates:', error)
+      console.warn('Failed to fetch document templates from API, using mock data:', error)
       return this.getMockDocuments()
     }
   }
 
   /**
-   * Upload document to Supabase storage
+   * Upload document to Supabase storage (client-side function that calls API)
    */
   static async uploadDocument(file: File, userId: string): Promise<{ data?: { path: string }, error?: any }> {
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${userId}/${Date.now()}.${fileExt}`
+      const formData = new FormData()
+      formData.append('file', file)
 
-      const { data, error } = await this.supabase.storage
-        .from('documents')
-        .upload(fileName, file)
+      const response = await fetch('/api/drive/upload', {
+        method: 'POST',
+        credentials: 'include', // Include cookies for authentication
+        body: formData
+      })
 
-      if (error) {
-        console.error('Upload error:', error)
-        return { error }
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      return { data: { path: data.path } }
+      const result = await response.json()
+
+      if (result.success) {
+        return { data: result.data }
+      } else {
+        return { error: result.error || 'Upload failed' }
+      }
     } catch (error) {
       console.error('Upload error:', error)
       return { error }
@@ -129,7 +70,7 @@ export class DriveService {
 
 
   /**
-   * Create a new document template with upload data
+   * Create a new document template with upload data (client-side function that calls API)
    */
   static async createDocumentTemplate(
     documentData: DocumentUploadData,
@@ -138,55 +79,30 @@ export class DriveService {
     userEmail?: string
   ): Promise<DocumentTemplate> {
     try {
-      // Prepare the document data with only the fields that exist in the database
-      const documentInsertData: any = {
-        title: documentData.name,
-        file_name: documentData.name,
-        user_id: userId,
-        user_email: userEmail || 'user@example.com',
-        status: 'draft',
-        document_type: documentData.type,
-        category: documentData.category || 'Other',
-        signature_type: 'single', // Default to single, will be updated based on signers
-        description: `${documentData.type} - ${documentData.category || 'Other'}`,
-        completion_percentage: 0
+      const response = await fetch('/api/drive/templates/create', {
+        method: 'POST',
+        credentials: 'include', // Include cookies for authentication
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          documentData,
+          pdfPath,
+          userEmail
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      // Add optional fields if they exist in the database schema
-      if (pdfPath) {
-        documentInsertData.file_url = pdfPath
+      const result = await response.json()
+
+      if (result.success) {
+        return result.data
+      } else {
+        throw new Error(result.error || 'Failed to create document template')
       }
-
-      const { data: document, error } = await this.supabase
-        .from('documents')
-        .insert(documentInsertData)
-        .select()
-        .single()
-
-      if (error) {
-        throw new Error(error.message)
-      }
-
-      return {
-        id: document.id,
-        name: document.title,
-        type: documentData.type,
-        category: documentData.category,
-        signature_type: 'single', // Will be determined by signers count
-        status: document.status,
-        pdf_url: document.file_url || pdfPath,
-        template_url: undefined,
-        schemas: [],
-        created_at: document.created_at,
-        updated_at: document.updated_at,
-        user_id: document.user_id,
-        description: document.description,
-        template_data: null,
-        is_public: false,
-        is_system_template: false,
-        usage_count: 0
-      }
-
     } catch (error) {
       console.error('Error creating document template with upload data:', error)
       throw error
@@ -806,7 +722,7 @@ export class DriveService {
   }
 
   /**
-   * Get document URL from path
+   * Get document URL from path (client-side function that calls API)
    */
   static async getDocumentUrl(pdfPath: string): Promise<string | null> {
     try {
@@ -825,22 +741,26 @@ export class DriveService {
         return null
       }
 
-      // Prefer a signed URL (works for private buckets too)
-      const signed = await this.supabase.storage
-        .from('documents')
-        .createSignedUrl(pdfPath, 60 * 10) // 10 minutes
+      const response = await fetch('/api/drive/document-url', {
+        method: 'POST',
+        credentials: 'include', // Include cookies for authentication
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pdfUrl: pdfPath })
+      })
 
-      if (signed.data?.signedUrl) {
-        return signed.data.signedUrl
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      // Fallback to public URL (if bucket is public)
-      const { data } = this.supabase.storage
-        .from('documents')
-        .getPublicUrl(pdfPath)
+      const result = await response.json()
 
-      return data.publicUrl || null
-
+      if (result.success) {
+        return result.data.url
+      } else {
+        throw new Error(result.error || 'Failed to get document URL')
+      }
     } catch (error) {
       console.error('Error getting document URL:', error)
       return null

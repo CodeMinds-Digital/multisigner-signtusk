@@ -17,7 +17,7 @@ import {
     Plus,
     Send
 } from 'lucide-react'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { supabase } from '@/lib/supabase'
 
 interface DocumentSharingProps {

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { Bell, User, LogOut, Settings, CheckCircle, Clock, AlertTriangle, X, ChevronRight, FileText, Pen } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { Button } from '@/components/ui/button'
 
 interface HeaderProps {

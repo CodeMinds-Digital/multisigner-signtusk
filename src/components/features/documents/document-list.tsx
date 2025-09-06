@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { File, Clock, CheckCircle, AlertTriangle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Calendar } from 'lucide-react'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { SigningWorkflowService, type SigningRequestListItem } from '@/lib/signing-workflow-service'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,7 +36,7 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
     const [viewingRequest, setViewingRequest] = useState<SigningRequestListItem | null>(null)
     const { user } = useAuth()
 
-    const loadSigningRequests = async () => {
+    const loadSigningRequests = useCallback(async () => {
         if (!user?.id) return
 
         setLoading(true)
@@ -51,11 +51,11 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
         } finally {
             setLoading(false)
         }
-    }
+    }, [user])
 
     useEffect(() => {
         loadSigningRequests()
-    }, [user])
+    }, [loadSigningRequests])
 
     useEffect(() => {
         if (onRefresh) {
@@ -95,7 +95,7 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
         if (status.includes('Viewed')) baseStatus = 'Viewed'
         else if (status.includes('Signed')) baseStatus = 'Signed'
 
-        const config = variants[baseStatus] || variants['Initiated']
+        const config = variants[baseStatus as keyof typeof variants] || variants['Initiated']
         const Icon = config.icon
 
         return (

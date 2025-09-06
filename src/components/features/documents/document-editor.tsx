@@ -14,7 +14,7 @@ import {
   Check,
   ArrowLeft
 } from 'lucide-react'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { supabase } from '@/lib/supabase'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import { LoadingOverlay } from '@/components/ui/loading'

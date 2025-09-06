@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Token Refresh Test</title>
+</head>
+<body>
+    <h1>Token Refresh Test</h1>
+    <div id="status">Testing...</div>
+    <button onclick="testTokenRefresh()">Test Token Refresh</button>
+    <button onclick="testExpiredToken()">Simulate Expired Token</button>
+    <div id="logs"></div>
+
+    <script>
+        function log(message) {
+            const logs = document.getElementById('logs');
+            logs.innerHTML += '<div>' + new Date().toLocaleTimeString() + ': ' + message + '</div>';
+        }
+
+        async function testTokenRefresh() {
+            log('Testing token refresh...');
+            
+            try {
+                // Simulate checking if we're on the sign-inbox page
+                const response = await fetch('/sign-inbox');
+                if (response.ok) {
+                    log('✅ Sign inbox loaded successfully');
+                    document.getElementById('status').textContent = 'Working';
+                } else {
+                    log('❌ Sign inbox failed to load: ' + response.status);
+                    document.getElementById('status').textContent = 'Failed';
+                }
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+                document.getElementById('status').textContent = 'Error';
+            }
+        }
+
+        async function testExpiredToken() {
+            log('Simulating expired token scenario...');
+            
+            // This would simulate what happens when a user returns to a tab after being idle
+            try {
+                // First, try to access a protected resource
+                const response = await fetch('/api/test-auth', {
+                    headers: {
+                        'Authorization': 'Bearer expired_token_simulation'
+                    }
+                });
+                
+                log('Response status: ' + response.status);
+                
+                if (response.status === 401) {
+                    log('🔄 Got 401, this would trigger token refresh...');
+                    // In the real app, this would trigger the auth interceptor
+                }
+            } catch (error) {
+                log('❌ Error: ' + error.message);
+            }
+        }
+
+        // Auto-test on load
+        setTimeout(testTokenRefresh, 1000);
+    </script>
+</body>
+</html>

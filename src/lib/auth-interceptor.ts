@@ -18,7 +18,7 @@ export class AuthInterceptor {
 
   // Token expiry threshold (5 minutes before actual expiry)
   private static readonly TOKEN_REFRESH_THRESHOLD = 5 * 60 * 1000 // 5 minutes in ms
-  private static readonly MIN_REFRESH_INTERVAL = 30 * 1000 // 30 seconds minimum between refresh attempts
+  private static readonly MIN_REFRESH_INTERVAL = 2 * 60 * 1000 // 2 minutes minimum between refresh attempts
 
   static isTokenExpiredError(error: any): boolean {
     if (!error) return false
@@ -40,15 +40,33 @@ export class AuthInterceptor {
   // Check if token needs refresh based on expiry time
   static async shouldRefreshToken(): Promise<boolean> {
     try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session?.expires_at) return false
+      const { data: { session }, error } = await supabase.auth.getSession()
+
+      if (error) {
+        console.error('Error getting session for token check:', error)
+        return false
+      }
+
+      if (!session?.expires_at) {
+        console.log('No session or expiry time found')
+        return false
+      }
 
       const expiryTime = new Date(session.expires_at * 1000).getTime()
       const currentTime = Date.now()
       const timeUntilExpiry = expiryTime - currentTime
 
+      // Don't refresh if token is already expired (let normal error handling deal with it)
+      if (timeUntilExpiry <= 0) {
+        console.log('Token already expired, skipping proactive refresh')
+        return false
+      }
+
       // Refresh if token expires within the threshold
-      return timeUntilExpiry <= this.TOKEN_REFRESH_THRESHOLD
+      const shouldRefresh = timeUntilExpiry <= this.TOKEN_REFRESH_THRESHOLD
+      console.log(`Token check: ${Math.round(timeUntilExpiry / 1000 / 60)} minutes until expiry, should refresh: ${shouldRefresh}`)
+
+      return shouldRefresh
     } catch (error) {
       console.error('Error checking token expiry:', error)
       return false
@@ -62,18 +80,24 @@ export class AuthInterceptor {
     // Prevent too frequent refresh attempts
     if (now - this.tokenRefreshState.lastRefreshTime < this.MIN_REFRESH_INTERVAL) {
       console.log('🔄 Skipping token refresh - too soon since last attempt')
-      return false
+      return true // Return true to indicate token is still valid
     }
 
     // If already refreshing, wait for the existing promise
     if (this.tokenRefreshState.isRefreshing && this.tokenRefreshState.refreshPromise) {
       console.log('🔄 Token refresh already in progress, waiting...')
-      return await this.tokenRefreshState.refreshPromise
+      try {
+        return await this.tokenRefreshState.refreshPromise
+      } catch (error) {
+        console.error('❌ Error waiting for token refresh:', error)
+        return false
+      }
     }
 
     // Check if refresh is needed
     const needsRefresh = await this.shouldRefreshToken()
     if (!needsRefresh) {
+      console.log('✅ Token is still valid, no refresh needed')
       return true // Token is still valid
     }
 
@@ -82,12 +106,17 @@ export class AuthInterceptor {
     this.tokenRefreshState.lastRefreshTime = now
 
     this.tokenRefreshState.refreshPromise = this.performTokenRefresh()
-    const result = await this.tokenRefreshState.refreshPromise
 
-    this.tokenRefreshState.isRefreshing = false
-    this.tokenRefreshState.refreshPromise = null
-
-    return result
+    try {
+      const result = await this.tokenRefreshState.refreshPromise
+      return result
+    } catch (error) {
+      console.error('❌ Token refresh failed:', error)
+      return false
+    } finally {
+      this.tokenRefreshState.isRefreshing = false
+      this.tokenRefreshState.refreshPromise = null
+    }
   }
 
   // Perform the actual token refresh
@@ -103,6 +132,10 @@ export class AuthInterceptor {
 
       if (data.session) {
         console.log('✅ Token refreshed successfully')
+
+        // Notify components that token was refreshed
+        this.notifyTokenRefreshed()
+
         return true
       }
 
@@ -111,6 +144,18 @@ export class AuthInterceptor {
     } catch (error) {
       console.error('❌ Token refresh exception:', error)
       return false
+    }
+  }
+
+  // Notify components that token was refreshed
+  private static notifyTokenRefreshed() {
+    if (typeof window !== 'undefined') {
+      // Dispatch a custom event that components can listen to
+      window.dispatchEvent(new CustomEvent('auth-token-refreshed', {
+        detail: { timestamp: Date.now() }
+      }))
+
+      console.log('📢 Notified components of token refresh')
     }
   }
 
@@ -195,8 +240,16 @@ export class AuthInterceptor {
     operation: () => Promise<T>,
     maxRetries: number = 1
   ): Promise<T> {
-    // First, check if we should proactively refresh the token
-    await this.proactiveTokenRefresh()
+    // FIRST: Always check and refresh token proactively before making the call
+    console.log('🔄 Checking token before API call...')
+    const shouldRefresh = await this.shouldRefreshToken()
+    if (shouldRefresh) {
+      console.log('🔄 Token needs refresh, refreshing before API call...')
+      const refreshSuccess = await this.silentTokenRefresh()
+      if (!refreshSuccess) {
+        console.warn('❌ Proactive token refresh failed, proceeding with API call anyway...')
+      }
+    }
 
     let lastError: any = null
 
@@ -249,7 +302,7 @@ export const createAuthenticatedSupabaseCall = <T>(
 export class TokenRefreshManager {
   private static refreshInterval: NodeJS.Timeout | null = null
   private static isInitialized = false
-  private static readonly REFRESH_CHECK_INTERVAL = 2 * 60 * 1000 // Check every 2 minutes
+  private static readonly REFRESH_CHECK_INTERVAL = 5 * 60 * 1000 // Check every 5 minutes
 
   // Initialize proactive token refresh
   static initialize() {
@@ -292,22 +345,35 @@ export class TokenRefreshManager {
   private static handleVisibilityChange = async () => {
     if (!document.hidden) {
       console.log('🔄 Page became visible, checking token...')
-      try {
-        await AuthInterceptor.proactiveTokenRefresh()
-      } catch (error) {
-        console.error('❌ Token refresh on visibility change failed:', error)
-      }
+      // Add a small delay to prevent rapid firing
+      setTimeout(async () => {
+        try {
+          // Force a token check when page becomes visible
+          const needsRefresh = await AuthInterceptor.shouldRefreshToken()
+          if (needsRefresh) {
+            console.log('🔄 Page visible and token needs refresh, refreshing immediately...')
+            await AuthInterceptor.silentTokenRefresh()
+          } else {
+            console.log('✅ Page visible and token is still valid')
+          }
+        } catch (error) {
+          console.error('❌ Token refresh on visibility change failed:', error)
+        }
+      }, 500)
     }
   }
 
   // Handle page focus
   private static handlePageFocus = async () => {
     console.log('🔄 Page focused, checking token...')
-    try {
-      await AuthInterceptor.proactiveTokenRefresh()
-    } catch (error) {
-      console.error('❌ Token refresh on focus failed:', error)
-    }
+    // Add a small delay to prevent rapid firing
+    setTimeout(async () => {
+      try {
+        await AuthInterceptor.proactiveTokenRefresh()
+      } catch (error) {
+        console.error('❌ Token refresh on focus failed:', error)
+      }
+    }, 500)
   }
 
   // Setup activity listeners for idle detection
@@ -352,8 +418,13 @@ export class TokenRefreshManager {
 if (typeof window !== 'undefined') {
   // Initialize after a short delay to ensure DOM is ready
   setTimeout(() => {
-    TokenRefreshManager.initialize()
-  }, 1000)
+    // Only initialize if we have a session
+    supabase.auth.getSession().then(({ data: { session } }: any) => {
+      if (session) {
+        TokenRefreshManager.initialize()
+      }
+    })
+  }, 2000)
 }
 
 // Global error handler for unhandled promise rejections

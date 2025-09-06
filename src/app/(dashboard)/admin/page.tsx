@@ -1,6 +1,6 @@
 'use client'
 
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { ComprehensiveAdminDashboard } from '@/components/features/admin/comprehensive-admin-dashboard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Shield } from 'lucide-react'

@@ -1,15 +1,8 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/components/providers/auth-provider";
-import { AuthErrorHandler } from "@/components/auth-error-handler";
+import { SecureAuthProvider } from "@/components/providers/secure-auth-provider";
 import { ConsoleFilterProvider } from "@/components/providers/console-filter-provider";
-
-// Import auth recovery utilities to make them globally available
-import "@/utils/auth-recovery";
-// Import auth interceptor and test utilities
-import "@/lib/auth-interceptor";
-import "@/utils/test-token-expiry";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -27,10 +20,9 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <ConsoleFilterProvider>
-          <AuthErrorHandler />
-          <AuthProvider>
+          <SecureAuthProvider>
             {children}
-          </AuthProvider>
+          </SecureAuthProvider>
         </ConsoleFilterProvider>
       </body>
     </html>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, FileText, Save, X } from 'lucide-react'
 import { DocumentMetadataService, DocumentType, CreateDocumentTypeData } from '@/lib/document-metadata-service'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 
 export function DocumentTypesManagement() {
   const { user } = useAuth()
@@ -61,7 +61,7 @@ export function DocumentTypesManagement() {
         formData
       )
       if (updatedType) {
-        setDocumentTypes(prev => 
+        setDocumentTypes(prev =>
           prev.map(type => type.id === editingType.id ? updatedType : type)
         )
         setEditingType(null)
@@ -190,7 +190,7 @@ export function DocumentTypesManagement() {
           {documentTypes.map((type) => (
             <div key={type.id} className="p-6 flex items-center justify-between">
               <div className="flex items-center space-x-4">
-                <div 
+                <div
                   className="w-10 h-10 rounded-lg flex items-center justify-center"
                   style={{ backgroundColor: `${type.color}20` }}
                 >

@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { X, ChevronDown, File, User, Upload } from 'lucide-react'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { uploadDocument, type Document as DocumentType } from '@/lib/document-store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Plus, Edit, Trash2, Folder, Save, X } from 'lucide-react'
 import { DocumentMetadataService, DocumentCategory, CreateDocumentCategoryData } from '@/lib/document-metadata-service'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 
 export function DocumentCategoriesManagement() {
   const { user } = useAuth()
@@ -61,7 +61,7 @@ export function DocumentCategoriesManagement() {
         formData
       )
       if (updatedCategory) {
-        setDocumentCategories(prev => 
+        setDocumentCategories(prev =>
           prev.map(category => category.id === editingCategory.id ? updatedCategory : category)
         )
         setEditingCategory(null)
@@ -190,7 +190,7 @@ export function DocumentCategoriesManagement() {
           {documentCategories.map((category) => (
             <div key={category.id} className="p-6 flex items-center justify-between">
               <div className="flex items-center space-x-4">
-                <div 
+                <div
                   className="w-10 h-10 rounded-lg flex items-center justify-center"
                   style={{ backgroundColor: `${category.color}20` }}
                 >
