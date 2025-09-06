@@ -10,7 +10,7 @@ import {
   Clock,
   CheckCircle,
   AlertTriangle,
-  SquareActivity,
+
   SquarePen,
   Send,
   CreditCard,
@@ -75,16 +75,7 @@ export function Sidebar({
               Drive
             </Link>
           </li>
-          <li>
-            <Link
-              href="/activity"
-              className={`flex items-center px-3 py-2 rounded-md ${isActive('/activity') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
-                }`}
-            >
-              <SquareActivity className="w-5 h-5 mr-3" />
-              Activities
-            </Link>
-          </li>
+
           <li>
             <Link
               href="/signatures"

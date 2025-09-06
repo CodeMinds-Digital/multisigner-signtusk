@@ -25,7 +25,7 @@ const protectedRoutes = [
   '/dashboard',
   '/documents',
   '/upload',
-  '/activity',
+
   '/pending',
   '/completed',
   '/drafts',

@@ -69,34 +69,7 @@ function getMockDocuments(): Document[] {
   ]
 }
 
-function getMockActivity(): Activity[] {
-  return [
-    {
-      id: '1',
-      user_id: 'mock-user',
-      action: 'Document signed',
-      type: 'sign',
-      time: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-    },
-    {
-      id: '2',
-      user_id: 'mock-user',
-      action: 'Document uploaded',
-      type: 'upload',
-      time: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-      created_at: new Date(Date.now() - 7200000).toISOString(),
-    },
-    {
-      id: '3',
-      user_id: 'mock-user',
-      action: 'Signature requested',
-      type: 'share',
-      time: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
-      created_at: new Date(Date.now() - 10800000).toISOString(),
-    }
-  ]
-}
+
 
 export interface Document {
   id: string
@@ -119,7 +92,7 @@ export interface Document {
   updated_at: string
   completed_at?: string
   expires_at?: string
-  last_activity_at?: string
+
   // Legacy fields for backward compatibility
   name?: string
   document_type?: string
@@ -128,14 +101,7 @@ export interface Document {
   public_url?: string
 }
 
-export interface Activity {
-  id: string
-  action: string
-  type: 'upload' | 'sign' | 'share' | 'complete'
-  user_id: string
-  time: string
-  created_at: string
-}
+
 
 export interface DashboardStats {
   total: number
@@ -256,33 +222,7 @@ export async function getDashboardStats(userId: string): Promise<DashboardStats>
   }
 }
 
-// Get recent activity
-export async function getRecentActivity(userId: string): Promise<Activity[]> {
-  // In development mode, always use mock data to avoid database setup issues
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Development mode: Using mock activity data')
-    return getMockActivity()
-  }
 
-  try {
-    const { data, error } = await supabase
-      .from('activity_logs')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(10)
-
-    if (error) {
-      console.error('Error fetching recent activity:', error)
-      return getMockActivity() // Fallback to mock data
-    }
-
-    return data || []
-  } catch (error) {
-    console.error('Database connection error:', error)
-    return getMockActivity() // Fallback to mock data
-  }
-}
 
 // Upload document
 export async function uploadDocument(
@@ -363,8 +303,7 @@ export async function uploadDocument(
 
     if (insertError) throw insertError
 
-    // Log activity
-    await logActivity(userId, 'upload', `Uploaded ${file.name}`, document.id)
+
 
     return { success: true, document }
   } catch (error) {
@@ -433,8 +372,7 @@ export async function deleteDocument(
 
     if (deleteError) throw deleteError
 
-    // Log activity
-    await logActivity(userId, 'delete', `Deleted document from storage`)
+
 
     return { success: true }
   } catch (error) {
@@ -443,80 +381,4 @@ export async function deleteDocument(
   }
 }
 
-// Enhanced activity logging function
-export async function logActivity(
-  userId: string,
-  type: string,
-  action: string,
-  documentId?: string,
-  metadata?: Record<string, string | number | boolean>
-) {
-  try {
-    await supabase
-      .from('recent_activity')
-      .insert({
-        user_id: userId,
-        type,
-        action,
-        document_id: documentId,
-        metadata,
-        time: new Date().toISOString(),
-        created_at: new Date().toISOString()
-      })
-  } catch (error) {
-    console.error('Failed to log activity:', error)
-  }
-}
 
-// Get activity with enhanced filtering
-export async function getActivityByType(userId: string, type?: string): Promise<Activity[]> {
-  try {
-    let query = supabase
-      .from('recent_activity')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(50)
-
-    if (type) {
-      query = query.eq('type', type)
-    }
-
-    const { data, error } = await query
-
-    if (error) throw error
-    return data || []
-  } catch (error) {
-    console.error('Error fetching activity:', error)
-    return []
-  }
-}
-
-// Get activity statistics
-export async function getActivityStats(userId: string): Promise<{
-  totalActivities: number
-  activitiesByType: Record<string, number>
-  recentActivity: Activity[]
-}> {
-  try {
-    const activities = await getRecentActivity(userId)
-
-    const activitiesByType = activities.reduce((acc, activity) => {
-      acc[activity.type] = (acc[activity.type] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-
-    return {
-      totalActivities: activities.length,
-      activitiesByType,
-      recentActivity: activities.slice(0, 10)
-    }
-  } catch (error) {
-    console.error('Error fetching activity stats:', error)
-    return {
-      totalActivities: 0,
-      activitiesByType: {},
-      recentActivity: []
-    }
-  }
-}

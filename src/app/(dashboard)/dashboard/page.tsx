@@ -5,15 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { FileText, Clock, CheckCircle, AlertTriangle, RefreshCw, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/providers/auth-provider'
-import { getDashboardStats, getDocuments, getRecentActivity, type Document as DocumentType } from '@/lib/document-store'
+import { getDashboardStats, getDocuments, type Document as DocumentType } from '@/lib/document-store'
 import { UploadDocument } from '@/components/features/documents/upload-document'
 import { getStatusConfig } from '@/utils/document-status'
 
-interface DashboardActivity {
-  id: number
-  action: string
-  time: string
-}
+
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -23,7 +19,6 @@ export default function DashboardPage() {
     completedDocuments: 0,
     expiredDocuments: 0
   })
-  const [recentActivity, setRecentActivity] = useState<DashboardActivity[]>([])
   const [recentDocuments, setRecentDocuments] = useState<DocumentType[]>([])
   const [loading, setLoading] = useState(true)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
@@ -45,15 +40,6 @@ export default function DashboardPage() {
       // Get recent documents
       const documents = await getDocuments(user.id)
       setRecentDocuments(documents.slice(0, 5))
-
-      // Get recent activity
-      const activity = await getRecentActivity(user.id)
-      const formattedActivity = activity.slice(0, 5).map((act, index) => ({
-        id: index + 1,
-        action: act.action,
-        time: getTimeAgo(act.time || act.created_at)
-      }))
-      setRecentActivity(formattedActivity)
 
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
@@ -215,38 +201,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>
-              Your latest document activities
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8 text-gray-500">
-                Loading activity...
-              </div>
-            ) : recentActivity.length > 0 ? (
-              <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900">{activity.action}</p>
-                      <p className="text-xs text-gray-500">{activity.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                No recent activity to display
-              </div>
-            )}
-          </CardContent>
-        </Card>
+
       </div>
 
       {/* Upload Document Modal */}

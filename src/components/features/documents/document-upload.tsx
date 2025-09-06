@@ -187,22 +187,7 @@ export function DocumentUpload({ onUploadComplete, onClose }: DocumentUploadProp
         console.warn('user_files table not available, file uploaded to storage only')
       }
 
-      // Try to log activity
-      try {
-        const { data: recentActivity, error: activityError } = await supabase
-          .from('recent_activity')
-          .insert([{
-            action: `You uploaded ${selectedDocument.name}`,
-            type: 'upload',
-            user_id: user.id
-          }])
 
-        if (activityError) {
-          console.warn('Could not log activity:', activityError.message)
-        }
-      } catch (err) {
-        console.warn('recent_activity table not available, skipping activity log')
-      }
 
       setUploadProgress(100)
       setSuccess(true)
