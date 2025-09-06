@@ -23,7 +23,7 @@ const authRoutes = [
 
 const protectedRoutes = [
   '/dashboard',
-  '/documents',
+  '/sign-inbox',
   '/upload',
 
   '/pending',

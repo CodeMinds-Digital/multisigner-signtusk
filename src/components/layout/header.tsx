@@ -25,7 +25,6 @@ interface Notification {
 
 export function Header({ userName, userSignature }: HeaderProps) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(true)
@@ -217,13 +216,6 @@ export function Header({ userName, userSignature }: HeaderProps) {
           </h2>
         </div>
         <div className="flex items-center space-x-4">
-          <Button
-            onClick={() => setIsUploadModalOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center font-medium"
-          >
-            + Request Signature
-          </Button>
-
           {/* Notifications Button and Popup */}
           <div className="relative" ref={notificationsRef}>
             <button

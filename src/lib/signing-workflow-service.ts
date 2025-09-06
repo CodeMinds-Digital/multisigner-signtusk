@@ -54,11 +54,12 @@ export interface SigningRequestListItem {
   initiated_at: string
   expires_at?: string
   days_remaining?: number
+  initiated_by_name?: string // For received requests, shows who sent it
 }
 
 export class SigningWorkflowService {
   /**
-   * Get all signing requests for a user
+   * Get all signing requests initiated by a user (sent requests)
    */
   static async getSigningRequests(userId: string): Promise<SigningRequestListItem[]> {
     return createAuthenticatedSupabaseCall(async () => {
@@ -73,10 +74,64 @@ export class SigningWorkflowService {
 
       if (error) {
         console.error('Error fetching signing requests:', error)
-        throw error
+        return []
       }
 
       return (requests || []).map((request: any) => this.transformToListItem(request))
+    })
+  }
+
+  /**
+   * Get all signing requests received by a user (where they are a signer)
+   */
+  static async getReceivedSigningRequests(userEmail: string): Promise<SigningRequestListItem[]> {
+    return createAuthenticatedSupabaseCall(async () => {
+      // First, get signing request signers for this user
+      const { data: signerRecords, error: signerError } = await supabase
+        .from('signing_request_signers')
+        .select('signing_request_id, status, viewed_at, signed_at')
+        .eq('signer_email', userEmail)
+
+      if (signerError) {
+        console.error('Error fetching signer records:', signerError)
+        return []
+      }
+
+      if (!signerRecords || signerRecords.length === 0) {
+        return []
+      }
+
+      const requestIds = signerRecords.map((s: any) => s.signing_request_id)
+
+      // Then get the signing requests
+      const { data: requests, error: requestError } = await supabase
+        .from('signing_requests')
+        .select(`
+          *,
+          signers:signing_request_signers(*)
+        `)
+        .in('id', requestIds)
+        .order('created_at', { ascending: false })
+
+      if (requestError) {
+        console.error('Error fetching received signing requests:', requestError)
+        return []
+      }
+
+      return (requests || []).map((request: any) => {
+        const listItem = this.transformToListItem(request)
+
+        // Set the status based on the current user's signer status
+        const userSigner = signerRecords.find((s: any) => s.signing_request_id === request.id)
+        if (userSigner) {
+          listItem.status = userSigner.status
+        }
+
+        // Try to get initiator name (this might not always be available)
+        listItem.initiated_by_name = 'Unknown Sender'
+
+        return listItem
+      })
     })
   }
 
@@ -320,10 +375,10 @@ export class SigningWorkflowService {
 
       const stats = {
         total: data.length,
-        initiated: data.filter(r => r.status === 'initiated').length,
-        in_progress: data.filter(r => r.status === 'in_progress').length,
-        completed: data.filter(r => r.status === 'completed').length,
-        expired: data.filter(r => r.status === 'expired').length
+        initiated: data.filter((r: any) => r.status === 'initiated').length,
+        in_progress: data.filter((r: any) => r.status === 'in_progress').length,
+        completed: data.filter((r: any) => r.status === 'completed').length,
+        expired: data.filter((r: any) => r.status === 'expired').length
       }
 
       return stats

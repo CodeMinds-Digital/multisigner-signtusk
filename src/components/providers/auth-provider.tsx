@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { User, LoginCredentials } from '@/types/auth'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
-import { AuthInterceptor } from '@/lib/auth-interceptor'
+import { AuthInterceptor, TokenRefreshManager } from '@/lib/auth-interceptor'
 
 interface AuthContextType {
   user: User | null
@@ -247,6 +247,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [])
 
   useEffect(() => {
+    // Initialize token refresh manager
+    TokenRefreshManager.initialize()
+
     // Get initial session
     const getSession = async () => {
       try {
@@ -404,7 +407,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     )
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+      TokenRefreshManager.cleanup()
+    }
   }, [isSigningIn, clearAuthStorage, router, handleExpiredSession, isTokenExpiredError])
 
   const value = {

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { createAuthenticatedSupabaseCall } from './auth-interceptor'
 
 // Mock data for development when database tables don't exist
 function getMockDocuments(): Document[] {
@@ -119,7 +120,7 @@ export async function getDocuments(userId: string): Promise<Document[]> {
     return getMockDocuments()
   }
 
-  try {
+  return createAuthenticatedSupabaseCall(async () => {
     const { data, error } = await supabase
       .from('documents')
       .select('*')
@@ -132,10 +133,7 @@ export async function getDocuments(userId: string): Promise<Document[]> {
     }
 
     return data || []
-  } catch (error) {
-    console.error('Database connection error:', error)
-    return getMockDocuments() // Fallback to mock data
-  }
+  })
 }
 
 // Get documents by status

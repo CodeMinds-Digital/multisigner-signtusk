@@ -3,10 +3,10 @@
 import { useState } from 'react'
 import { Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { DocumentList } from '@/components/features/documents/document-list'
+import { UnifiedSigningRequestsList } from '@/components/features/documents/unified-signing-requests-list'
 import { UploadDocument } from '@/components/features/documents/upload-document'
 
-export default function DocumentsPage() {
+export default function SignInboxPage() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
@@ -23,8 +23,8 @@ export default function DocumentsPage() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Documents</h1>
-          <p className="text-gray-600">Manage and track all your documents</p>
+          <h1 className="text-2xl font-bold text-gray-900">Sign Inbox</h1>
+          <p className="text-gray-600">Manage signature requests you've sent and received</p>
         </div>
         <Button
           onClick={() => setIsUploadModalOpen(true)}
@@ -35,7 +35,7 @@ export default function DocumentsPage() {
         </Button>
       </div>
 
-      <DocumentList key={refreshKey} onRefresh={handleRefresh} />
+      <UnifiedSigningRequestsList key={refreshKey} onRefresh={handleRefresh} />
 
       <UploadDocument
         isOpen={isUploadModalOpen}
