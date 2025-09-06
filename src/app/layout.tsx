@@ -7,6 +7,9 @@ import { ConsoleFilterProvider } from "@/components/providers/console-filter-pro
 
 // Import auth recovery utilities to make them globally available
 import "@/utils/auth-recovery";
+// Import auth interceptor and test utilities
+import "@/lib/auth-interceptor";
+import "@/utils/test-token-expiry";
 
 const inter = Inter({ subsets: ["latin"] });
 

@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { createAuthenticatedSupabaseCall } from './auth-interceptor'
 
 export interface SigningRequestSigner {
   id: string
@@ -60,7 +61,7 @@ export class SigningWorkflowService {
    * Get all signing requests for a user
    */
   static async getSigningRequests(userId: string): Promise<SigningRequestListItem[]> {
-    try {
+    return createAuthenticatedSupabaseCall(async () => {
       const { data: requests, error } = await supabase
         .from('signing_requests')
         .select(`
@@ -75,11 +76,8 @@ export class SigningWorkflowService {
         throw error
       }
 
-      return (requests || []).map(request => this.transformToListItem(request))
-    } catch (error) {
-      console.error('Error in getSigningRequests:', error)
-      throw error
-    }
+      return (requests || []).map((request: any) => this.transformToListItem(request))
+    })
   }
 
   /**

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { User, LoginCredentials } from '@/types/auth'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
+import { AuthInterceptor } from '@/lib/auth-interceptor'
 
 interface AuthContextType {
   user: User | null
@@ -39,6 +40,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const router = useRouter()
 
   const clearError = useCallback(() => setError(null), [])
+
+  // Enhanced token expiry detection using AuthInterceptor
+  const isTokenExpiredError = useCallback((error: Error | { message?: string; status?: number; code?: string } | null): boolean => {
+    return AuthInterceptor.isTokenExpiredError(error)
+  }, [])
 
   // Clear auth storage function
   const clearAuthStorage = useCallback(() => {
@@ -85,15 +91,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Handle refresh token errors during sign in
       if (error) {
         console.log('❌ Auth Provider: Supabase auth error:', error)
-        if (error.message.includes('refresh_token_not_found') ||
-          error.message.includes('Invalid Refresh Token') ||
-          error.message.includes('Refresh Token Not Found') ||
-          error.message.includes('AuthApiError')) {
-          console.warn('Refresh token error during sign in, clearing auth storage:', error.message)
+        if (isTokenExpiredError(error)) {
+          console.warn('Token expired during sign in, clearing auth storage:', error.message)
           clearAuthStorage()
           // Retry the sign in after clearing storage
           const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword(credentials)
-          if (retryError) throw retryError
+          if (retryError) {
+            if (isTokenExpiredError(retryError)) {
+              throw new Error('Authentication failed. Please try again.')
+            }
+            throw retryError
+          }
           data.user = retryData.user
           data.session = retryData.session
         } else {
@@ -195,7 +203,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       setIsSigningIn(false) // Clear the signing in flag
       setLoading(false)
     }
-  }, [router, clearAuthStorage])
+  }, [router, clearAuthStorage, isTokenExpiredError])
 
   const signOut = useCallback(async () => {
     try {
@@ -227,6 +235,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [clearAuthStorage, router])
 
+  // Clear expired session and redirect to login
+  const handleExpiredSession = useCallback((reason: string) => {
+    console.warn('🧹 Session expired:', reason)
+    setUser(null)
+    setError(null)
+    setLoading(false)
+
+    // Use the global auth interceptor for consistent handling
+    AuthInterceptor.handleExpiredToken()
+  }, [])
+
   useEffect(() => {
     // Get initial session
     const getSession = async () => {
@@ -234,18 +253,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.log('🔄 Auth Provider: Getting initial session...')
         const { data: { session }, error } = await supabase.auth.getSession()
 
-        // Handle refresh token errors
+        // Handle any session errors (including expired tokens)
         if (error) {
           console.error('❌ Auth Provider: Session error:', error)
-          if (error.message.includes('refresh_token_not_found') ||
-            error.message.includes('Invalid Refresh Token') ||
-            error.message.includes('Refresh Token Not Found') ||
-            error.message.includes('AuthApiError')) {
-            console.warn('🧹 Refresh token error detected, clearing auth storage:', error.message)
-            clearAuthStorage()
-            setUser(null)
-            setLoading(false)
-            // Don't redirect here, let the user stay on current page
+          if (isTokenExpiredError(error)) {
+            handleExpiredSession(`Session error: ${error.message}`)
             return
           }
           throw error
@@ -322,11 +334,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
         // Handle auth errors (like refresh token issues)
         if (event === 'TOKEN_REFRESHED' && !session) {
-          console.warn('Token refresh failed, clearing auth storage')
-          clearAuthStorage()
+          handleExpiredSession('Token refresh failed')
+          return
+        }
+
+        // Handle SIGNED_OUT event
+        if (event === 'SIGNED_OUT') {
+          console.log('🔄 User signed out, clearing state')
           setUser(null)
+          setError(null)
           setLoading(false)
-          window.location.href = '/login'
           return
         }
 
@@ -375,17 +392,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         } catch (error) {
           console.error('Auth state change error:', error)
 
-          // Check if it's a refresh token error
-          if (error instanceof Error && (
-            error.message.includes('refresh_token_not_found') ||
-            error.message.includes('Invalid Refresh Token') ||
-            error.message.includes('Refresh Token Not Found') ||
-            error.message.includes('AuthApiError')
-          )) {
-            console.warn('Refresh token error in auth state change, clearing storage')
-            clearAuthStorage()
-            setUser(null)
-            window.location.href = '/login'
+          // Check if it's a token expiry error
+          if (isTokenExpiredError(error as Error)) {
+            handleExpiredSession(`Auth state change error: ${error instanceof Error ? error.message : 'Unknown error'}`)
           } else {
             setError(error instanceof Error ? error.message : 'An error occurred')
           }
@@ -396,7 +405,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     )
 
     return () => subscription.unsubscribe()
-  }, [isSigningIn, clearAuthStorage, router])
+  }, [isSigningIn, clearAuthStorage, router, handleExpiredSession, isTokenExpiredError])
 
   const value = {
     user,
