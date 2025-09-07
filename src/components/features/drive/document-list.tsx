@@ -5,7 +5,6 @@ import { DocumentTemplate } from '@/types/drive'
 import { DriveService } from '@/lib/drive-service'
 import { FileText, Calendar, User, Eye, Edit } from 'lucide-react'
 import { getStatusConfig } from '@/utils/document-status'
-import { analyzeDocumentSignatureType } from '@/lib/signature-field-utils'
 import { DocumentActionsMenu } from '@/components/ui/document-actions-menu'
 
 interface DocumentListProps {
@@ -32,23 +31,20 @@ export function DocumentList({ documents, onEdit, onDelete, onArchive, onUnarchi
     }
   }
 
-  // Get dynamic signature type based on actual signature fields in schemas
+  // Get signature type display text based on signature_type column
   const getDocumentSignatureType = (document: DocumentTemplate): string => {
-    try {
-      // Analyze the document's schemas to determine actual signature type
-      const analysis = analyzeDocumentSignatureType(document)
+    // Use the signature_type field from the documents table
+    if (!document.signature_type) {
+      return 'No signatures'
+    }
 
-      if (analysis.signatureFieldsCount === 0) {
-        return 'No signatures'
-      } else if (analysis.signatureFieldsCount === 1) {
+    switch (document.signature_type) {
+      case 'single':
         return 'Single signature'
-      } else {
+      case 'multi':
         return 'Multi signature'
-      }
-    } catch (error) {
-      console.warn('Error analyzing signature type for document:', document.id, error)
-      // Fallback to stored signature_type if analysis fails
-      return document.signature_type ? `${document.signature_type} signature` : 'Unknown'
+      default:
+        return 'No signatures'
     }
   }
 

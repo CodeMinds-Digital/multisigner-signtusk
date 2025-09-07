@@ -649,45 +649,124 @@ export class DriveService {
     return [
       {
         id: 'mock-1',
-        name: 'Sample Contract Template',
+        name: 'Employment Contract',
         type: 'contract',
         signature_type: 'single',
-        status: 'completed',
-        pdf_url: '/mock/sample-contract.pdf',
+        status: 'ready',
+        pdf_url: '/mock/employment-contract.pdf',
         template_url: undefined,
-        schemas: [],
+        schemas: [
+          {
+            id: 'sig-1',
+            type: 'signature',
+            x: 100,
+            y: 200,
+            width: 200,
+            height: 50,
+            name: 'Employee Signature',
+            properties: {
+              signerId: 'signer_1'
+            }
+          }
+        ],
         created_at: new Date(Date.now() - 86400000).toISOString(),
         updated_at: new Date(Date.now() - 86400000).toISOString(),
         user_id: 'mock-user',
-        description: 'A sample contract template for testing'
+        description: 'Employment contract ready for signature'
       },
       {
         id: 'mock-2',
-        name: 'NDA Template',
-        type: 'nda',
-        signature_type: 'single',
-        status: 'completed',
-        pdf_url: '/mock/nda-template.pdf',
+        name: 'Partnership Agreement',
+        type: 'partnership',
+        signature_type: 'multi',
+        status: 'ready',
+        pdf_url: '/mock/partnership-agreement.pdf',
         template_url: undefined,
-        schemas: [],
+        schemas: [
+          {
+            id: 'sig-1',
+            type: 'signature',
+            x: 100,
+            y: 200,
+            width: 200,
+            height: 50,
+            name: 'Partner 1 Signature',
+            properties: {
+              signerId: 'signer_1'
+            }
+          },
+          {
+            id: 'sig-2',
+            type: 'signature',
+            x: 100,
+            y: 300,
+            width: 200,
+            height: 50,
+            name: 'Partner 2 Signature',
+            properties: {
+              signerId: 'signer_2'
+            }
+          }
+        ],
         created_at: new Date(Date.now() - 172800000).toISOString(),
         updated_at: new Date(Date.now() - 172800000).toISOString(),
         user_id: 'mock-user',
-        description: 'Non-disclosure agreement template'
+        description: 'Partnership agreement requiring multiple signatures'
       },
       {
         id: 'mock-3',
+        name: 'NDA Template',
+        type: 'nda',
+        signature_type: 'single',
+        status: 'ready',
+        pdf_url: '/mock/nda-template.pdf',
+        template_url: undefined,
+        schemas: [
+          {
+            id: 'sig-1',
+            type: 'signature',
+            x: 100,
+            y: 250,
+            width: 200,
+            height: 50,
+            name: 'Signatory',
+            properties: {
+              signerId: 'signer_1'
+            }
+          }
+        ],
+        created_at: new Date(Date.now() - 259200000).toISOString(),
+        updated_at: new Date(Date.now() - 259200000).toISOString(),
+        user_id: 'mock-user',
+        description: 'Non-disclosure agreement ready for signature'
+      },
+      {
+        id: 'mock-4',
         name: 'Service Agreement Draft',
         type: 'service_agreement',
-        signature_type: 'single',
+        signature_type: undefined as any, // No signature type set
         status: 'draft',
         pdf_url: '/mock/service-agreement.pdf',
         template_url: undefined,
         schemas: [],
-        created_at: new Date(Date.now() - 259200000).toISOString(),
-        updated_at: new Date(Date.now() - 259200000).toISOString(),
+        created_at: new Date(Date.now() - 345600000).toISOString(),
+        updated_at: new Date(Date.now() - 345600000).toISOString(),
         user_id: 'mock-user',
         description: 'Service agreement template in progress'
+      },
+      {
+        id: 'mock-5',
+        name: 'Agreement Template',
+        type: 'agreement',
+        signature_type: undefined as any, // No signature type set
+        status: 'draft',
+        pdf_url: '/mock/agreement.pdf',
+        template_url: undefined,
+        schemas: [],
+        created_at: new Date(Date.now() - 432000000).toISOString(),
+        updated_at: new Date(Date.now() - 432000000).toISOString(),
+        user_id: 'mock-user',
+        description: 'Agreement template without signatures configured'
       }
     ]
   }

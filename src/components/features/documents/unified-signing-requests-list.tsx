@@ -3,12 +3,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { File, Clock, CheckCircle, AlertTriangle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Calendar, Send, Inbox, Filter } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
-import { SigningWorkflowService, type SigningRequestListItem } from '@/lib/signing-workflow-service'
+import { type SigningRequestListItem } from '@/lib/signing-workflow-service'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorAlert } from '@/components/ui/alert'
+import { RequestDetailsModal } from './request-details-modal'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -83,54 +84,45 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         try {
             const dateFilter = getDateFilter(timeRange)
 
-            // Load both sent and received requests with individual error handling
-            let sentRequests: SigningRequestListItem[] = []
-            let receivedRequests: SigningRequestListItem[] = []
-            let hasErrors = false
+            // Fetch all requests using the new API endpoint
+            const response = await fetch('/api/signature-requests')
 
-            try {
-                sentRequests = await SigningWorkflowService.getSigningRequests(user.id)
-            } catch (sentError) {
-                console.error('Error fetching sent signing requests:', sentError)
-                hasErrors = true
+            if (!response.ok) {
+                throw new Error('Failed to fetch signing requests')
             }
 
-            try {
-                receivedRequests = await SigningWorkflowService.getReceivedSigningRequests(user.email)
-            } catch (receivedError) {
-                console.error('Error fetching received signing requests:', receivedError)
-                hasErrors = true
+            const result = await response.json()
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to fetch signing requests')
             }
 
-            // Only show error if both requests failed
-            if (hasErrors && sentRequests.length === 0 && receivedRequests.length === 0) {
-                setError('Failed to load signing requests')
-                return
-            }
+            const allRequests = result.data || []
 
-            // Filter by date range and add type
-            const filteredSent = sentRequests
-                .filter(req => new Date(req.initiated_at) >= dateFilter)
-                .map(req => ({ ...req, type: 'sent' as const }))
+            // Filter by date range and categorize requests
+            const filteredRequests = allRequests
+                .filter((req: any) => new Date(req.initiated_at) >= dateFilter)
+                .map((req: any) => {
+                    // Determine if this is a sent or received request
+                    const isSent = !req.initiated_by_name // Sent requests don't have initiated_by_name
 
-            const filteredReceived = receivedRequests
-                .filter(req => new Date(req.initiated_at) >= dateFilter)
-                .map(req => ({
-                    ...req,
-                    type: 'received' as const,
-                    sender_name: req.initiated_by_name,
-                    user_status: req.status
-                }))
-
-            // Combine and sort by date
-            const allRequests = [...filteredSent, ...filteredReceived]
+                    return {
+                        ...req,
+                        type: isSent ? 'sent' as const : 'received' as const,
+                        sender_name: req.initiated_by_name,
+                        user_status: isSent ? undefined : req.status
+                    }
+                })
                 .sort((a, b) => new Date(b.initiated_at).getTime() - new Date(a.initiated_at).getTime())
 
-            setRequests(allRequests)
+            const sentCount = filteredRequests.filter(req => req.type === 'sent').length
+            const receivedCount = filteredRequests.filter(req => req.type === 'received').length
+
+            setRequests(filteredRequests)
             setStats({
-                total: allRequests.length,
-                sent: filteredSent.length,
-                received: filteredReceived.length
+                total: filteredRequests.length,
+                sent: sentCount,
+                received: receivedCount
             })
         } catch (err) {
             console.error('Unexpected error loading signing requests:', err)
@@ -147,14 +139,20 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const getStatusBadge = (request: UnifiedSigningRequest) => {
         const status = request.type === 'received' ? request.user_status || request.status : request.status
 
+        // Debug: Log the actual status to understand the mapping issue
+        console.log('Status for request:', request.title, 'is:', status, 'type:', request.type)
+
         const statusConfig = {
             pending: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800' },
             viewed: { label: 'Viewed', color: 'bg-blue-100 text-blue-800' },
             signed: { label: 'Signed', color: 'bg-green-100 text-green-800' },
             declined: { label: 'Declined', color: 'bg-red-100 text-red-800' },
             initiated: { label: 'Initiated', color: 'bg-blue-100 text-blue-800' },
+            'Initiated': { label: 'Initiated', color: 'bg-blue-100 text-blue-800' }, // Handle capitalized version
             in_progress: { label: 'In Progress', color: 'bg-yellow-100 text-yellow-800' },
+            'In Progress': { label: 'In Progress', color: 'bg-blue-100 text-blue-800' },
             completed: { label: 'Completed', color: 'bg-green-100 text-green-800' },
+            'Completed': { label: 'Completed', color: 'bg-green-100 text-green-800' },
             expired: { label: 'Expired', color: 'bg-gray-100 text-gray-800' },
             cancelled: { label: 'Cancelled', color: 'bg-red-100 text-red-800' }
         }
@@ -191,8 +189,11 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     }
 
     const handleView = (request: UnifiedSigningRequest) => {
-        console.log('View request:', request)
+        console.log('👁️ Eye icon clicked! View request:', request.title, 'Status:', request.status)
+        console.log('📊 Request progress:', request.progress)
+        console.log('👥 Request signers:', request.signers)
         setViewingRequest(request)
+        console.log('✅ ViewingRequest state set, modal should open')
     }
 
     const handleSign = (request: UnifiedSigningRequest) => {
@@ -376,9 +377,11 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-sm text-gray-600">
-                                                {request.type === 'sent'
-                                                    ? `To ${request.signers?.length || 0} signer${request.signers?.length !== 1 ? 's' : ''}`
-                                                    : `From ${request.sender_name || 'Unknown'}`
+                                                {(request as any).context_display ||
+                                                    (request.type === 'sent'
+                                                        ? `To ${request.signers?.length || 0} signer${request.signers?.length !== 1 ? 's' : ''}`
+                                                        : `From ${request.sender_name || 'Unknown'}`
+                                                    )
                                                 }
                                             </span>
                                         </TableCell>
@@ -444,6 +447,15 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                     )}
                 </CardContent>
             </Card>
+
+            {/* Request Details Modal */}
+            {viewingRequest && (
+                <RequestDetailsModal
+                    request={viewingRequest}
+                    isOpen={!!viewingRequest}
+                    onClose={() => setViewingRequest(null)}
+                />
+            )}
         </div>
     )
 }

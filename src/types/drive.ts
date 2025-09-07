@@ -9,7 +9,7 @@ export interface DocumentTemplate {
   id: string
   name: string
   type: string
-  signature_type: 'single' | 'multi'
+  signature_type?: 'single' | 'multi'
   status: DocumentStatus
   pdf_url?: string
   template_url?: string

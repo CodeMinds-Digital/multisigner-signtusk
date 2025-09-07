@@ -4,15 +4,16 @@ import { useState } from 'react'
 import { Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { UnifiedSigningRequestsList } from '@/components/features/documents/unified-signing-requests-list'
-import { UploadDocument } from '@/components/features/documents/upload-document'
+import { RequestSignatureModal } from '@/components/features/documents/request-signature-modal'
 
 export default function SignInboxPage() {
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false)
   const [refreshKey, setRefreshKey] = useState(0)
 
-  const handleUploadSuccess = () => {
+  const handleRequestSuccess = (requestId: string) => {
     setRefreshKey(prev => prev + 1)
-    setIsUploadModalOpen(false)
+    setIsRequestModalOpen(false)
+    console.log('Signature request sent successfully:', requestId)
   }
 
   const handleRefresh = () => {
@@ -27,7 +28,7 @@ export default function SignInboxPage() {
           <p className="text-gray-600">Manage signature requests you've sent and received</p>
         </div>
         <Button
-          onClick={() => setIsUploadModalOpen(true)}
+          onClick={() => setIsRequestModalOpen(true)}
           className="bg-blue-600 hover:bg-blue-700"
         >
           <Upload className="w-4 h-4 mr-2" />
@@ -37,10 +38,10 @@ export default function SignInboxPage() {
 
       <UnifiedSigningRequestsList key={refreshKey} onRefresh={handleRefresh} />
 
-      <UploadDocument
-        isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
-        onSuccess={handleUploadSuccess}
+      <RequestSignatureModal
+        isOpen={isRequestModalOpen}
+        onClose={() => setIsRequestModalOpen(false)}
+        onSuccess={handleRequestSuccess}
       />
     </div>
   )

@@ -21,13 +21,15 @@ export interface EmailResult {
 // Send signature request email
 export async function sendSignatureRequestEmail(emailData: SignatureRequestEmail): Promise<EmailResult> {
   try {
+    console.log('📧 Sending signature request email to:', emailData.to)
+
     if (!process.env.RESEND_API_KEY) {
       console.warn('RESEND_API_KEY not configured, simulating email send')
       return simulateEmailSend(emailData)
     }
 
     const { data, error } = await resend.emails.send({
-      from: 'SignTusk <noreply@signtusk.com>',
+      from: 'SignTusk <onboarding@resend.dev>',
       to: [emailData.to],
       subject: `Signature Request: ${emailData.documentTitle}`,
       html: generateSignatureRequestHTML(emailData),
@@ -63,7 +65,7 @@ export async function sendBulkSignatureRequests(
 
   for (const signer of signers) {
     const signatureUrl = `${process.env.NEXT_PUBLIC_APP_URL}/sign/${options.documentId}?signer=${encodeURIComponent(signer.email)}`
-    
+
     const emailData: SignatureRequestEmail = {
       to: signer.email,
       signerName: signer.name,
@@ -97,11 +99,11 @@ export async function sendBulkSignatureRequests(
 
 // Generate HTML email template
 function generateSignatureRequestHTML(emailData: SignatureRequestEmail): string {
-  const dueText = emailData.dueDate 
+  const dueText = emailData.dueDate
     ? `<p><strong>Due Date:</strong> ${new Date(emailData.dueDate).toLocaleDateString()}</p>`
     : ''
 
-  const messageText = emailData.message 
+  const messageText = emailData.message
     ? `<div style="background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
          <p><strong>Message from ${emailData.senderName}:</strong></p>
          <p style="font-style: italic;">"${emailData.message}"</p>
@@ -175,7 +177,7 @@ function simulateEmailSend(emailData: SignatureRequestEmail): EmailResult {
   console.log('Subject: Signature Request:', emailData.documentTitle)
   console.log('Signature URL:', emailData.signatureUrl)
   console.log('---')
-  
+
   // Simulate success with a fake message ID
   return {
     success: true,
@@ -195,7 +197,7 @@ export async function testEmailConfiguration(): Promise<{ success: boolean; erro
 
     // Test with a simple email send
     const testResult = await resend.emails.send({
-      from: 'SignTusk <noreply@signtusk.com>',
+      from: 'SignTusk <onboarding@resend.dev>',
       to: ['test@example.com'],
       subject: 'SignTusk Email Configuration Test',
       html: '<p>This is a test email to verify Resend configuration.</p>',
@@ -226,7 +228,7 @@ export async function resendSignatureRequest(
   senderName: string
 ): Promise<EmailResult> {
   const signatureUrl = `${process.env.NEXT_PUBLIC_APP_URL}/sign/${documentId}?signer=${encodeURIComponent(signerEmail)}`
-  
+
   const emailData: SignatureRequestEmail = {
     to: signerEmail,
     signerName: signerEmail.split('@')[0], // Use email prefix as fallback name
