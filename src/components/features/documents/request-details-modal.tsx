@@ -35,9 +35,10 @@ interface RequestDetailsModalProps {
   }
   isOpen: boolean
   onClose: () => void
+  currentUserEmail?: string
 }
 
-export function RequestDetailsModal({ request, isOpen, onClose }: RequestDetailsModalProps) {
+export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail }: RequestDetailsModalProps) {
   if (!isOpen) return null
 
   const formatDate = (dateString: string) => {
@@ -298,6 +299,29 @@ export function RequestDetailsModal({ request, isOpen, onClose }: RequestDetails
           </div>
         </div>
       </div>
+
+      {/* PDF Signing Screen */}
+      {showSigningScreen && (
+        <PDFSigningScreen
+          request={{
+            id: request.id,
+            title: request.title,
+            document_url: request.document_url || '',
+            expires_at: request.expires_at || '',
+            signers: request.signers.map(s => ({
+              id: s.email,
+              name: s.name,
+              email: s.email,
+              status: s.status,
+              signing_order: 1
+            }))
+          }}
+          currentUserEmail={currentUserEmail || ''}
+          onClose={() => setShowSigningScreen(false)}
+          onSign={handleSignatureAccept}
+          onDecline={handleSignatureDecline}
+        />
+      )}
     </div>
   )
 }

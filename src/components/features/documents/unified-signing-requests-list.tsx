@@ -42,6 +42,13 @@ interface UnifiedSigningRequest extends SigningRequestListItem {
     type: 'sent' | 'received'
     sender_name?: string
     user_status?: string
+    document_status?: string
+    can_sign?: boolean
+    decline_reason?: string
+    document_url?: string
+    document_id?: string
+    final_pdf_url?: string
+    context_display?: string
 }
 
 interface RequestStats {
@@ -160,9 +167,18 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.pending
 
         return (
-            <span className={`px-2 py-1 text-xs font-medium rounded-full ${config.color}`}>
-                {config.label}
-            </span>
+            <div className="flex flex-col">
+                <span className={`px-2 py-1 text-xs font-medium rounded-full ${config.color}`}>
+                    {config.label}
+                </span>
+                {request.decline_reason && (
+                    <span className="text-xs text-red-600 mt-1" title={request.decline_reason}>
+                        Reason: {request.decline_reason.length > 30
+                            ? `${request.decline_reason.substring(0, 30)}...`
+                            : request.decline_reason}
+                    </span>
+                )}
+            </div>
         )
     }
 
@@ -182,10 +198,21 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         const diffTime = expiry.getTime() - now.getTime()
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-        if (diffDays < 0) return 'Expired'
-        if (diffDays === 0) return 'Expires today'
-        if (diffDays === 1) return 'Expires tomorrow'
-        return `${diffDays} days left`
+        // Format the full date and time
+        const fullDateTime = expiry.toLocaleDateString('en-US', {
+            month: 'short',
+            day: 'numeric',
+            year: 'numeric'
+        }) + ' · ' + expiry.toLocaleTimeString('en-US', {
+            hour: 'numeric',
+            minute: '2-digit',
+            hour12: true
+        })
+
+        if (diffDays < 0) return `Expired (${fullDateTime})`
+        if (diffDays === 0) return `Expires Today (${fullDateTime})`
+        if (diffDays === 1) return `Expires Tomorrow (${fullDateTime})`
+        return `Expires ${fullDateTime}`
     }
 
     const handleView = (request: UnifiedSigningRequest) => {
@@ -197,7 +224,9 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     }
 
     const handleSign = (request: UnifiedSigningRequest) => {
-        console.log('Sign document:', request)
+        console.log('🖊️ Sign document clicked:', request.title)
+        // Open the request details modal which will show the Sign Document button
+        setViewingRequest(request)
     }
 
     const handleShare = (request: UnifiedSigningRequest) => {
@@ -407,13 +436,23 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                                 >
                                                     <Eye className="w-4 h-4" />
                                                 </Button>
-                                                {request.type === 'received' && request.user_status === 'pending' && (
+                                                {request.type === 'received' && request.can_sign && (
                                                     <Button
                                                         size="sm"
                                                         onClick={() => handleSign(request)}
-                                                        className="bg-blue-600 hover:bg-blue-700"
+                                                        className="bg-green-600 hover:bg-green-700"
                                                     >
                                                         Sign
+                                                    </Button>
+                                                )}
+                                                {request.type === 'received' && request.document_status === 'completed' && request.final_pdf_url && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => window.open(request.final_pdf_url, '_blank')}
+                                                    >
+                                                        <Download className="w-4 h-4 mr-1" />
+                                                        Final PDF
                                                     </Button>
                                                 )}
                                                 {request.type === 'sent' && (
@@ -454,6 +493,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                     request={viewingRequest}
                     isOpen={!!viewingRequest}
                     onClose={() => setViewingRequest(null)}
+                    currentUserEmail={user?.email}
                 />
             )}
         </div>

@@ -131,30 +131,50 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Transform data to match UI expectations (same logic as SigningWorkflowService)
+    // Transform data to match UI expectations with enhanced status tracking
     const transformToListItem = (request: any, isReceived = false) => {
-      const { total_signers, viewed_signers, completed_signers, status } = request
+      const { total_signers, viewed_count, signed_count, document_status } = request
 
       let displayStatus = 'Initiated'
-      if (status === 'completed') {
+      let canSign = false
+      let declineReason = null
+
+      // Use document_status for overall status
+      if (document_status === 'completed') {
         displayStatus = 'Completed'
-      } else if (status === 'cancelled') {
-        displayStatus = 'Cancelled'
-      } else if (status === 'expired') {
-        displayStatus = 'Expired'
-      } else if (completed_signers > 0) {
-        if (completed_signers === total_signers) {
-          displayStatus = 'Completed'
-        } else {
-          displayStatus = `Signed (${completed_signers}/${total_signers})`
-        }
-      } else if (viewed_signers > 0) {
-        displayStatus = `Viewed (${viewed_signers}/${total_signers})`
+      } else if (document_status === 'declined') {
+        displayStatus = 'Declined'
+        declineReason = request.decline_reason
+      } else if (document_status === 'partially_signed') {
+        displayStatus = `Signed (${signed_count}/${total_signers})`
+      } else if (viewed_count > 0) {
+        displayStatus = `Viewed (${viewed_count}/${total_signers})`
       }
 
       // For received requests, use the user's signer status if available
       if (isReceived && request.user_signer_status) {
-        displayStatus = request.user_signer_status
+        const userSigner = request.signers?.find((s: any) => s.signer_email === userEmail)
+        if (userSigner) {
+          switch (userSigner.signer_status) {
+            case 'initiated':
+              displayStatus = 'Pending'
+              canSign = true
+              break
+            case 'viewed':
+              displayStatus = 'Viewed'
+              canSign = true
+              break
+            case 'signed':
+              displayStatus = 'Signed'
+              canSign = false
+              break
+            case 'declined':
+              displayStatus = 'Declined'
+              canSign = false
+              declineReason = userSigner.decline_reason
+              break
+          }
+        }
       }
 
       const calculateDaysRemaining = (expiresAt?: string): number | undefined => {
@@ -192,17 +212,21 @@ export async function GET(request: NextRequest) {
         id: request.id,
         title: request.title,
         status: displayStatus,
+        document_status: request.document_status,
+        can_sign: canSign,
+        decline_reason: declineReason,
         progress: {
-          viewed: request.viewed_signers || 0,
-          signed: request.completed_signers || 0,
+          viewed: request.viewed_count || 0,
+          signed: request.signed_count || 0,
           total: request.total_signers || 0
         },
         signers: (request.signers || []).map((signer: any) => ({
           name: signer.signer_name,
           email: signer.signer_email,
-          status: signer.status,
+          status: signer.signer_status || signer.status,
           viewed_at: signer.viewed_at,
-          signed_at: signer.signed_at
+          signed_at: signer.signed_at,
+          decline_reason: signer.decline_reason
         })),
         initiated_at: request.initiated_at,
         expires_at: request.expires_at,
@@ -210,7 +234,8 @@ export async function GET(request: NextRequest) {
         initiated_by_name: request.sender_name, // For received requests
         context_display: contextDisplay, // New field for better UX
         document_url: request.document?.pdf_url || request.document?.file_url, // Document URL for opening
-        document_id: request.document?.id // Document ID for reference
+        document_id: request.document?.id, // Document ID for reference
+        final_pdf_url: request.final_pdf_url // Final signed PDF if completed
       }
     }
 
