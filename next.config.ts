@@ -9,6 +9,12 @@ const nextConfig: NextConfig = {
       allowedOrigins: ['localhost:3000'],
     },
   },
+  // Fix cross-origin dev warnings
+  allowedDevOrigins: ['http://192.168.1.2:3001'],
+  // Fix Turbopack root directory
+  turbopack: {
+    root: __dirname,
+  },
   webpack: (config, { isServer }) => {
     // Handle canvas package issues
     config.resolve.alias.canvas = false;

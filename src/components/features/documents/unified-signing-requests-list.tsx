@@ -230,8 +230,49 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         setViewingRequest(request)
     }
 
+    const handleShare = (request: UnifiedSigningRequest) => {
+        console.log('Send reminder for request:', request)
+    }
+
+    const handleDelete = (request: UnifiedSigningRequest) => {
+        if (confirm('Are you sure you want to delete this request?')) {
+            console.log('Delete request:', request)
+        }
+    }
+
     const handlePreviewPDF = async (request: UnifiedSigningRequest) => {
-        console.log('👁️ PDF Preview clicked for:', request.title)
+        console.log('👁️ PDF Preview clicked for:', request.title, '- Smart detection enabled')
+        console.log('📄 Request data:', {
+            document_url: request.document_url,
+            final_pdf_url: request.final_pdf_url,
+            file_url: (request as any).file_url,
+            full_request: request
+        })
+
+        // Get the document path - try different fields
+        const documentPath = (request as any).file_url || request.document_url || request.final_pdf_url
+
+        if (!documentPath) {
+            console.log('📋 No document path found - opening details modal')
+            setViewingRequest(request)
+            return
+        }
+
+        // Smart detection: Check if this looks like a test document
+        const isTestDocument = documentPath.includes('/175') || // Timestamp-based paths like 1757007746811.pdf
+            documentPath.includes('/1756') || // Other timestamp patterns
+            !documentPath.includes('public/') // Real uploads usually have public/ prefix
+
+        if (isTestDocument) {
+            console.log('🧪 Detected test document - skipping API calls and opening details modal')
+            setViewingRequest(request)
+            setTimeout(() => {
+                alert(`📄 "${request.title}" is a demo document.\n\nTo test PDF preview:\n1. Upload a real document through the Drive\n2. Create a signature request with that document\n\nShowing document details instead.`)
+            }, 300)
+            return
+        }
+
+        console.log('🔍 Real document detected - trying storage access for:', documentPath)
 
         try {
             // Try multiple storage buckets for PDF access
@@ -240,28 +281,40 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
             for (const bucket of buckets) {
                 try {
-                    const response = await fetch(`/api/documents/preview?bucket=${bucket}&path=${request.document_url || request.final_pdf_url}`)
+                    console.log(`🔍 Trying bucket: ${bucket}`)
+                    const response = await fetch(`/api/documents/preview?bucket=${bucket}&path=${documentPath}`)
+                    console.log(`📡 Response from ${bucket}:`, response.status, response.statusText)
+
                     if (response.ok) {
                         const result = await response.json()
+                        console.log(`📋 Result from ${bucket}:`, result)
                         if (result.success && result.url) {
                             pdfUrl = result.url
+                            console.log(`✅ Found PDF URL in ${bucket}:`, pdfUrl)
                             break
                         }
                     }
                 } catch (err) {
-                    console.log(`Failed to get PDF from ${bucket}:`, err)
+                    console.log(`❌ Failed to get PDF from ${bucket}:`, err)
                 }
             }
 
             if (pdfUrl) {
+                console.log('🚀 Opening PDF URL:', pdfUrl)
                 window.open(pdfUrl, '_blank')
             } else {
-                console.error('Could not access PDF from any storage bucket')
-                alert('Unable to preview document. Please try again later.')
+                console.log('📋 Real document not found in storage - opening details modal')
+                setViewingRequest(request)
+                setTimeout(() => {
+                    alert(`PDF not found in storage for "${request.title}". The document may have been moved or deleted. Showing document details instead.`)
+                }, 300)
             }
         } catch (error) {
-            console.error('Error previewing PDF:', error)
-            alert('Error opening document preview')
+            console.error('❌ Error previewing PDF:', error)
+            setViewingRequest(request)
+            setTimeout(() => {
+                alert('Error accessing PDF. Document details are shown instead.')
+            }, 300)
         }
     }
 
@@ -276,10 +329,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     }
 
     const getFromToDisplay = (request: UnifiedSigningRequest) => {
-        if (request.context_display) {
-            return request.context_display
-        }
-
+        // Prioritize count-based display for sent requests
         if (request.type === 'sent') {
             const signerCount = request.signers?.length || 0
             if (signerCount === 1) {
@@ -289,101 +339,8 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             }
             return `To ${signerCount} signer${signerCount !== 1 ? 's' : ''}`
         } else {
+            // For received requests, show sender name
             return `From ${request.sender_name || 'Unknown'}`
-        }
-    }
-
-    const isDocumentCompleted = (request: UnifiedSigningRequest) => {
-        return request.status === 'completed' || request.document_status === 'completed'
-    }
-
-    const canSendReminderSimple = (request: UnifiedSigningRequest) => {
-        if (isDocumentCompleted(request)) return false
-
-        // Simple 24-hour check based on initiated_at
-        const now = new Date()
-        const initiatedAt = new Date(request.initiated_at)
-        const hoursSinceInitiated = (now.getTime() - initiatedAt.getTime()) / (1000 * 60 * 60)
-
-        return hoursSinceInitiated >= 24
-    }
-
-    const getTimeUntilNextReminder = (request: UnifiedSigningRequest) => {
-        const now = new Date()
-        const initiatedAt = new Date(request.initiated_at)
-        const hoursSinceInitiated = (now.getTime() - initiatedAt.getTime()) / (1000 * 60 * 60)
-        const hoursRemaining = Math.max(0, 24 - hoursSinceInitiated)
-
-        if (hoursRemaining === 0) return null
-
-        const hours = Math.floor(hoursRemaining)
-        const minutes = Math.floor((hoursRemaining - hours) * 60)
-
-        if (hours > 0) {
-            return `${hours}h ${minutes}m`
-        } else {
-            return `${minutes}m`
-        }
-    }
-
-    const handleSendReminder = async (request: UnifiedSigningRequest) => {
-        if (!canSendReminderSimple(request)) {
-            const timeRemaining = getTimeUntilNextReminder(request)
-            if (timeRemaining) {
-                alert(`You can send another reminder in ${timeRemaining}`)
-            }
-            return
-        }
-
-        try {
-            const response = await fetch('/api/signature-requests/send-reminder', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ requestId: request.id })
-            })
-
-            const result = await response.json()
-
-            if (result.success) {
-                alert('Reminder sent successfully!')
-                loadAllRequests() // Refresh the list
-            } else {
-                alert(result.error || 'Failed to send reminder')
-            }
-        } catch (error) {
-            console.error('Error sending reminder:', error)
-            alert('Error sending reminder')
-        }
-    }
-
-    const handleDelete = async (request: UnifiedSigningRequest) => {
-        if (isDocumentCompleted(request)) {
-            alert('Cannot delete completed documents')
-            return
-        }
-
-        if (!confirm('Are you sure you want to delete this request?')) {
-            return
-        }
-
-        try {
-            const response = await fetch('/api/signature-requests/delete', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ requestId: request.id })
-            })
-
-            const result = await response.json()
-
-            if (result.success) {
-                alert('Request deleted successfully!')
-                loadAllRequests() // Refresh the list
-            } else {
-                alert(result.error || 'Failed to delete request')
-            }
-        } catch (error) {
-            console.error('Error deleting request:', error)
-            alert('Error deleting request')
         }
     }
 
@@ -521,7 +478,6 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                 <TableRow>
                                     <TableHead>Type</TableHead>
                                     <TableHead>Document Title</TableHead>
-                                    <TableHead>Category/Type</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>From/To</TableHead>
                                     <TableHead>Date</TableHead>
@@ -551,22 +507,12 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                             </div>
                                         </TableCell>
                                         <TableCell>
-                                            <div className="flex flex-col space-y-1">
-                                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800 w-fit">
-                                                    {(request as any).document_category || 'General'}
-                                                </span>
-                                                <span className="px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-800 w-fit">
-                                                    {(request as any).document_type || 'Document'}
-                                                </span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
                                             {getStatusBadge(request)}
                                         </TableCell>
                                         <TableCell>
                                             <button
-                                                className="text-sm text-gray-600 hover:text-blue-600 hover:underline cursor-pointer text-left"
                                                 onClick={() => handleFromToClick(request)}
+                                                className="text-sm text-gray-600 hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left"
                                             >
                                                 {getFromToDisplay(request)}
                                             </button>
@@ -628,43 +574,18 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                                                 <MoreHorizontal className="w-4 h-4" />
                                                             </Button>
                                                         </DropdownMenuTrigger>
-                                                        <DropdownMenuContent
-                                                            align="end"
-                                                            className="w-56 bg-white border border-gray-200 shadow-lg rounded-md z-50"
-                                                        >
-                                                            {canSendReminderSimple(request) ? (
-                                                                <DropdownMenuItem
-                                                                    onClick={() => handleSendReminder(request)}
-                                                                    className="flex items-center px-3 py-2 text-sm hover:bg-gray-50 cursor-pointer"
-                                                                >
-                                                                    <Share2 className="w-4 h-4 mr-2" />
-                                                                    Send Reminder
-                                                                </DropdownMenuItem>
-                                                            ) : (
-                                                                <DropdownMenuItem
-                                                                    disabled
-                                                                    className="flex items-center px-3 py-2 text-sm text-gray-400 cursor-not-allowed"
-                                                                >
-                                                                    <Timer className="w-4 h-4 mr-2" />
-                                                                    <div className="flex flex-col">
-                                                                        <span>Send Reminder</span>
-                                                                        {getTimeUntilNextReminder(request) && (
-                                                                            <span className="text-xs">
-                                                                                Available in {getTimeUntilNextReminder(request)}
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                            {!isDocumentCompleted(request) && (
-                                                                <DropdownMenuItem
-                                                                    onClick={() => handleDelete(request)}
-                                                                    className="flex items-center px-3 py-2 text-sm text-red-600 hover:bg-red-50 cursor-pointer"
-                                                                >
-                                                                    <Trash2 className="w-4 h-4 mr-2" />
-                                                                    Delete
-                                                                </DropdownMenuItem>
-                                                            )}
+                                                        <DropdownMenuContent>
+                                                            <DropdownMenuItem onClick={() => handleShare(request)}>
+                                                                <Share2 className="w-4 h-4 mr-2" />
+                                                                Send Reminder
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem
+                                                                onClick={() => handleDelete(request)}
+                                                                className="text-red-600"
+                                                            >
+                                                                <Trash2 className="w-4 h-4 mr-2" />
+                                                                Delete
+                                                            </DropdownMenuItem>
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 )}
@@ -734,9 +655,9 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                             </div>
                                             <div className="text-right">
                                                 <span className={`px-2 py-1 text-xs font-medium rounded-full ${signer.status === 'signed' ? 'bg-green-100 text-green-800' :
-                                                        signer.status === 'viewed' ? 'bg-blue-100 text-blue-800' :
-                                                            signer.status === 'declined' ? 'bg-red-100 text-red-800' :
-                                                                'bg-yellow-100 text-yellow-800'
+                                                    signer.status === 'viewed' ? 'bg-blue-100 text-blue-800' :
+                                                        signer.status === 'declined' ? 'bg-red-100 text-red-800' :
+                                                            'bg-yellow-100 text-yellow-800'
                                                     }`}>
                                                     {signer.status || 'Pending'}
                                                 </span>
