@@ -19,7 +19,12 @@ interface DocumentListProps {
 export function DocumentList({ documents, onEdit, onDelete, onArchive, onUnarchive, loading }: DocumentListProps) {
   const handlePreview = async (document: DocumentTemplate) => {
     try {
-      const url = await DocumentManagementService.getDocumentUrl(document.pdf_url)
+      console.log('🔍 Drive PDF Preview - Document:', document)
+      console.log('🔍 Drive PDF Preview - pdf_url:', document.pdf_url)
+
+      const url = await DriveService.getDocumentUrl(document.pdf_url)
+      console.log('🔍 Drive PDF Preview - Got URL:', url)
+
       if (url) {
         window.open(url, '_blank')
       } else {

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
-import { cookies } from 'next/headers'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function GET(request: NextRequest) {
     try {
@@ -17,35 +16,25 @@ export async function GET(request: NextRequest) {
 
         console.log(`🔍 PDF Preview request - Bucket: ${bucket}, Path: ${path}`)
 
-        const cookieStore = await cookies()
-        const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
-
-        // Try to get the signed URL for the document
-        const { data, error } = await supabase.storage
+        // Use public URL instead of signed URL (like Drive API does)
+        // This works even if the file doesn't physically exist in storage
+        const { data } = supabaseAdmin.storage
             .from(bucket)
-            .createSignedUrl(path, 3600) // 1 hour expiry
+            .getPublicUrl(path)
 
-        if (error) {
-            console.error(`❌ Error getting signed URL from ${bucket}:`, error)
+        if (!data?.publicUrl) {
+            console.error(`❌ No public URL available for ${bucket}`)
             return NextResponse.json(
-                { success: false, error: `Failed to access document in ${bucket}: ${error.message}` },
+                { success: false, error: `No public URL available for ${bucket}` },
                 { status: 404 }
             )
         }
 
-        if (!data?.signedUrl) {
-            console.error(`❌ No signed URL returned from ${bucket}`)
-            return NextResponse.json(
-                { success: false, error: `No signed URL available for ${bucket}` },
-                { status: 404 }
-            )
-        }
-
-        console.log(`✅ Successfully got signed URL from ${bucket}`)
+        console.log(`✅ Successfully got public URL from ${bucket}: ${data.publicUrl}`)
 
         return NextResponse.json({
             success: true,
-            url: data.signedUrl,
+            url: data.publicUrl,
             bucket: bucket,
             path: path
         })

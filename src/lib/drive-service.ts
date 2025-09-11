@@ -807,19 +807,44 @@ export class DriveService {
     try {
       if (!pdfPath) return null
 
+      console.log('🔍 DriveService.getDocumentUrl called with path:', pdfPath)
+
       // If it's an absolute HTTP(S) URL, return as is
       if (pdfPath.startsWith('http')) {
+        console.log('✅ Path is already HTTP URL, returning as-is')
         return pdfPath
       }
 
       // If it's an app-relative path like "/mock/sample.pdf", build a full URL
       if (pdfPath.startsWith('/')) {
         if (typeof window !== 'undefined') {
-          return `${window.location.origin}${pdfPath}`
+          const fullUrl = `${window.location.origin}${pdfPath}`
+          console.log('✅ Built full URL from relative path:', fullUrl)
+          return fullUrl
         }
         return null
       }
 
+      console.log('🔍 Trying to get signed URL via API for path:', pdfPath)
+
+      // Try the documents preview API (PDFs are stored in 'documents' bucket)
+      try {
+        const previewResponse = await fetch(`/api/documents/preview?bucket=documents&path=${pdfPath}`)
+        console.log('📡 Preview API response:', previewResponse.status, previewResponse.statusText)
+
+        if (previewResponse.ok) {
+          const result = await previewResponse.json()
+          console.log('📋 Preview API result:', result)
+          if (result.success && result.url) {
+            console.log('✅ Got signed URL from preview API:', result.url)
+            return result.url
+          }
+        }
+      } catch (previewError) {
+        console.log('❌ Preview API failed:', previewError)
+      }
+
+      // Fallback to the original drive document-url API
       const response = await fetch('/api/drive/document-url', {
         method: 'POST',
         credentials: 'include', // Include cookies for authentication

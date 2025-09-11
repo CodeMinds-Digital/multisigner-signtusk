@@ -243,8 +243,9 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const tryOpenPDF = async (documentPath: string, title: string) => {
         console.log('🔍 Trying to access PDF at path:', documentPath)
 
-        // For Sign Inbox documents, prioritize 'documents' bucket first, then 'files'
-        const buckets = ['documents', 'files']
+        // For Sign Inbox documents, use 'documents' bucket only (PDFs are stored here)
+        // User confirmed: files bucket contains only JSON schemas, documents bucket contains PDFs
+        const buckets = ['documents']
         let pdfUrl = null
 
         for (const bucket of buckets) {
@@ -290,19 +291,48 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         try {
             // Based on terminal logs, the document data is already available in request.document
             // Let's try to get the file path directly from the nested document object first
-            const documentPath = (request as any).document?.file_url || (request as any).document?.pdf_url
+            console.log('🔍 Checking for document in request object...')
+            console.log('📄 request.document:', (request as any).document)
+            console.log('📄 Available keys in request:', Object.keys(request))
+
+            // Check multiple possible data structures
+            const documentObj = (request as any).document
+            const documentUrl = (request as any).document_url
+            const documentId = (request as any).document_id
+            const documentTemplateId = (request as any).document_template_id
+
+            console.log('🔍 Document object type:', typeof documentObj)
+            console.log('🔍 Document object value:', documentObj)
+            console.log('🔍 Document URL:', documentUrl)
+            console.log('🔍 Document ID:', documentId)
+            console.log('🔍 Document Template ID:', documentTemplateId)
+
+            // Try to get document path from various sources
+            let documentPath = null
+
+            // First try: nested document object
+            if (documentObj?.file_url || documentObj?.pdf_url) {
+                documentPath = documentObj.file_url || documentObj.pdf_url
+                console.log('✅ Found document path in nested object:', documentPath)
+            }
+            // Second try: direct document_url field
+            else if (documentUrl) {
+                documentPath = documentUrl
+                console.log('✅ Found document path in document_url field:', documentPath)
+            }
 
             if (documentPath) {
-                console.log('✅ Found document path in nested object:', documentPath)
                 console.log('🔍 Direct PDF access with path:', documentPath)
                 await tryOpenPDF(documentPath, request.title)
                 return
             }
 
-            // Fallback: try to get document_template_id and fetch document details
-            const documentTemplateId = (request as any).document_template_id
+            console.log('❌ No document path found in nested object, checking other fields...')
 
-            if (!documentTemplateId) {
+            // Fallback: try to get document_template_id or document_id and fetch document details
+            const fallbackDocumentId = documentTemplateId || documentId
+
+            if (!fallbackDocumentId) {
                 console.log('❌ No document path or template ID found')
                 console.log('📋 Available request fields:', Object.keys(request))
                 console.log('📋 Document object:', (request as any).document)
@@ -310,10 +340,10 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                 return
             }
 
-            console.log('🔍 Fetching document details for template ID:', documentTemplateId)
+            console.log('🔍 Fetching document details for ID:', fallbackDocumentId)
 
             // Fetch document details from the documents table
-            const response = await fetch(`/api/documents/${documentTemplateId}`)
+            const response = await fetch(`/api/documents/${fallbackDocumentId}`)
 
             if (!response.ok) {
                 console.log('❌ Document not found via API')

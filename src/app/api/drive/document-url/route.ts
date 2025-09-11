@@ -31,9 +31,9 @@ export async function POST(request: NextRequest) {
     // If it's already a full URL, return it
     if (pdfUrl.startsWith('http')) {
       return new Response(
-        JSON.stringify({ 
-          success: true, 
-          data: { url: pdfUrl } 
+        JSON.stringify({
+          success: true,
+          data: { url: pdfUrl }
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       )
@@ -48,23 +48,37 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Get public URL from Supabase storage
-    const { data: publicUrlData } = supabaseAdmin.storage
+    console.log('🔍 Getting public URL for Drive document path:', filePath)
+
+    // For Drive documents, use 'documents' bucket (signed/active documents)
+    const { data: documentsUrlData } = supabaseAdmin.storage
       .from('documents')
       .getPublicUrl(filePath)
 
-    const publicUrl = publicUrlData.publicUrl
+    let publicUrl = null
+    if (documentsUrlData?.publicUrl) {
+      console.log('✅ Got public URL from documents bucket:', documentsUrlData.publicUrl)
+      publicUrl = documentsUrlData.publicUrl
+    }
+
+    if (!publicUrl) {
+      console.log('❌ Failed to get public URL from any bucket')
+      return new Response(
+        JSON.stringify({ error: 'Failed to get document URL' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        data: { url: publicUrl } 
+      JSON.stringify({
+        success: true,
+        data: { url: publicUrl }
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
   } catch (error) {
     console.error('Error getting document URL:', error)
-    
+
     if (error instanceof Error && error.message.includes('token')) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
