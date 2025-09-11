@@ -5,6 +5,7 @@ import { X, Calendar, Clock, Users, FileText, Mail, Phone, ExternalLink } from '
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { SigningProgressStepper } from './signing-progress-stepper'
+import { PDFSigningScreen } from './pdf-signing-screen'
 import { cn } from '@/lib/utils'
 import { DriveService } from '@/lib/drive-service'
 
@@ -32,6 +33,8 @@ interface RequestDetailsModalProps {
     sender_name?: string
     document_url?: string
     document_id?: string
+    document_type?: string
+    document_category?: string
   }
   isOpen: boolean
   onClose: () => void
@@ -39,6 +42,8 @@ interface RequestDetailsModalProps {
 }
 
 export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail }: RequestDetailsModalProps) {
+  const [showSigningScreen, setShowSigningScreen] = useState(false)
+
   if (!isOpen) return null
 
   const formatDate = (dateString: string) => {
@@ -140,6 +145,28 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
     }
   }
 
+  const handleSignatureAccept = async (signatureData: any) => {
+    try {
+      console.log('✅ Signature accepted:', signatureData)
+      // TODO: Implement signature acceptance logic
+      setShowSigningScreen(false)
+      onClose()
+    } catch (error) {
+      console.error('❌ Error accepting signature:', error)
+    }
+  }
+
+  const handleSignatureDecline = async (reason: string) => {
+    try {
+      console.log('❌ Signature declined:', reason)
+      // TODO: Implement signature decline logic
+      setShowSigningScreen(false)
+      onClose()
+    } catch (error) {
+      console.error('❌ Error declining signature:', error)
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       {/* Backdrop */}
@@ -182,9 +209,26 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
                   <div className="bg-gray-50 rounded-lg p-4 space-y-3">
                     <div className="flex items-center">
                       <FileText className="w-5 h-5 text-gray-400 mr-3" />
-                      <div>
+                      <div className="flex-1">
                         <p className="font-medium text-gray-900">{request.title}</p>
                         <p className="text-sm text-gray-600">Document ID: {request.id.slice(0, 8)}...</p>
+
+                        {/* Category and Type Display */}
+                        <div className="flex gap-2 mt-2">
+                          {request.document_category && (
+                            <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                              📁 {request.document_category}
+                            </span>
+                          )}
+                          {request.document_type && (
+                            <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                              📄 {request.document_type}
+                            </span>
+                          )}
+                          {!request.document_category && !request.document_type && (
+                            <span className="text-xs text-gray-400">Category/Type not specified</span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -281,15 +325,25 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
                 </>
               )}
               {request.type === 'received' && (
-                <Button
-                  size="sm"
-                  className="bg-blue-600 hover:bg-blue-700"
-                  onClick={handleOpenDocument}
-                  disabled={!request.document_url}
-                >
-                  <FileText className="w-4 h-4 mr-2" />
-                  Open Document
-                </Button>
+                <>
+                  <Button
+                    size="sm"
+                    className="bg-blue-600 hover:bg-blue-700"
+                    onClick={handleOpenDocument}
+                    disabled={!request.document_url}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Open Document
+                  </Button>
+                  <Button
+                    size="sm"
+                    className="bg-green-600 hover:bg-green-700"
+                    onClick={() => setShowSigningScreen(true)}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Sign Document
+                  </Button>
+                </>
               )}
             </div>
 

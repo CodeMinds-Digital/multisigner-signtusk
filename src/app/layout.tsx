@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { SecureAuthProvider } from "@/components/providers/secure-auth-provider";
 import { ConsoleFilterProvider } from "@/components/providers/console-filter-provider";
+import { ToastProvider } from "@/components/ui/toast";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -21,7 +22,9 @@ export default function RootLayout({
       <body className={inter.className}>
         <ConsoleFilterProvider>
           <SecureAuthProvider>
-            {children}
+            <ToastProvider>
+              {children}
+            </ToastProvider>
           </SecureAuthProvider>
         </ConsoleFilterProvider>
       </body>

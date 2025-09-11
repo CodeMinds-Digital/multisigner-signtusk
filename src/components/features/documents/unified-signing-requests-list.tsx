@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { File, Clock, CheckCircle, AlertTriangle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Calendar, Send, Inbox, Filter } from 'lucide-react'
+import { File, Clock, CheckCircle, AlertTriangle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Calendar, Send, Inbox, Filter, Timer, Info } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { type SigningRequestListItem } from '@/lib/signing-workflow-service'
 import { Button } from '@/components/ui/button'
@@ -215,12 +215,88 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         return `Expires ${fullDateTime}`
     }
 
-    const handleView = (request: UnifiedSigningRequest) => {
-        console.log('👁️ Eye icon clicked! View request:', request.title, 'Status:', request.status)
+    const handleViewDetails = (request: UnifiedSigningRequest) => {
+        console.log('ℹ️ Info icon clicked! View request details:', request.title, 'Status:', request.status)
         console.log('📊 Request progress:', request.progress)
         console.log('👥 Request signers:', request.signers)
         setViewingRequest(request)
         console.log('✅ ViewingRequest state set, modal should open')
+    }
+
+    const handlePreviewPDF = async (request: UnifiedSigningRequest) => {
+        try {
+            console.log('👁️ Eye icon clicked! Preview PDF:', request.title)
+
+            if (!request.document_url) {
+                alert('Document URL not available')
+                return
+            }
+
+            console.log('🔗 Opening document with URL:', request.document_url)
+
+            let documentUrl = request.document_url
+
+            // If it's already a full URL, use it directly
+            if (documentUrl.startsWith('http')) {
+                console.log('✅ Using direct URL:', documentUrl)
+                window.open(documentUrl, '_blank')
+                return
+            }
+
+            // For storage paths, try multiple buckets (documents, files, uploads)
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://gzxfsojbbfipzvjxucci.supabase.co'
+            const buckets = ['documents', 'files', 'uploads']
+
+            // Try each bucket until we find the file
+            for (const bucket of buckets) {
+                const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${documentUrl}`
+                console.log(`🔗 Trying ${bucket} bucket:`, publicUrl)
+
+                try {
+                    // Test if the URL is accessible
+                    const response = await fetch(publicUrl, { method: 'HEAD' })
+                    if (response.ok) {
+                        console.log(`✅ Found document in ${bucket} bucket`)
+                        window.open(publicUrl, '_blank')
+                        return
+                    }
+                } catch (error) {
+                    console.log(`❌ ${bucket} bucket failed:`, error)
+                    continue
+                }
+            }
+
+            // If direct access fails, try API fallback
+            try {
+                console.log('🔄 Trying API fallback...')
+                const response = await fetch('/api/drive/document-url', {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ pdfUrl: documentUrl })
+                })
+
+                if (response.ok) {
+                    const data = await response.json()
+                    if (data.success && data.data?.url) {
+                        console.log('✅ API resolved URL:', data.data.url)
+                        window.open(data.data.url, '_blank')
+                        return
+                    }
+                }
+            } catch (apiError) {
+                console.log('❌ API fallback failed:', apiError)
+            }
+
+            // If all approaches fail, show helpful error
+            alert('Document is not currently accessible. This may be because:\n\n• The document is still being processed\n• Storage permissions need to be configured\n• The document was not properly uploaded\n\nPlease contact support if this issue persists.')
+
+        } catch (error) {
+            console.error('❌ Error opening document:', error)
+            alert(`Error opening document: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        }
     }
 
     const handleSign = (request: UnifiedSigningRequest) => {
@@ -229,13 +305,35 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         setViewingRequest(request)
     }
 
-    const handleShare = (request: UnifiedSigningRequest) => {
+    const handleSendReminder = (request: UnifiedSigningRequest) => {
         console.log('Send reminder for request:', request)
+        // TODO: Implement reminder functionality
     }
 
     const handleDelete = (request: UnifiedSigningRequest) => {
         if (confirm('Are you sure you want to delete this request?')) {
             console.log('Delete request:', request)
+            // TODO: Implement delete functionality
+        }
+    }
+
+    const isDocumentCompleted = (request: UnifiedSigningRequest) => {
+        return request.status === 'completed' || request.document_status === 'completed'
+    }
+
+    const canSendReminderSimple = (request: UnifiedSigningRequest) => {
+        // Simple 24-hour check
+        const lastUpdate = new Date(request.initiated_at)
+        const now = new Date()
+        const hoursSinceUpdate = (now.getTime() - lastUpdate.getTime()) / (1000 * 60 * 60)
+
+        const allowed = hoursSinceUpdate >= 24
+        const hoursRemaining = Math.max(0, 24 - hoursSinceUpdate)
+
+        return {
+            allowed,
+            message: allowed ? 'Can send reminder' : 'Must wait 24 hours between reminders',
+            timeRemaining: allowed ? null : `${Math.floor(hoursRemaining)}h ${Math.floor((hoursRemaining % 1) * 60)}m remaining`
         }
     }
 
@@ -373,6 +471,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                 <TableRow>
                                     <TableHead>Type</TableHead>
                                     <TableHead>Document Title</TableHead>
+                                    <TableHead>Category/Type</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>From/To</TableHead>
                                     <TableHead>Date</TableHead>
@@ -402,11 +501,28 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                             </div>
                                         </TableCell>
                                         <TableCell>
+                                            <div className="flex flex-col space-y-1">
+                                                {request.document_category && (
+                                                    <span className="text-xs text-gray-600 bg-gray-100 px-2 py-1 rounded">
+                                                        📁 {request.document_category}
+                                                    </span>
+                                                )}
+                                                {request.document_type && (
+                                                    <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                                                        📄 {request.document_type}
+                                                    </span>
+                                                )}
+                                                {!request.document_category && !request.document_type && (
+                                                    <span className="text-xs text-gray-400">Not specified</span>
+                                                )}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell>
                                             {getStatusBadge(request)}
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-sm text-gray-600">
-                                                {(request as any).context_display ||
+                                                {request.context_display ||
                                                     (request.type === 'sent'
                                                         ? `To ${request.signers?.length || 0} signer${request.signers?.length !== 1 ? 's' : ''}`
                                                         : `From ${request.sender_name || 'Unknown'}`
@@ -429,12 +545,23 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                         </TableCell>
                                         <TableCell>
                                             <div className="flex items-center space-x-2">
+                                                {/* PDF Preview Button */}
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => handleView(request)}
+                                                    onClick={() => handlePreviewPDF(request)}
+                                                    title="Preview PDF"
                                                 >
                                                     <Eye className="w-4 h-4" />
+                                                </Button>
+                                                {/* Details Info Button */}
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => handleViewDetails(request)}
+                                                    title="View Details"
+                                                >
+                                                    <Info className="w-4 h-4" />
                                                 </Button>
                                                 {request.type === 'received' && request.can_sign && (
                                                     <Button
@@ -463,7 +590,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent>
-                                                            <DropdownMenuItem onClick={() => handleShare(request)}>
+                                                            <DropdownMenuItem onClick={() => handleSendReminder(request)}>
                                                                 <Share2 className="w-4 h-4 mr-2" />
                                                                 Send Reminder
                                                             </DropdownMenuItem>

@@ -84,19 +84,19 @@ export function Alert({
             sizeStyles.icon
           )} />
         </div>
-        
+
         <div className="ml-3 flex-1">
           {title && (
             <h3 className={cn(sizeStyles.title, 'mb-1')}>
               {title}
             </h3>
           )}
-          
+
           <div className={cn(sizeStyles.content)}>
             {children}
           </div>
         </div>
-        
+
         {onClose && (
           <div className="ml-auto pl-3">
             <Button
@@ -204,3 +204,16 @@ export function SuccessAlert({
     </Alert>
   )
 }
+
+// AlertDescription component for compatibility with shadcn/ui patterns
+export const AlertDescription = React.forwardRef<
+  HTMLParagraphElement,
+  React.HTMLAttributes<HTMLParagraphElement>
+>(({ className, ...props }, ref) => (
+  <div
+    ref={ref}
+    className={cn("text-sm [&_p]:leading-relaxed", className)}
+    {...props}
+  />
+))
+AlertDescription.displayName = "AlertDescription"
