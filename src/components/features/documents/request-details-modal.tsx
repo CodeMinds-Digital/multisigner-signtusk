@@ -177,7 +177,7 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
 
       {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
+        <div className="relative bg-white rounded-lg shadow-xl max-w-5xl w-full max-h-[95vh] overflow-hidden">
           {/* Header */}
           <div className="flex items-center justify-between p-6 border-b border-gray-200">
             <div>
@@ -199,7 +199,7 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
           </div>
 
           {/* Content */}
-          <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
+          <div className="p-6 overflow-y-auto max-h-[calc(95vh-120px)]">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Left Column - Document Info */}
               <div className="space-y-6">

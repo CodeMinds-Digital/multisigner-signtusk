@@ -3,6 +3,58 @@ import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
+export async function GET(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    // Await params to fix Next.js async API warning
+    const resolvedParams = await params
+    const documentId = resolvedParams.id
+
+    console.log('🔍 Fetching document with ID:', documentId)
+
+    // Get document details from documents table (no auth required for PDF preview)
+    const { data: document, error } = await supabaseAdmin
+      .from('documents')
+      .select('id, title, file_url, pdf_url, template_url, status, document_type, category')
+      .eq('id', documentId)
+      .single()
+
+    if (error) {
+      console.error('❌ Error fetching document:', error)
+      return NextResponse.json(
+        { error: 'Document not found', details: error.message },
+        { status: 404 }
+      )
+    }
+
+    if (!document) {
+      console.log('📋 Document not found with ID:', documentId)
+      return NextResponse.json(
+        { error: 'Document not found' },
+        { status: 404 }
+      )
+    }
+
+    console.log('✅ Document found:', {
+      id: document.id,
+      title: document.title,
+      file_url: document.file_url,
+      pdf_url: document.pdf_url,
+      template_url: document.template_url
+    })
+
+    return NextResponse.json(document)
+  } catch (error) {
+    console.error('❌ Error in document GET API:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -76,7 +128,7 @@ export async function DELETE(
     )
   } catch (error) {
     console.error('Error deleting document:', error)
-    
+
     if (error instanceof Error && error.message.includes('token')) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),

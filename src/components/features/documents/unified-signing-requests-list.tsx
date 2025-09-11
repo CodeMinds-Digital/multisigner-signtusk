@@ -240,81 +240,112 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         }
     }
 
+    const tryOpenPDF = async (documentPath: string, title: string) => {
+        console.log('🔍 Trying to access PDF at path:', documentPath)
+
+        // For Sign Inbox documents, prioritize 'documents' bucket first, then 'files'
+        const buckets = ['documents', 'files']
+        let pdfUrl = null
+
+        for (const bucket of buckets) {
+            try {
+                console.log(`🔍 Trying bucket: ${bucket}`)
+                const previewResponse = await fetch(`/api/documents/preview?bucket=${bucket}&path=${documentPath}`)
+                console.log(`📡 Response from ${bucket}:`, previewResponse.status, previewResponse.statusText)
+
+                if (previewResponse.ok) {
+                    const result = await previewResponse.json()
+                    console.log(`📋 Result from ${bucket}:`, result)
+                    if (result.success && result.url) {
+                        pdfUrl = result.url
+                        console.log(`✅ Found PDF URL in ${bucket}:`, pdfUrl)
+                        break
+                    }
+                }
+            } catch (err) {
+                console.log(`❌ Failed to get PDF from ${bucket}:`, err)
+            }
+        }
+
+        if (pdfUrl) {
+            console.log('🚀 Opening PDF URL:', pdfUrl)
+            window.open(pdfUrl, '_blank')
+        } else {
+            console.log('📋 PDF not found in any bucket')
+            alert(`PDF not accessible for "${title}". The document may be in a different storage location.`)
+        }
+    }
+
     const handlePreviewPDF = async (request: UnifiedSigningRequest) => {
-        console.log('👁️ PDF Preview clicked for:', request.title, '- Smart detection enabled')
+        console.log('👁️ PDF Preview clicked for:', request.title)
         console.log('📄 Request data:', {
+            document_template_id: (request as any).document_template_id,
+            document: (request as any).document,
             document_url: request.document_url,
             final_pdf_url: request.final_pdf_url,
             file_url: (request as any).file_url,
             full_request: request
         })
 
-        // Get the document path - try different fields
-        const documentPath = (request as any).file_url || request.document_url || request.final_pdf_url
-
-        if (!documentPath) {
-            console.log('📋 No document path found - opening details modal')
-            setViewingRequest(request)
-            return
-        }
-
-        // Smart detection: Check if this looks like a test document
-        const isTestDocument = documentPath.includes('/175') || // Timestamp-based paths like 1757007746811.pdf
-            documentPath.includes('/1756') || // Other timestamp patterns
-            !documentPath.includes('public/') // Real uploads usually have public/ prefix
-
-        if (isTestDocument) {
-            console.log('🧪 Detected test document - skipping API calls and opening details modal')
-            setViewingRequest(request)
-            setTimeout(() => {
-                alert(`📄 "${request.title}" is a demo document.\n\nTo test PDF preview:\n1. Upload a real document through the Drive\n2. Create a signature request with that document\n\nShowing document details instead.`)
-            }, 300)
-            return
-        }
-
-        console.log('🔍 Real document detected - trying storage access for:', documentPath)
-
         try {
-            // Try multiple storage buckets for PDF access
-            const buckets = ['documents', 'files', 'signed-documents']
-            let pdfUrl = null
+            // Based on terminal logs, the document data is already available in request.document
+            // Let's try to get the file path directly from the nested document object first
+            const documentPath = (request as any).document?.file_url || (request as any).document?.pdf_url
 
-            for (const bucket of buckets) {
-                try {
-                    console.log(`🔍 Trying bucket: ${bucket}`)
-                    const response = await fetch(`/api/documents/preview?bucket=${bucket}&path=${documentPath}`)
-                    console.log(`📡 Response from ${bucket}:`, response.status, response.statusText)
-
-                    if (response.ok) {
-                        const result = await response.json()
-                        console.log(`📋 Result from ${bucket}:`, result)
-                        if (result.success && result.url) {
-                            pdfUrl = result.url
-                            console.log(`✅ Found PDF URL in ${bucket}:`, pdfUrl)
-                            break
-                        }
-                    }
-                } catch (err) {
-                    console.log(`❌ Failed to get PDF from ${bucket}:`, err)
-                }
+            if (documentPath) {
+                console.log('✅ Found document path in nested object:', documentPath)
+                console.log('🔍 Direct PDF access with path:', documentPath)
+                await tryOpenPDF(documentPath, request.title)
+                return
             }
 
-            if (pdfUrl) {
-                console.log('🚀 Opening PDF URL:', pdfUrl)
-                window.open(pdfUrl, '_blank')
-            } else {
-                console.log('📋 Real document not found in storage - opening details modal')
-                setViewingRequest(request)
-                setTimeout(() => {
-                    alert(`PDF not found in storage for "${request.title}". The document may have been moved or deleted. Showing document details instead.`)
-                }, 300)
+            // Fallback: try to get document_template_id and fetch document details
+            const documentTemplateId = (request as any).document_template_id
+
+            if (!documentTemplateId) {
+                console.log('❌ No document path or template ID found')
+                console.log('📋 Available request fields:', Object.keys(request))
+                console.log('📋 Document object:', (request as any).document)
+                alert(`Cannot preview PDF: No document reference found for "${request.title}".`)
+                return
             }
+
+            console.log('🔍 Fetching document details for template ID:', documentTemplateId)
+
+            // Fetch document details from the documents table
+            const response = await fetch(`/api/documents/${documentTemplateId}`)
+
+            if (!response.ok) {
+                console.log('❌ Document not found via API')
+                alert(`Document not found for "${request.title}".`)
+                return
+            }
+
+            const documentData = await response.json()
+            console.log('📄 Document data:', documentData)
+
+            // Get the document path from the fetched document
+            // Based on terminal output, documents have file_url but pdf_url is null
+            const fetchedDocumentPath = documentData.file_url || documentData.pdf_url || documentData.template_url
+
+            console.log('📄 Document paths available:', {
+                file_url: documentData.file_url,
+                pdf_url: documentData.pdf_url,
+                template_url: documentData.template_url,
+                selected_path: fetchedDocumentPath
+            })
+
+            if (!fetchedDocumentPath) {
+                console.log('❌ No file path in document')
+                alert(`No file path found for "${request.title}".`)
+                return
+            }
+
+            console.log('🔍 Trying to access PDF with path:', fetchedDocumentPath)
+            await tryOpenPDF(fetchedDocumentPath, request.title)
         } catch (error) {
-            console.error('❌ Error previewing PDF:', error)
-            setViewingRequest(request)
-            setTimeout(() => {
-                alert('Error accessing PDF. Document details are shown instead.')
-            }, 300)
+            console.error('❌ Error in PDF preview:', error)
+            alert('Error accessing document.')
         }
     }
 
