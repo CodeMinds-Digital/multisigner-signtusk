@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { generateSignersFromSchemas, analyzeDocumentSignatureType } from '@/lib/signature-field-utils'
+import { generateSignersFromSchemas, analyzeDocumentSignatureType, validateDocumentCompletion } from '@/lib/signature-field-utils'
 
 export async function POST(request: NextRequest) {
   try {
     // Verify authentication
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -41,19 +41,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Validate completion and determine status
-    const documentWithSchemas = { ...currentDoc, schemas }
-    const hasSchemas = schemas && Array.isArray(schemas) && schemas.length > 0
-    const status = hasSchemas ? 'ready' : 'draft'
-    const completion_percentage = hasSchemas ? 100 : 0
+    // Get current signers from the document
+    const currentSigners = currentDoc.signers || []
 
-    console.log('🔍 Status validation result:', {
+    // Validate document completion in template mode (no email validation)
+    const validation = validateDocumentCompletion(schemas, currentSigners, true)
+
+    console.log('🔍 Document validation result:', {
       documentId,
       currentStatus: currentDoc.status,
-      newStatus: status,
+      newStatus: validation.status,
       currentCompletion: currentDoc.completion_percentage,
-      newCompletion: completion_percentage,
-      schemasCount: schemas.length
+      newCompletion: validation.completion_percentage,
+      schemasCount: schemas?.length || 0,
+      signatureFieldsCount: validation.signatureFieldsCount,
+      validSignersCount: validation.validSignersCount,
+      isValid: validation.isValid,
+      issues: validation.issues
     })
 
     // Ensure schemas is properly serialized for JSONB column
@@ -61,8 +65,8 @@ export async function POST(request: NextRequest) {
 
     const updatePayload: any = {
       schemas: serializedSchemas,
-      status,
-      completion_percentage,
+      status: validation.status,
+      completion_percentage: validation.completion_percentage,
       updated_at: new Date().toISOString()
     }
 
@@ -77,10 +81,24 @@ export async function POST(request: NextRequest) {
     // Always update signature_type based on actual signature fields in schemas
     updatePayload.signature_type = signatureAnalysis.signatureType
 
-    // Auto-generate signers from signature fields if not provided
+    // Auto-generate signers from signature fields if not provided or validation failed
     let finalSigners = signers
-    if (!signers || signers.length === 0) {
+    if (!signers || signers.length === 0 || !validation.isValid) {
+      console.log('🔍 Generating signers from schemas due to missing signers or validation issues')
       finalSigners = generateSignersFromSchemas(schemas)
+
+      // Re-validate with generated signers in template mode
+      const revalidation = validateDocumentCompletion(schemas, finalSigners, true)
+      console.log('🔍 Re-validation with generated signers:', {
+        status: revalidation.status,
+        completion: revalidation.completion_percentage,
+        isValid: revalidation.isValid,
+        issues: revalidation.issues
+      })
+
+      // Update payload with re-validation results
+      updatePayload.status = revalidation.status
+      updatePayload.completion_percentage = revalidation.completion_percentage
     }
 
     if (finalSigners && Array.isArray(finalSigners)) {

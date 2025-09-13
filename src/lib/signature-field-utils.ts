@@ -279,6 +279,116 @@ export function validateSignerFieldMapping(
 }
 
 /**
+ * Validate document completion status based on schemas and signers
+ * For template creation: only validates schemas and signature fields
+ * For signature requests: validates signers and email requirements
+ */
+export function validateDocumentCompletion(
+  schemas: any[],
+  signers: Signer[],
+  isTemplateMode: boolean = true
+): {
+  status: 'draft' | 'ready'
+  completion_percentage: number
+  isValid: boolean
+  issues: string[]
+  signatureFieldsCount: number
+  validSignersCount: number
+} {
+  const issues: string[] = []
+
+  // Check if schemas exist
+  if (!schemas || !Array.isArray(schemas) || schemas.length === 0) {
+    return {
+      status: 'draft',
+      completion_percentage: 0,
+      isValid: false,
+      issues: ['No schemas defined'],
+      signatureFieldsCount: 0,
+      validSignersCount: 0
+    }
+  }
+
+  // Extract signature fields
+  const signatureFields = extractSignatureFields(schemas)
+
+  if (signatureFields.length === 0) {
+    return {
+      status: 'draft',
+      completion_percentage: 0,
+      isValid: false,
+      issues: ['No signature fields defined'],
+      signatureFieldsCount: 0,
+      validSignersCount: 0
+    }
+  }
+
+  // For template mode: only validate schemas and signature fields
+  if (isTemplateMode) {
+    // Template is ready if it has schemas and signature fields
+    const completion = 100 // Templates with signature fields are complete
+
+    return {
+      status: 'ready',
+      completion_percentage: completion,
+      isValid: true,
+      issues: [],
+      signatureFieldsCount: signatureFields.length,
+      validSignersCount: signatureFields.length // Count signature fields as potential signers
+    }
+  }
+
+  // For signature request mode: validate signers and emails
+  const validSigners = signers.filter(signer =>
+    signer.name && signer.name.trim() !== '' &&
+    signer.email && signer.email.trim() !== ''
+  )
+
+  // Validate signer-field mapping
+  const validation = validateSignerFieldMapping(validSigners, schemas)
+
+  if (validation.missingSigners > 0) {
+    issues.push(`${validation.missingSigners} signature field(s) missing signer assignment`)
+  }
+
+  if (validation.excessSigners > 0) {
+    issues.push(`${validation.excessSigners} excess signer(s) without signature fields`)
+  }
+
+  // Check if all signers have required information
+  const invalidSigners = signers.filter(signer =>
+    !signer.name || signer.name.trim() === '' ||
+    !signer.email || signer.email.trim() === ''
+  )
+
+  if (invalidSigners.length > 0) {
+    issues.push(`${invalidSigners.length} signer(s) missing name or email`)
+  }
+
+  // Calculate completion percentage for signature request mode
+  let completion = 0
+  if (schemas.length > 0) completion += 40 // Has schemas
+  if (signatureFields.length > 0) completion += 30 // Has signature fields
+  if (validSigners.length > 0) completion += 20 // Has valid signers
+  if (validation.isValid && issues.length === 0) completion += 10 // Perfect mapping
+
+  // Determine status (only 'draft' and 'ready' allowed by database constraint)
+  let status: 'draft' | 'ready' = 'draft'
+  if (completion >= 100 && issues.length === 0) {
+    status = 'ready'
+  }
+
+  return {
+    status,
+    completion_percentage: completion,
+    isValid: validation.isValid && issues.length === 0,
+    issues,
+    signatureFieldsCount: signatureFields.length,
+    validSignersCount: validSigners.length
+  }
+}
+
+/**
  * Get signature type display text
  */
 export function getSignatureTypeDisplay(signers: Signer[], schemas?: any[]): string {

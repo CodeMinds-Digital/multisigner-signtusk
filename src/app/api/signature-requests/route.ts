@@ -368,57 +368,213 @@ export async function POST(request: NextRequest) {
 
     // Create signature request in database
     const now = new Date().toISOString()
+    const signatureRequestData = {
+      document_template_id: realDocumentId,
+      title: documentTitle,
+      initiated_by: userId,
+      initiated_at: now,
+      expires_at: expiresAt.toISOString(),
+      status: 'initiated',
+      total_signers: signers.length,
+      completed_signers: 0,
+      viewed_signers: 0,
+      created_at: now,
+      updated_at: now
+    }
+
+    console.log('🔍 Creating signature request with data (v7 - FINAL):', signatureRequestData)
+
+    // Verify document exists before creating signature request
+    const { data: documentCheck, error: docCheckError } = await supabaseAdmin
+      .from('documents')
+      .select('id, title, status')
+      .eq('id', realDocumentId)
+      .single()
+
+    if (docCheckError || !documentCheck) {
+      console.error('❌ Document not found for signature request:', {
+        documentId: realDocumentId,
+        error: docCheckError
+      })
+      return new Response(
+        JSON.stringify({
+          error: 'Document not found',
+          details: `Document ${realDocumentId} does not exist`
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('✅ Document verified:', documentCheck)
+
     const { data: signatureRequest, error: requestError } = await supabaseAdmin
       .from('signing_requests')
-      .insert({
-        document_template_id: realDocumentId,
-        title: documentTitle,
-        initiated_by: userId,
-        initiated_at: now,
-        expires_at: expiresAt.toISOString(),
-        status: 'in_progress',
-        total_signers: signers.length,
-        completed_signers: 0,
-        viewed_signers: 0,
-        created_at: now,
-        updated_at: now
-      })
+      .insert(signatureRequestData)
       .select()
       .single()
 
     if (requestError) {
-      console.error('Error creating signature request:', requestError)
+      console.error('❌ Error creating signature request:', requestError)
+      console.error('Request data:', signatureRequestData)
+      console.error('Error details:', {
+        code: requestError.code,
+        message: requestError.message,
+        details: requestError.details,
+        hint: requestError.hint
+      })
       return new Response(
-        JSON.stringify({ error: 'Failed to create signature request' }),
+        JSON.stringify({
+          error: 'Failed to create signature request',
+          details: requestError.message || requestError
+        }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
+    if (!signatureRequest) {
+      console.error('❌ Signature request creation returned no data')
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to create signature request',
+          details: 'No data returned from insert operation'
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('✅ Created signature request:', signatureRequest.id)
+
+    // Verify the signature request was actually created
+    const { data: verifyRequest, error: verifyError } = await supabaseAdmin
+      .from('signing_requests')
+      .select('id, title, status')
+      .eq('id', signatureRequest.id)
+      .single()
+
+    if (verifyError || !verifyRequest) {
+      console.error('❌ Failed to verify signature request creation:', {
+        id: signatureRequest.id,
+        error: verifyError
+      })
+      return new Response(
+        JSON.stringify({
+          error: 'Failed to verify signature request creation',
+          details: 'Signature request was not found after creation'
+        }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('✅ Verified signature request exists:', verifyRequest)
+
     // Create signer records
     const signerInserts = signers.map((signer: any, index: number) => ({
-      signing_request_id: signatureRequest.id,
+      signing_request_id: signatureRequest.id, // Correct foreign key column
       signer_email: signer.email.trim(),
       signer_name: signer.name.trim(),
-      signing_order: index + 1
+      signing_order: index + 1,
+      status: 'pending',
+      signer_status: 'initiated',
+      reminder_count: 0,
+      created_at: now,
+      updated_at: now
     }))
 
-    const { error: signersError } = await supabaseAdmin
+    console.log('🔍 Inserting signers (v7 - FINAL):', signerInserts)
+
+    console.log('🔍 Attempting signer insert (v7 - FINAL)...')
+    console.log('🔍 Using correct table: signing_request_signers (FINAL FIX)')
+    console.log('🔍 Supabase admin client URL:', supabaseAdmin.supabaseUrl)
+    console.log('🔍 First signer data sample:', JSON.stringify(signerInserts[0], null, 2))
+
+    // Test if the signing_request_id exists in signing_requests table
+    const { data: testRequest, error: testError } = await supabaseAdmin
+      .from('signing_requests')
+      .select('id')
+      .eq('id', signatureRequest.id)
+      .single()
+
+    console.log('🔍 Test signing_request exists:', { found: !!testRequest, error: testError })
+
+    // Test if we can query the signing_request_signers table at all
+    const { data: testSigners, error: testSignersError } = await supabaseAdmin
+      .from('signing_request_signers')
+      .select('id')
+      .limit(1)
+
+    console.log('🔍 Test signing_request_signers table access:', {
+      canQuery: !testSignersError,
+      error: testSignersError,
+      count: testSigners?.length || 0
+    })
+
+    // Try inserting without foreign key first to test if it's a constraint issue
+    const testInsert = {
+      signer_email: 'test@example.com',
+      signer_name: 'Test User',
+      signing_order: 999,
+      status: 'pending',
+      signer_status: 'initiated',
+      reminder_count: 0,
+      created_at: now,
+      updated_at: now
+      // Note: No signing_request_id to avoid foreign key constraint
+    }
+
+    console.log('🔍 Testing insert without foreign key...')
+    const { data: testInsertData, error: testInsertError } = await supabaseAdmin
+      .from('signing_request_signers')
+      .insert(testInsert)
+      .select()
+
+    console.log('🔍 Test insert result:', {
+      success: !testInsertError,
+      error: testInsertError,
+      insertedId: testInsertData?.[0]?.id
+    })
+
+    // Clean up test record if it was created
+    if (testInsertData?.[0]?.id) {
+      await supabaseAdmin
+        .from('signing_request_signers')
+        .delete()
+        .eq('id', testInsertData[0].id)
+      console.log('🔍 Cleaned up test record')
+    }
+
+    const { data: signersData, error: signersError } = await supabaseAdmin
       .from('signing_request_signers')
       .insert(signerInserts)
+      .select()
 
     if (signersError) {
-      console.error('Error creating signers:', signersError)
+      console.error('❌ Error creating signers:', signersError)
+      console.error('Signer insert data:', signerInserts)
+      console.error('Signature request ID:', signatureRequest.id)
+      console.error('Error details:', {
+        code: signersError.code,
+        message: signersError.message,
+        details: signersError.details,
+        hint: signersError.hint
+      })
+
       // Rollback: delete the signature request
+      console.log('🔄 Rolling back signature request:', signatureRequest.id)
       await supabaseAdmin
         .from('signing_requests')
         .delete()
         .eq('id', signatureRequest.id)
 
       return new Response(
-        JSON.stringify({ error: 'Failed to create signature request signers' }),
+        JSON.stringify({
+          error: 'Failed to create signature request signers',
+          details: signersError.message || signersError
+        }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
     }
+
+    console.log('✅ Created signers:', signersData?.length || 0)
 
     // Send emails using Resend
     try {
