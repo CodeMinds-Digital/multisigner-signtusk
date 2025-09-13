@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     // Verify access token
     const payload = await verifyAccessToken(accessToken)
     const userEmail = payload.email
+    const userId = payload.userId
 
     console.log('👤 Fetching profile for user:', userEmail)
 
@@ -36,16 +37,38 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Get user signatures from signatures table
+    const { data: signatures, error: signaturesError } = await supabaseAdmin
+      .from('signatures')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+
+    if (signaturesError) {
+      console.error('❌ Error fetching user signatures:', signaturesError)
+    }
+
+    // Convert signatures to the format expected by the frontend
+    const signatureData = signatures ? signatures.map(sig => sig.signature_data) : []
+
     // Check if profile has required signing data
     const hasRequiredData = {
       full_name: !!profile.full_name,
-      signatures: profile.signatures && profile.signatures.length > 0,
+      signatures: signatureData.length > 0,
       location: !!profile.location
     }
+
+    console.log('👤 Profile validation data:', {
+      full_name: !!profile.full_name,
+      signatures_count: signatureData.length,
+      has_signatures: signatureData.length > 0,
+      location: !!profile.location
+    })
 
     return new Response(
       JSON.stringify({
         ...profile,
+        signatures: signatureData, // Include actual signatures data
         hasRequiredData,
         isComplete: hasRequiredData.full_name && hasRequiredData.signatures
       }),
@@ -54,7 +77,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error fetching user profile:', error)
-    
+
     if (error instanceof Error && error.message.includes('token')) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
@@ -118,7 +141,7 @@ export async function PUT(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error updating user profile:', error)
-    
+
     if (error instanceof Error && error.message.includes('token')) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),

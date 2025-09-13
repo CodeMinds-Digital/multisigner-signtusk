@@ -32,6 +32,11 @@ export async function GET(request: NextRequest) {
 
         console.log(`✅ Successfully got public URL from ${bucket}: ${data.publicUrl}`)
 
+        // For signed bucket, also log that this is a final signed PDF
+        if (bucket === 'signed') {
+            console.log('📄 This is a final signed PDF from the signed bucket')
+        }
+
         return NextResponse.json({
             success: true,
             url: data.publicUrl,

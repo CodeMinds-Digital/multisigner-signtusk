@@ -68,6 +68,9 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const [viewingRequest, setViewingRequest] = useState<UnifiedSigningRequest | null>(null)
     const [showSignersSheet, setShowSignersSheet] = useState<UnifiedSigningRequest | null>(null)
     const [signingRequest, setSigningRequest] = useState<UnifiedSigningRequest | null>(null)
+    const [showProfileValidation, setShowProfileValidation] = useState(false)
+    const [pendingSigningRequest, setPendingSigningRequest] = useState<UnifiedSigningRequest | null>(null)
+    const [userProfile, setUserProfile] = useState<any>(null)
     const { user } = useAuth()
 
     const getDateFilter = (range: TimeRange): Date => {
@@ -231,7 +234,28 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         console.log('🖊️ Sign document clicked:', request.title)
 
         try {
-            // Get the PDF URL using the same logic as the Eye icon
+            // Step 1: Validate user profile first
+            console.log('🔍 Validating user profile for signing...')
+            const profile = await fetchUserProfile()
+
+            if (!profile) {
+                alert('Unable to fetch user profile. Please try again.')
+                return
+            }
+
+            const validation = validateProfileForSigning(profile)
+
+            if (!validation.isValid) {
+                console.log('❌ Profile validation failed:', validation.missingFields)
+                // Store the request for later use after profile setup
+                setPendingSigningRequest(request)
+                setShowProfileValidation(true)
+                return
+            }
+
+            console.log('✅ Profile validation passed, proceeding to PDF preview...')
+
+            // Step 2: Get the PDF URL using the same logic as the Eye icon
             let documentPath = null
 
             // Check multiple possible data structures for original document
@@ -491,6 +515,48 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const handleFromToClick = (request: UnifiedSigningRequest) => {
         console.log('👥 From/To clicked for:', request.title)
         setShowSignersSheet(request)
+    }
+
+    const fetchUserProfile = async () => {
+        try {
+            const response = await fetch('/api/user/profile', {
+                credentials: 'include'
+            })
+
+            if (response.ok) {
+                const profile = await response.json()
+                setUserProfile(profile)
+                return profile
+            }
+            return null
+        } catch (error) {
+            console.error('Error fetching user profile:', error)
+            return null
+        }
+    }
+
+    const validateProfileForSigning = (profile: any) => {
+        const hasName = !!profile?.full_name
+        const hasSignature = profile?.signatures && profile.signatures.length > 0
+
+        console.log('🔍 Profile validation debug:', {
+            profile_full_name: profile?.full_name,
+            profile_signatures: profile?.signatures,
+            signatures_length: profile?.signatures?.length,
+            hasName,
+            hasSignature,
+            profile_keys: Object.keys(profile || {})
+        })
+
+        return {
+            isValid: hasName && hasSignature,
+            hasName,
+            hasSignature,
+            missingFields: [
+                ...(!hasName ? ['Name'] : []),
+                ...(!hasSignature ? ['Primary Signature'] : [])
+            ]
+        }
     }
 
     const handleSignatureAccept = async (signatureData: any) => {
@@ -923,6 +989,108 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Profile Validation Popup */}
+            {showProfileValidation && userProfile && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+                        <h3 className="text-lg font-semibold mb-4">Complete Your Profile</h3>
+                        <p className="text-sm text-gray-600 mb-4">
+                            Before signing, please ensure your profile contains the required information:
+                        </p>
+
+                        <div className="space-y-3 mb-6">
+                            {/* Name Status */}
+                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div className="flex items-center space-x-3">
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${userProfile.full_name ? 'bg-green-100' : 'bg-red-100'
+                                        }`}>
+                                        {userProfile.full_name ? (
+                                            <CheckCircle className="w-3 h-3 text-green-600" />
+                                        ) : (
+                                            <X className="w-3 h-3 text-red-600" />
+                                        )}
+                                    </div>
+                                    <span className="font-medium">Name</span>
+                                </div>
+                                {userProfile.full_name ? (
+                                    <span className="text-sm text-green-600">Available</span>
+                                ) : (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            window.open('/profile', '_blank')
+                                        }}
+                                    >
+                                        Setup
+                                    </Button>
+                                )}
+                            </div>
+
+                            {/* Signature Status */}
+                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                <div className="flex items-center space-x-3">
+                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${userProfile.signatures && userProfile.signatures.length > 0 ? 'bg-green-100' : 'bg-red-100'
+                                        }`}>
+                                        {userProfile.signatures && userProfile.signatures.length > 0 ? (
+                                            <CheckCircle className="w-3 h-3 text-green-600" />
+                                        ) : (
+                                            <X className="w-3 h-3 text-red-600" />
+                                        )}
+                                    </div>
+                                    <span className="font-medium">Primary Signature</span>
+                                </div>
+                                {userProfile.signatures && userProfile.signatures.length > 0 ? (
+                                    <span className="text-sm text-green-600">Available</span>
+                                ) : (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            window.open('/signatures', '_blank')
+                                        }}
+                                    >
+                                        Setup
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="space-y-3">
+                            <Button
+                                className="w-full"
+                                onClick={async () => {
+                                    // Re-check profile after setup
+                                    const updatedProfile = await fetchUserProfile()
+                                    if (updatedProfile) {
+                                        const validation = validateProfileForSigning(updatedProfile)
+                                        if (validation.isValid && pendingSigningRequest) {
+                                            setShowProfileValidation(false)
+                                            // Continue with the signing flow
+                                            handleSign(pendingSigningRequest)
+                                        } else {
+                                            alert('Please complete all required profile fields before continuing.')
+                                        }
+                                    }
+                                }}
+                            >
+                                Check & Continue
+                            </Button>
+                            <Button
+                                variant="outline"
+                                className="w-full"
+                                onClick={() => {
+                                    setShowProfileValidation(false)
+                                    setPendingSigningRequest(null)
+                                }}
+                            >
+                                Cancel
+                            </Button>
                         </div>
                     </div>
                 </div>

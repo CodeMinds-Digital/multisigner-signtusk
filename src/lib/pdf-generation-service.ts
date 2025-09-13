@@ -1,5 +1,5 @@
 import { supabaseAdmin } from './supabase-admin'
-import { generate, text, image, dateTime, barcodes } from 'pdfme-complete'
+import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 interface SignerData {
   id: string
@@ -93,7 +93,7 @@ export class PDFGenerationService {
           .update({
             final_pdf_url: finalPdfUrl,
             document_status: 'completed',
-            completed_at: new Date().toISOString(),
+            status: 'completed',
             updated_at: new Date().toISOString()
           })
           .eq('id', requestId)
@@ -232,15 +232,12 @@ export class PDFGenerationService {
       // Prepare inputs for PDF generation
       const inputs = this.prepareInputsFromFields(populatedFields)
 
-      // Generate PDF using pdfme-complete
-      const pdfBytes = await generate({
-        template: {
-          basePdf: templateData.basePdf,
-          schemas: templateData.schemas
-        },
-        inputs: [inputs],
-        plugins: { text, image, dateTime, qrcode: barcodes.qrcode },
-      })
+      // Generate PDF using pdf-lib (server-compatible)
+      console.log('📄 Generating signed PDF with pdf-lib')
+      console.log('📋 Generating PDF with inputs:', inputs)
+
+      // Create signed PDF using pdf-lib
+      const pdfBytes = await this.createSignedPDFWithPdfLib(originalPdfUrl, populatedFields, requestId)
 
       // Upload to Supabase storage
       const timestamp = new Date().getTime()
@@ -274,7 +271,7 @@ export class PDFGenerationService {
   }
 
   /**
-   * Prepare inputs for pdfme-complete from populated fields
+   * Prepare inputs for pdfme from populated fields
    */
   private static prepareInputsFromFields(populatedFields: any[]): Record<string, any> {
     const inputs: Record<string, any> = {}
@@ -286,6 +283,169 @@ export class PDFGenerationService {
     })
 
     return inputs
+  }
+
+  /**
+   * Create signed PDF using pdf-lib (server-compatible)
+   */
+  private static async createSignedPDFWithPdfLib(
+    originalPdfUrl: string,
+    populatedFields: any[],
+    requestId: string
+  ): Promise<Uint8Array> {
+    try {
+      console.log('📄 Loading original PDF from:', originalPdfUrl)
+
+      // Fetch the original PDF
+      const response = await fetch(originalPdfUrl)
+      if (!response.ok) {
+        throw new Error(`Failed to fetch PDF: ${response.statusText}`)
+      }
+
+      const originalPdfBytes = await response.arrayBuffer()
+      const pdfDoc = await PDFDocument.load(originalPdfBytes)
+
+      // Get the first page (assuming single page for now)
+      const pages = pdfDoc.getPages()
+      const firstPage = pages[0]
+      const { width, height } = firstPage.getSize()
+
+      // Embed font
+      const font = await pdfDoc.embedFont(StandardFonts.Helvetica)
+      const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold)
+
+      console.log('📝 Adding signature fields to PDF...')
+
+      // Add signature fields to the PDF
+      for (const field of populatedFields) {
+        await this.addFieldToPDF(firstPage, field, font, boldFont, width, height)
+      }
+
+      // Add generation timestamp
+      firstPage.drawText(
+        `Generated: ${new Date().toLocaleString()}`,
+        {
+          x: 50,
+          y: 30,
+          size: 8,
+          font: font,
+          color: rgb(0.5, 0.5, 0.5),
+        }
+      )
+
+      // Save the PDF
+      const pdfBytes = await pdfDoc.save()
+      console.log('✅ PDF generated successfully with pdf-lib')
+
+      return pdfBytes
+
+    } catch (error) {
+      console.error('❌ Error creating PDF with pdf-lib:', error)
+      throw error
+    }
+  }
+
+  /**
+   * Add a field to the PDF page
+   */
+  private static async addFieldToPDF(
+    page: any,
+    field: any,
+    font: any,
+    boldFont: any,
+    pageWidth: number,
+    pageHeight: number
+  ) {
+    const { type, value, position } = field
+
+    // Default position if not specified
+    let x = position?.x || 100
+    let y = position?.y || pageHeight - 200
+
+    // Convert coordinates if needed (pdfme uses different coordinate system)
+    y = pageHeight - y
+
+    console.log(`📍 Adding ${type} field at (${x}, ${y}):`, value)
+
+    switch (type) {
+      case 'signature':
+        // Handle signature image
+        if (value && value.startsWith('data:image')) {
+          try {
+            // Extract base64 data
+            const base64Data = value.split(',')[1]
+            const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0))
+
+            // Embed image
+            const image = await page.doc.embedPng(imageBytes)
+            const imageDims = image.scale(0.5) // Scale down signature
+
+            page.drawImage(image, {
+              x: x,
+              y: y - imageDims.height,
+              width: imageDims.width,
+              height: imageDims.height,
+            })
+          } catch (error) {
+            console.error('Error embedding signature image:', error)
+            // Fallback to text
+            page.drawText('[Signature]', {
+              x: x,
+              y: y,
+              size: 12,
+              font: boldFont,
+              color: rgb(0, 0, 0),
+            })
+          }
+        }
+        break
+
+      case 'name':
+      case 'full_name':
+        page.drawText(value || '[Name]', {
+          x: x,
+          y: y,
+          size: 12,
+          font: boldFont,
+          color: rgb(0, 0, 0),
+        })
+        break
+
+      case 'date':
+      case 'signed_date':
+      case 'datetime':
+      case 'timestamp':
+        page.drawText(value || new Date().toLocaleDateString(), {
+          x: x,
+          y: y,
+          size: 10,
+          font: font,
+          color: rgb(0, 0, 0),
+        })
+        break
+
+      case 'location':
+      case 'state':
+      case 'district':
+      case 'email':
+        page.drawText(value || '', {
+          x: x,
+          y: y,
+          size: 10,
+          font: font,
+          color: rgb(0, 0, 0),
+        })
+        break
+
+      default:
+        page.drawText(value || '', {
+          x: x,
+          y: y,
+          size: 10,
+          font: font,
+          color: rgb(0, 0, 0),
+        })
+    }
   }
 
   /**

@@ -159,6 +159,7 @@ export async function POST(request: NextRequest) {
       console.log('🎉 All signers completed! Triggering PDF generation...')
 
       // Trigger PDF generation in background
+      console.log('🎉 All signers completed! Triggering PDF generation...')
       PDFGenerationService.triggerPDFGeneration(requestId)
         .then(result => {
           if (result.success) {
