@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { MultiSignatureWorkflowService } from '@/lib/multi-signature-workflow-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -47,52 +48,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update signer's viewed_at timestamp and status if not already viewed
-    if (!signer.viewed_at) {
-      const { error: updateError } = await supabaseAdmin
-        .from('signing_request_signers')
-        .update({
-          viewed_at: new Date().toISOString(),
-          signer_status: 'viewed',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', signer.id)
+    // Track document view using the new multi-signature workflow service
+    const viewTracked = await MultiSignatureWorkflowService.trackDocumentView(
+      requestId,
+      payload.email
+    )
 
-      if (updateError) {
-        console.error('❌ Error updating signer viewed_at:', updateError)
-        return new Response(
-          JSON.stringify({ error: 'Failed to track document view' }),
-          { status: 500, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
-
-      // Update the signing request's viewed_count
-      const { data: allSigners, error: signersError } = await supabaseAdmin
-        .from('signing_request_signers')
-        .select('viewed_at')
-        .eq('signing_request_id', requestId)
-
-      if (!signersError && allSigners) {
-        const viewedCount = allSigners.filter(s => s.viewed_at).length
-
-        const { error: requestUpdateError } = await supabaseAdmin
-          .from('signing_requests')
-          .update({
-            viewed_signers: viewedCount,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', requestId)
-
-        if (requestUpdateError) {
-          console.error('❌ Error updating signing request viewed count:', requestUpdateError)
-        } else {
-          console.log('✅ Updated viewed count to:', viewedCount)
-        }
-      }
-
-      console.log('✅ Document view tracked successfully for signer:', signer.signer_email)
-    } else {
-      console.log('📊 Document already viewed by this signer')
+    if (!viewTracked) {
+      return new Response(
+        JSON.stringify({ error: 'Failed to track document view' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      )
     }
 
     return new Response(

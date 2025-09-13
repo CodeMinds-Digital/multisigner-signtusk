@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { MultiSignatureWorkflowService } from '@/lib/multi-signature-workflow-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -126,66 +127,25 @@ export async function POST(request: NextRequest) {
     const allSignersCompleted = signedCount === totalSigners
 
     // Also calculate viewed count (signers who have viewed_at timestamp)
-    const { data: allSignersWithView, error: viewError } = await supabaseAdmin
-      .from('signing_request_signers')
-      .select('viewed_at')
-      .eq('signing_request_id', requestId)
-
-    const viewedCount = viewError ? 0 : allSignersWithView.filter(s => s.viewed_at).length
-
-    // Update signing request status
-    let documentStatus = 'pending'
-    let requestStatus = 'in_progress'
-
-    if (allSignersCompleted) {
-      documentStatus = 'completed'
-      requestStatus = 'completed'
-    } else if (signedCount > 0) {
-      documentStatus = 'partially_signed'
-      requestStatus = 'in_progress'
-    }
-
-    const { error: requestUpdateError } = await supabaseAdmin
-      .from('signing_requests')
-      .update({
-        status: requestStatus,
-        signed_count: signedCount,
-        completed_signers: signedCount,
-        viewed_signers: viewedCount,
-        document_status: documentStatus,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', requestId)
-
-    if (requestUpdateError) {
-      console.error('❌ Error updating signing request:', requestUpdateError)
-    }
-
     console.log('✅ Signature saved successfully. Signed:', signedCount, 'Total:', totalSigners)
 
-    // If all signers completed, trigger PDF generation
-    if (allSignersCompleted) {
-      console.log('🎉 All signers completed! Triggering PDF generation...')
+    // Handle signer completion using the new multi-signature workflow service
+    const completionResult = await MultiSignatureWorkflowService.handleSignerCompletion(
+      requestId,
+      signerEmail
+    )
 
-      // Trigger PDF generation using the new API endpoint
-      try {
-        const pdfResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/signature-requests/generate-pdf`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ requestId })
-        })
-
-        if (pdfResponse.ok) {
-          const pdfResult = await pdfResponse.json()
-          console.log('✅ PDF generation completed successfully:', pdfResult.finalPdfUrl)
-        } else {
-          const errorData = await pdfResponse.json()
-          console.error('❌ PDF generation failed:', errorData.error)
-        }
-      } catch (error) {
-        console.error('❌ Error triggering PDF generation:', error)
-      }
+    if (!completionResult.success) {
+      console.error('❌ Failed to handle signer completion')
+      return new Response(
+        JSON.stringify({ error: 'Failed to process signature completion' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      )
     }
+
+    console.log('📊 Signer completion result:', completionResult)
+
+
 
     return new Response(
       JSON.stringify({

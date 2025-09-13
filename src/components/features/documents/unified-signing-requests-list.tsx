@@ -520,6 +520,22 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
             console.log('🔍 Trying to access PDF with path:', fetchedDocumentPath)
             await tryOpenPDF(fetchedDocumentPath, request.title)
+
+            // Track document view for received requests
+            if (request.type === 'received') {
+                try {
+                    console.log('📊 Tracking document view for original document:', request.id)
+                    await fetch('/api/signature-requests/track-view', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ requestId: request.id })
+                    })
+                    console.log('✅ Document view tracked successfully')
+                } catch (error) {
+                    console.error('❌ Error tracking document view:', error)
+                }
+            }
         } catch (error) {
             console.error('❌ Error in PDF preview:', error)
             alert('Error accessing document.')

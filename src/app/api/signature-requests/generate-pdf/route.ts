@@ -213,36 +213,63 @@ export async function POST(request: NextRequest) {
 async function populateSchemaWithSignatures(schema: any[], signers: any[], requestId: string) {
   const inputs: Record<string, any> = {}
 
+  console.log(`📋 Processing ${schema.length} fields for ${signers.length} signers`)
+
   for (const field of schema) {
     const fieldName = field.name
     if (!fieldName) continue
 
     // Find the appropriate signer for this field
-    const signer = signers[0] // For now, assume single signer. TODO: Handle multi-signer
+    // Check if field has signer assignment (signer_email or signer_id)
+    let targetSigner = null
 
-    if (!signer || !signer.signature_data) {
-      console.log(`⚠️ No signature data found for field: ${fieldName}`)
+    if (field.signer_email) {
+      // Field is assigned to specific signer by email
+      targetSigner = signers.find(s => s.signer_email === field.signer_email)
+      console.log(`🎯 Field ${fieldName} assigned to signer: ${field.signer_email}`)
+    } else if (field.signer_id) {
+      // Field is assigned to specific signer by ID
+      targetSigner = signers.find(s => s.id === field.signer_id)
+      console.log(`🎯 Field ${fieldName} assigned to signer ID: ${field.signer_id}`)
+    } else if (field.signing_order !== undefined) {
+      // Field is assigned by signing order
+      targetSigner = signers.find(s => s.signing_order === field.signing_order)
+      console.log(`🎯 Field ${fieldName} assigned to signing order: ${field.signing_order}`)
+    } else {
+      // No specific assignment - use first available signed signer
+      targetSigner = signers.find(s => s.status === 'signed' || s.signer_status === 'signed')
+      console.log(`🎯 Field ${fieldName} using first available signed signer`)
+    }
+
+    if (!targetSigner) {
+      console.log(`⚠️ No signer found for field: ${fieldName}`)
+      continue
+    }
+
+    if (!targetSigner.signature_data) {
+      console.log(`⚠️ No signature data found for field: ${fieldName}, signer: ${targetSigner.signer_email}`)
       continue
     }
 
     let signatureData
     try {
-      signatureData = typeof signer.signature_data === 'string'
-        ? JSON.parse(signer.signature_data)
-        : signer.signature_data
+      signatureData = typeof targetSigner.signature_data === 'string'
+        ? JSON.parse(targetSigner.signature_data)
+        : targetSigner.signature_data
     } catch (error) {
       console.error(`❌ Error parsing signature data for ${fieldName}:`, error)
       continue
     }
 
     // Populate field based on type
-    const fieldValue = getFieldValue(field, signatureData, signer)
+    const fieldValue = getFieldValue(field, signatureData, targetSigner)
     if (fieldValue !== null && fieldValue !== undefined) {
       inputs[fieldName] = fieldValue
       console.log(`✅ Populated field ${fieldName} with:`, fieldValue.substring ? fieldValue.substring(0, 50) + '...' : fieldValue)
     }
   }
 
+  console.log(`📊 Successfully populated ${Object.keys(inputs).length} fields`)
   return inputs
 }
 
