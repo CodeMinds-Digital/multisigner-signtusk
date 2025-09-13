@@ -16,12 +16,12 @@ export function LoadingSpinner({ size = 'md', className }: LoadingSpinnerProps) 
   }
 
   return (
-    <Loader2 
+    <Loader2
       className={cn(
         'animate-spin text-blue-600',
         sizeClasses[size],
         className
-      )} 
+      )}
     />
   )
 }
@@ -33,17 +33,17 @@ interface LoadingOverlayProps {
   className?: string
 }
 
-export function LoadingOverlay({ 
-  isLoading, 
-  children, 
-  message = 'Loading...', 
-  className 
+export function LoadingOverlay({
+  isLoading,
+  children,
+  message = 'Loading...',
+  className
 }: LoadingOverlayProps) {
   return (
     <div className={cn('relative', className)}>
       {children}
       {isLoading && (
-        <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="absolute inset-0 bg-white flex items-center justify-center z-50">
           <div className="flex flex-col items-center gap-3">
             <LoadingSpinner size="lg" />
             <p className="text-sm text-gray-600 font-medium">{message}</p>
@@ -59,9 +59,9 @@ interface LoadingPageProps {
   className?: string
 }
 
-export function LoadingPage({ 
-  message = 'Loading...', 
-  className 
+export function LoadingPage({
+  message = 'Loading...',
+  className
 }: LoadingPageProps) {
   return (
     <div className={cn(
@@ -89,10 +89,10 @@ interface LoadingButtonProps {
   type?: 'button' | 'submit' | 'reset'
 }
 
-export function LoadingButton({ 
-  isLoading, 
-  children, 
-  loadingText = 'Loading...', 
+export function LoadingButton({
+  isLoading,
+  children,
+  loadingText = 'Loading...',
   className,
   disabled,
   onClick,
@@ -125,11 +125,11 @@ interface ProgressBarProps {
   message?: string
 }
 
-export function ProgressBar({ 
-  progress, 
-  className, 
-  showPercentage = true, 
-  message 
+export function ProgressBar({
+  progress,
+  className,
+  showPercentage = true,
+  message
 }: ProgressBarProps) {
   const clampedProgress = Math.min(Math.max(progress, 0), 100)
 
@@ -146,7 +146,7 @@ export function ProgressBar({
         </div>
       )}
       <div className="w-full bg-gray-200 rounded-full h-2">
-        <div 
+        <div
           className="bg-blue-600 h-2 rounded-full transition-all duration-300 ease-out"
           style={{ width: `${clampedProgress}%` }}
         />

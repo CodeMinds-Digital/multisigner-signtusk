@@ -200,7 +200,7 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center z-50">
+        <div className="fixed inset-0 flex items-center justify-center z-50">
             <Card className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                     <div>

@@ -12,12 +12,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorAlert } from '@/components/ui/alert'
 import { RequestDetailsModal } from './request-details-modal'
 import { PDFSigningScreen } from './pdf-signing-screen'
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
+
 import {
     Select,
     SelectContent,
@@ -67,6 +62,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const [timeRange, setTimeRange] = useState<TimeRange>('30d')
     const [viewingRequest, setViewingRequest] = useState<UnifiedSigningRequest | null>(null)
     const [showSignersSheet, setShowSignersSheet] = useState<UnifiedSigningRequest | null>(null)
+    const [showActionsSheet, setShowActionsSheet] = useState<UnifiedSigningRequest | null>(null)
     const [signingRequest, setSigningRequest] = useState<UnifiedSigningRequest | null>(null)
     const [showProfileValidation, setShowProfileValidation] = useState(false)
     const [pendingSigningRequest, setPendingSigningRequest] = useState<UnifiedSigningRequest | null>(null)
@@ -896,26 +892,13 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                                     </Button>
                                                 )}
                                                 {request.type === 'sent' && (
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="outline" size="sm">
-                                                                <MoreHorizontal className="w-4 h-4" />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent>
-                                                            <DropdownMenuItem onClick={() => handleShare(request)}>
-                                                                <Share2 className="w-4 h-4 mr-2" />
-                                                                Send Reminder
-                                                            </DropdownMenuItem>
-                                                            <DropdownMenuItem
-                                                                onClick={() => handleDelete(request)}
-                                                                className="text-red-600"
-                                                            >
-                                                                <Trash2 className="w-4 h-4 mr-2" />
-                                                                Delete
-                                                            </DropdownMenuItem>
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        onClick={() => setShowActionsSheet(request)}
+                                                    >
+                                                        <MoreHorizontal className="w-4 h-4" />
+                                                    </Button>
                                                 )}
                                             </div>
                                         </TableCell>
@@ -1019,9 +1002,71 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                 </div>
             )}
 
+            {/* Actions Bottom Sheet */}
+            {showActionsSheet && (
+                <div className="fixed inset-0 z-50 flex items-end justify-center">
+                    {/* Backdrop - no opacity overlay */}
+                    <div
+                        className="fixed inset-0"
+                        onClick={() => setShowActionsSheet(null)}
+                    />
+
+                    {/* Bottom Sheet */}
+                    <div className="relative bg-white rounded-t-lg shadow-xl w-full max-w-md max-h-[50vh] overflow-hidden transform transition-transform duration-300 ease-out translate-y-0">
+                        {/* Header */}
+                        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                            <h3 className="text-lg font-semibold text-gray-900">
+                                Document Actions
+                            </h3>
+                            <button
+                                onClick={() => setShowActionsSheet(null)}
+                                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                            >
+                                <X className="w-5 h-5 text-gray-500" />
+                            </button>
+                        </div>
+
+                        {/* Content */}
+                        <div className="p-4">
+                            <div className="space-y-2">
+                                {/* Send Reminder Action */}
+                                <button
+                                    onClick={() => {
+                                        handleShare(showActionsSheet)
+                                        setShowActionsSheet(null)
+                                    }}
+                                    className="w-full flex items-center p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                                >
+                                    <Share2 className="w-5 h-5 text-blue-600 mr-3" />
+                                    <div>
+                                        <p className="font-medium text-gray-900">Send Reminder</p>
+                                        <p className="text-sm text-gray-600">Notify signers about pending signatures</p>
+                                    </div>
+                                </button>
+
+                                {/* Delete Action */}
+                                <button
+                                    onClick={() => {
+                                        handleDelete(showActionsSheet)
+                                        setShowActionsSheet(null)
+                                    }}
+                                    className="w-full flex items-center p-3 text-left hover:bg-red-50 rounded-lg transition-colors"
+                                >
+                                    <Trash2 className="w-5 h-5 text-red-600 mr-3" />
+                                    <div>
+                                        <p className="font-medium text-red-900">Delete Request</p>
+                                        <p className="text-sm text-red-600">Permanently remove this signature request</p>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Profile Validation Popup */}
             {showProfileValidation && userProfile && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                <div className="fixed inset-0 flex items-center justify-center z-50">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
                         <h3 className="text-lg font-semibold mb-4">Complete Your Profile</h3>
                         <p className="text-sm text-gray-600 mb-4">

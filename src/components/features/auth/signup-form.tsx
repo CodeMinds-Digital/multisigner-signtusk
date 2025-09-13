@@ -629,7 +629,7 @@ export function SignUpForm() {
       </div>
 
       {termsPopup && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-lg w-96 max-h-[80vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4">Terms and Conditions</h3>
             <div className="text-sm text-gray-600 mb-4">
