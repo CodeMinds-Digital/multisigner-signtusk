@@ -1,5 +1,4 @@
 import { supabaseAdmin } from './supabase-admin'
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
 
 interface SignerData {
   id: string

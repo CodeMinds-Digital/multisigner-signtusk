@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     if (!signer.viewed_at) {
       const { error: updateError } = await supabaseAdmin
         .from('signing_request_signers')
-        .update({ 
+        .update({
           viewed_at: new Date().toISOString(),
           signer_status: 'viewed',
           updated_at: new Date().toISOString()
@@ -77,8 +77,8 @@ export async function POST(request: NextRequest) {
 
         const { error: requestUpdateError } = await supabaseAdmin
           .from('signing_requests')
-          .update({ 
-            viewed_count: viewedCount,
+          .update({
+            viewed_signers: viewedCount,
             updated_at: new Date().toISOString()
           })
           .eq('id', requestId)
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest) {
     }
 
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
         message: 'Document view tracked successfully'
       }),
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error tracking document view:', error)
-    
+
     if (error instanceof Error && error.message.includes('token')) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),

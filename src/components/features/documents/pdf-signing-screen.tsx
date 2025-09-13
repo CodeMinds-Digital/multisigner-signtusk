@@ -88,7 +88,31 @@ export function PDFSigningScreen({
       setPdfLoading(false)
       console.log('✅ PDF URL set for signing:', request.document_url)
     }
+
+    // Track document view when PDF signing screen opens
+    trackDocumentView()
   }, [request.document_url])
+
+  const trackDocumentView = async () => {
+    try {
+      console.log('📊 Tracking document view for signing request:', request.id)
+
+      const response = await fetch('/api/signature-requests/track-view', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: request.id })
+      })
+
+      if (response.ok) {
+        console.log('✅ Document view tracked successfully')
+      } else {
+        console.log('❌ Failed to track document view:', response.status)
+      }
+    } catch (error) {
+      console.error('❌ Error tracking document view:', error)
+    }
+  }
 
   const fetchUserProfile = async () => {
     try {

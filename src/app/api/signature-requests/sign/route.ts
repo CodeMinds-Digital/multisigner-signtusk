@@ -2,7 +2,6 @@ import { NextRequest } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { PDFGenerationService } from '@/lib/pdf-generation-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -88,6 +87,7 @@ export async function POST(request: NextRequest) {
         status: 'signed',
         signer_status: 'signed',
         signed_at: new Date().toISOString(),
+        viewed_at: signer.viewed_at || new Date().toISOString(), // Set viewed_at if not already set
         signature_data: JSON.stringify(completeSignatureData),
         location: locationData,
         ip_address: clientIP,
@@ -125,6 +125,14 @@ export async function POST(request: NextRequest) {
     const totalSigners = allSigners.length
     const allSignersCompleted = signedCount === totalSigners
 
+    // Also calculate viewed count (signers who have viewed_at timestamp)
+    const { data: allSignersWithView, error: viewError } = await supabaseAdmin
+      .from('signing_request_signers')
+      .select('viewed_at')
+      .eq('signing_request_id', requestId)
+
+    const viewedCount = viewError ? 0 : allSignersWithView.filter(s => s.viewed_at).length
+
     // Update signing request status
     let documentStatus = 'pending'
     let requestStatus = 'in_progress'
@@ -142,9 +150,10 @@ export async function POST(request: NextRequest) {
       .update({
         status: requestStatus,
         signed_count: signedCount,
+        completed_signers: signedCount,
+        viewed_signers: viewedCount,
         document_status: documentStatus,
-        updated_at: new Date().toISOString(),
-        ...(allSignersCompleted && { completed_at: new Date().toISOString() })
+        updated_at: new Date().toISOString()
       })
       .eq('id', requestId)
 
@@ -158,19 +167,24 @@ export async function POST(request: NextRequest) {
     if (allSignersCompleted) {
       console.log('🎉 All signers completed! Triggering PDF generation...')
 
-      // Trigger PDF generation in background
-      console.log('🎉 All signers completed! Triggering PDF generation...')
-      PDFGenerationService.triggerPDFGeneration(requestId)
-        .then(result => {
-          if (result.success) {
-            console.log('✅ PDF generation initiated successfully')
-          } else {
-            console.error('❌ PDF generation failed:', result.error)
-          }
+      // Trigger PDF generation using the new API endpoint
+      try {
+        const pdfResponse = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/signature-requests/generate-pdf`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ requestId })
         })
-        .catch(error => {
-          console.error('❌ Error triggering PDF generation:', error)
-        })
+
+        if (pdfResponse.ok) {
+          const pdfResult = await pdfResponse.json()
+          console.log('✅ PDF generation completed successfully:', pdfResult.finalPdfUrl)
+        } else {
+          const errorData = await pdfResponse.json()
+          console.error('❌ PDF generation failed:', errorData.error)
+        }
+      } catch (error) {
+        console.error('❌ Error triggering PDF generation:', error)
+      }
     }
 
     return new Response(

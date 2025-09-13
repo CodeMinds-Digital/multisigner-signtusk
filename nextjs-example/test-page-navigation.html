@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Designer Page Navigation Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-result {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 3px;
+        }
+        .pass {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .fail {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .instructions {
+            background-color: #e2e3e5;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>PDF Designer Page Navigation Test</h1>
+    
+    <div class="instructions">
+        <h3>Test Instructions:</h3>
+        <ol>
+            <li>Open the Next.js example at <a href="http://localhost:3000" target="_blank">http://localhost:3000</a></li>
+            <li>Click on the "🎨 Designer" tab</li>
+            <li>Click "📄 Load Sample PDF" to load a multi-page PDF</li>
+            <li>Test the page navigation controls at the bottom of the designer</li>
+            <li>Verify that clicking page numbers correctly shows the corresponding page</li>
+            <li>Check that the page indicator matches the actual page being displayed</li>
+            <li><strong>Important:</strong> Test bidirectional scrolling - scroll from top to bottom AND bottom to top</li>
+            <li><strong>Critical:</strong> Verify that bottom-to-top scrolling works as smoothly as top-to-bottom</li>
+        </ol>
+    </div>
+
+    <div class="test-section">
+        <h3>Manual Test Checklist - Button Navigation</h3>
+        <p>Test the page navigation buttons:</p>
+
+        <div>
+            <input type="checkbox" id="test1">
+            <label for="test1">Page navigation buttons (◀ ▶) work correctly</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test2">
+            <label for="test2">Page indicator shows correct page number (e.g., "3/4" when on page 3 of 4)</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test3">
+            <label for="test3">Clicking next page button shows the next page content</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test4">
+            <label for="test4">Clicking previous page button shows the previous page content</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test5">
+            <label for="test5">Page content matches the page number displayed</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test6">
+            <label for="test6">No flickering or jumping when changing pages</label>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>Manual Test Checklist - Visible Area-Based Page Detection</h3>
+        <p><strong>New Feature:</strong> Test the improved visible area-based page detection:</p>
+
+        <div>
+            <input type="checkbox" id="test7">
+            <label for="test7">Scrolling manually updates the page indicator correctly</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test8">
+            <label for="test8">In a 2-page PDF: Scrolling to the bottom shows page 2 (not page 1)</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test9">
+            <label for="test9">In a 4-page PDF: Scrolling from top to bottom correctly shows pages 1→2→3→4</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test10">
+            <label for="test10">When viewing page 3 content, the page indicator shows "3/4" (not "2/4")</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test11">
+            <label for="test11">Scrolling to the very bottom shows the last page (page 4/4)</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test12">
+            <label for="test12">Page indicator updates smoothly during scrolling without lag</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test13">
+            <label for="test13"><strong>Visible Area Test:</strong> Page changes when new page becomes more visible (>50% visible area)</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test14">
+            <label for="test14"><strong>Transition Test:</strong> Page indicator changes at intuitive points during scroll transitions</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test15">
+            <label for="test15"><strong>Accuracy Test:</strong> Active page always matches the page with largest visible area</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test16">
+            <label for="test16"><strong>Bidirectional Test:</strong> Bottom-to-top scrolling works as well as top-to-bottom</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test17">
+            <label for="test17"><strong>Reverse Scroll Test:</strong> Scroll from page 4 to page 1 - all transitions work correctly</label>
+        </div>
+
+        <div>
+            <input type="checkbox" id="test18">
+            <label for="test18"><strong>No Sticking Test:</strong> Pages don't "stick" when scrolling in reverse direction</label>
+        </div>
+    </div>
+
+    <div class="test-section">
+        <h3>Expected Behavior (Enhanced)</h3>
+        <h4>Button Navigation:</h4>
+        <ul>
+            <li>✅ When the designer shows "Page 4/4", the view should actually be on page 4</li>
+            <li>✅ Page navigation should be consistent and accurate</li>
+            <li>✅ No race conditions between scroll events and page state updates</li>
+            <li>✅ Smooth transitions between pages without visual glitches</li>
+        </ul>
+
+        <h4>Visible Area-Based Detection:</h4>
+        <ul>
+            <li>✅ Page indicator reflects the page with the largest visible area</li>
+            <li>✅ Page transitions occur when new page becomes more visible than current page</li>
+            <li>✅ Intuitive behavior that matches user visual perception</li>
+            <li>✅ No arbitrary threshold points - based on actual visible content</li>
+            <li>✅ Works consistently across different page sizes</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>Previous Issues (Should be Fixed)</h3>
+        <h4>Button Navigation Issues:</h4>
+        <ul>
+            <li>❌ Designer indicated page 4 but view remained on page 3</li>
+            <li>❌ Inconsistent page navigation in React 18</li>
+            <li>❌ Race conditions between scroll position and page cursor state</li>
+        </ul>
+
+        <h4>Scroll-Based Detection Issues:</h4>
+        <ul>
+            <li>❌ In 2-page PDF: scrolling to bottom still displayed page 1 instead of page 2</li>
+            <li>❌ In 4-page PDF: scrolling from top kept view on page 1</li>
+            <li>❌ When scrolling near last page: visible content was page 3 but indicator showed page 2</li>
+            <li>❌ Scrolling to bottom (page 4) still displayed page 3</li>
+            <li>❌ Required manual page navigation to view the 4th page</li>
+        </ul>
+    </div>
+
+    <div class="test-section">
+        <h3>Technical Details of the Implementation</h3>
+        <p>The page detection has been enhanced with:</p>
+
+        <h4>Phase 1: Basic Fix</h4>
+        <ul>
+            <li><strong>Fixed calculation mismatch:</strong> Aligned the scroll position calculation in <code>getPagesScrollTopByIndex</code> with the page detection logic in <code>useScrollPageCursor</code></li>
+            <li><strong>Prevented race conditions:</strong> Added programmatic scrolling control to temporarily disable scroll event handling during manual page changes</li>
+            <li><strong>React 18 compatibility:</strong> Optimized event listener dependencies and state updates for React 18's automatic batching</li>
+        </ul>
+
+        <h4>Phase 2: Visible Area-Based Detection</h4>
+        <ul>
+            <li><strong>Viewport calculation:</strong> Determines visible area of the scroll container</li>
+            <li><strong>Page intersection:</strong> Calculates how much of each page is visible within the viewport</li>
+            <li><strong>Area comparison:</strong> Selects the page with the largest visible area as the active page</li>
+            <li><strong>Intuitive transitions:</strong> Page changes occur when it makes visual sense to the user</li>
+        </ul>
+
+        <p><strong>Algorithm:</strong> For each page, calculate <code>visibleHeight = max(0, min(viewportBottom, pageBottom) - max(viewportTop, pageTop))</code> and select the page with maximum visible height.</p>
+    </div>
+
+    <script>
+        // Simple test result tracking
+        function updateTestResults() {
+            const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+            const checkedCount = document.querySelectorAll('input[type="checkbox"]:checked').length;
+            const totalCount = checkboxes.length;
+            
+            console.log(`Test Progress: ${checkedCount}/${totalCount} tests passed`);
+            
+            if (checkedCount === totalCount) {
+                alert('🎉 All tests passed! The page navigation fix appears to be working correctly.');
+            }
+        }
+
+        // Add event listeners to checkboxes
+        document.querySelectorAll('input[type="checkbox"]').forEach(checkbox => {
+            checkbox.addEventListener('change', updateTestResults);
+        });
+    </script>
+</body>
+</html>

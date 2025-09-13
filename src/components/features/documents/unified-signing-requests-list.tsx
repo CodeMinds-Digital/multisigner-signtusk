@@ -197,7 +197,30 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         })
     }
 
-    const getTimeRemaining = (expiresAt?: string) => {
+    const getTimeRemaining = (expiresAt?: string, request?: UnifiedSigningRequest) => {
+        // Check if document is completed first
+        if (request) {
+            const isCompleted = request.status === 'completed' || request.document_status === 'completed'
+            if (isCompleted) {
+                // Show completion time instead of expiry
+                const completedAt = request.initiated_at // Use initiated_at as fallback since updated_at doesn't exist
+                if (completedAt) {
+                    const completedDate = new Date(completedAt)
+                    const formattedDate = completedDate.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                    }) + ' · ' + completedDate.toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                    })
+                    return `Completed: ${formattedDate}`
+                }
+                return 'Completed'
+            }
+        }
+
         if (!expiresAt) return 'No expiry'
 
         const now = new Date()
@@ -826,11 +849,13 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                             </span>
                                         </TableCell>
                                         <TableCell>
-                                            <span className={`text-sm ${getTimeRemaining(request.expires_at).includes('Expired')
+                                            <span className={`text-sm ${getTimeRemaining(request.expires_at, request).includes('Expired')
                                                 ? 'text-red-600'
-                                                : 'text-gray-600'
+                                                : getTimeRemaining(request.expires_at, request).includes('Completed')
+                                                    ? 'text-green-600'
+                                                    : 'text-gray-600'
                                                 }`}>
-                                                {getTimeRemaining(request.expires_at)}
+                                                {getTimeRemaining(request.expires_at, request)}
                                             </span>
                                         </TableCell>
                                         <TableCell>
