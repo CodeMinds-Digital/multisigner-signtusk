@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import { LoadingPage } from '@/components/ui/loading'
+import { ClientOnly } from '@/components/ui/client-only'
 
 export default function DashboardLayout({
   children,
@@ -31,18 +32,20 @@ export default function DashboardLayout({
   }
 
   return (
-    <ErrorBoundary>
-      <div className="flex h-screen bg-gray-50">
-        <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <Header />
-          <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
-            <ErrorBoundary>
-              {children}
-            </ErrorBoundary>
-          </main>
+    <ClientOnly fallback={<LoadingPage message="Initializing dashboard..." />}>
+      <ErrorBoundary>
+        <div className="flex h-screen bg-gray-50">
+          <Sidebar />
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <Header />
+            <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
+              <ErrorBoundary>
+                {children}
+              </ErrorBoundary>
+            </main>
+          </div>
         </div>
-      </div>
-    </ErrorBoundary>
+      </ErrorBoundary>
+    </ClientOnly>
   )
 }

@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if already signed
-    if (signer.signer_status === 'signed') {
+    // Check if already signed (check both status and signer_status fields)
+    if (signer.status === 'signed' || signer.signer_status === 'signed') {
       return new Response(
         JSON.stringify({ error: 'Document already signed by this user' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
@@ -66,22 +66,32 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Get client IP and user agent for audit trail
+    const clientIP = request.headers.get('x-forwarded-for') ||
+      request.headers.get('x-real-ip') ||
+      'unknown'
+    const userAgent = request.headers.get('user-agent') || 'unknown'
+
     // Prepare signature data with timestamp and location
     const completeSignatureData = {
       ...signatureData,
       signed_at: new Date().toISOString(),
       location: locationData,
-      ip_address: request.headers.get('x-forwarded-for') || 'unknown'
+      ip_address: clientIP,
+      user_agent: userAgent
     }
 
-    // Update signer record
+    // Update signer record with both status fields for compatibility
     const { error: updateError } = await supabaseAdmin
       .from('signing_request_signers')
       .update({
-        signed_at: new Date().toISOString(),
+        status: 'signed',
         signer_status: 'signed',
-        signature_data: completeSignatureData,
+        signed_at: new Date().toISOString(),
+        signature_data: JSON.stringify(completeSignatureData),
         location: locationData,
+        ip_address: clientIP,
+        user_agent: userAgent,
         updated_at: new Date().toISOString()
       })
       .eq('id', signer.id)
@@ -97,7 +107,7 @@ export async function POST(request: NextRequest) {
     // Get all signers to check completion status
     const { data: allSigners, error: signersError } = await supabaseAdmin
       .from('signing_request_signers')
-      .select('signer_status')
+      .select('status, signer_status')
       .eq('signing_request_id', requestId)
 
     if (signersError) {
@@ -108,22 +118,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Calculate completion status
-    const signedCount = allSigners.filter(s => s.signer_status === 'signed').length
+    // Calculate completion status (check both status fields for compatibility)
+    const signedCount = allSigners.filter(s =>
+      s.status === 'signed' || s.signer_status === 'signed'
+    ).length
     const totalSigners = allSigners.length
     const allSignersCompleted = signedCount === totalSigners
 
     // Update signing request status
     let documentStatus = 'pending'
+    let requestStatus = 'in_progress'
+
     if (allSignersCompleted) {
       documentStatus = 'completed'
+      requestStatus = 'completed'
     } else if (signedCount > 0) {
       documentStatus = 'partially_signed'
+      requestStatus = 'in_progress'
     }
 
     const { error: requestUpdateError } = await supabaseAdmin
       .from('signing_requests')
       .update({
+        status: requestStatus,
         signed_count: signedCount,
         document_status: documentStatus,
         updated_at: new Date().toISOString(),

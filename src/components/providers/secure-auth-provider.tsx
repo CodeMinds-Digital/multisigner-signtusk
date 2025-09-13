@@ -157,6 +157,9 @@ export function SecureAuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        // Add a small delay to prevent hydration mismatch
+        await new Promise(resolve => setTimeout(resolve, 100))
+
         // Try to refresh to check if we have valid cookies
         await refreshAuth()
       } catch (err) {
@@ -166,7 +169,12 @@ export function SecureAuthProvider({ children }: AuthProviderProps) {
       }
     }
 
-    checkAuth()
+    // Only run on client side to prevent hydration issues
+    if (typeof window !== 'undefined') {
+      checkAuth()
+    } else {
+      setLoading(false)
+    }
   }, [refreshAuth])
 
   // Set up automatic token refresh

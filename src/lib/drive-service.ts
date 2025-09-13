@@ -8,6 +8,18 @@ import { generateSignersFromSchemas, analyzeDocumentSignatureType } from './sign
 
 export class DriveService {
   // Note: Admin operations moved to API routes for security
+  // WARNING: Methods below that use 'this.supabase' are SERVER-SIDE ONLY
+  // They should only be used in API routes, not in client components
+
+  // Server-side only supabase instance (will be null on client)
+  private static get supabase() {
+    if (typeof window !== 'undefined') {
+      throw new Error('Server-side DriveService methods cannot be used on the client side. Use API endpoints instead.')
+    }
+    // Only import on server side
+    const { supabaseAdmin } = require('./supabase-admin')
+    return supabaseAdmin
+  }
 
   /**
    * Get document templates for a user (client-side function that calls API)
@@ -163,54 +175,32 @@ export class DriveService {
    */
   static async saveTemplate(template: any, userId: string, documentId: string): Promise<{ data?: { path: string }, error?: any }> {
     try {
-      // Get document info to ensure correct metadata
-      const { data: document } = await this.supabase
-        .from('documents')
-        .select('signature_type, title, category, document_type')
-        .eq('id', documentId)
-        .single()
-
-      if (!document) {
-        throw new Error('Document not found')
-      }
-
-      // Preserve complete PDFme template structure
-      const completeTemplate = {
-        basePdf: template.basePdf || null, // Preserve basePdf if exists
-        schemas: template.schemas || [],
-        // ✅ CRITICAL: Preserve signers array
-        signers: template.signers || [],
-        // ✅ CRITICAL: Preserve multiSignature flag
-        multiSignature: template.multiSignature || (template.signers && template.signers.length > 1) || document.signature_type === 'multi',
-        // Add metadata for compatibility
-        metadata: {
-          signature_type: document.signature_type,
-          document_type: document.document_type,
-          category: document.category,
-          title: document.title,
-          is_multi_signature: document.signature_type === 'multi',
-          created_at: new Date().toISOString(),
-          version: '1.0',
-          // Preserve any existing metadata
-          ...template.metadata
-        }
-      }
-
-      const fileName = `templates/${userId}/${documentId}/template.json`
-      const json = JSON.stringify(completeTemplate, null, 2)
-
-      // Upload to 'files' bucket (no MIME type restrictions)
-      const { data, error } = await this.supabase.storage
-        .from('files')
-        .upload(fileName, new Blob([json], { type: 'application/json' }), {
-          upsert: true
+      // Use API call instead of direct Supabase access for authentication compatibility
+      const response = await fetch('/api/drive/save-template', {
+        method: 'POST',
+        credentials: 'include', // Include cookies for authentication
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          template,
+          userId,
+          documentId
         })
+      })
 
-      if (error) {
-        return { error }
+      if (!response.ok) {
+        const errorData = await response.json()
+        return { error: errorData.error || `HTTP error! status: ${response.status}` }
       }
 
-      return { data: { path: data!.path } }
+      const result = await response.json()
+
+      if (result.success) {
+        return { data: result.data }
+      } else {
+        return { error: result.error || 'Template save failed' }
+      }
     } catch (error) {
       console.error('Error saving template JSON to storage:', error)
       return { error }
@@ -347,7 +337,36 @@ export class DriveService {
     schemas: any[],
     templatePath?: string
   ): Promise<DocumentTemplate> {
-    return this.updateDocumentWithSchemas(documentId, schemas, templatePath)
+    try {
+      const response = await fetch('/api/drive/templates/update', {
+        method: 'POST',
+        credentials: 'include', // Include cookies for authentication
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          documentId,
+          schemas,
+          templatePath
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.success) {
+        return result.data
+      } else {
+        throw new Error(result.error || 'Document update failed')
+      }
+    } catch (error) {
+      console.error('Error updating document template:', error)
+      throw error
+    }
   }
 
   /**
@@ -606,34 +625,28 @@ export class DriveService {
   }
 
   /**
-   * Get a single document template
+   * Get a single document template (client-side function that calls API)
    */
   static async getDocumentTemplate(documentId: string, userId: string): Promise<DocumentTemplate | null> {
     try {
-      const { data: document, error } = await this.supabase
-        .from('documents')
-        .select('*')
-        .eq('id', documentId)
-        .eq('user_id', userId)
-        .single()
+      const response = await fetch(`/api/drive/templates/${documentId}`, {
+        method: 'GET',
+        credentials: 'include', // Include cookies for authentication
+      })
 
-      if (error || !document) {
-        return null
+      if (!response.ok) {
+        if (response.status === 404) {
+          return null
+        }
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      return {
-        id: document.id,
-        name: document.title,
-        status: document.status,
-        created_at: document.created_at,
-        updated_at: document.updated_at,
-        file_name: document.file_name,
-        file_url: document.file_url,
-        user_id: document.user_id,
-        metadata: document.metadata || {},
-        description: document.description,
-        document_type: document.document_type,
-        completion_percentage: document.completion_percentage
+      const result = await response.json()
+
+      if (result.success) {
+        return result.data
+      } else {
+        throw new Error(result.error || 'Failed to fetch document template')
       }
 
     } catch (error) {
@@ -872,34 +885,40 @@ export class DriveService {
   }
 
   /**
-   * Get PDF data as ArrayBuffer for PDFme
+   * Get PDF data as ArrayBuffer for PDFme (client-side function that calls API)
    */
   static async getPdfData(pdfPath: string): Promise<ArrayBuffer | null> {
     try {
       if (!pdfPath) throw new Error('Empty PDF path')
 
-      // If it's an absolute URL or app-relative path (e.g. /mock/foo.pdf), resolve and fetch directly
-      if (pdfPath.startsWith('http') || pdfPath.startsWith('/')) {
-        const url = await this.getDocumentUrl(pdfPath)
-        if (!url) throw new Error('Unable to resolve PDF URL')
-        const noCacheUrl = url.includes('?') ? `${url}&_=${Date.now()}` : `${url}?_=${Date.now()}`
-        const response = await fetch(noCacheUrl, { cache: 'no-store' })
-        if (!response.ok) {
-          throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`)
+      console.log('🔍 Getting PDF data for path:', pdfPath)
+
+      const response = await fetch('/api/drive/pdf-data', {
+        method: 'POST',
+        credentials: 'include', // Include cookies for authentication
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pdfPath })
+      })
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+
+      if (result.success && result.data.base64) {
+        // Convert base64 back to ArrayBuffer
+        const binaryString = atob(result.data.base64)
+        const bytes = new Uint8Array(binaryString.length)
+        for (let i = 0; i < binaryString.length; i++) {
+          bytes[i] = binaryString.charCodeAt(i)
         }
-        return await response.arrayBuffer()
+        return bytes.buffer
+      } else {
+        throw new Error(result.error || 'Failed to get PDF data')
       }
-
-      // Otherwise, treat as a storage object path and use Supabase SDK download (auth-aware)
-      const { data, error } = await this.supabase.storage
-        .from('documents')
-        .download(pdfPath)
-
-      if (error || !data) {
-        throw new Error(error?.message || 'Failed to download PDF from storage')
-      }
-
-      return await data.arrayBuffer()
 
     } catch (error) {
       console.error('Error getting PDF data for path:', pdfPath, error)

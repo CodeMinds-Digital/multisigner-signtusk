@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase-admin'
+import { generate, text, image, dateTime, barcodes } from 'pdfme-complete'
 
 interface SignerData {
   id: string
@@ -31,7 +32,7 @@ interface DocumentSchema {
 }
 
 export class PDFGenerationService {
-  
+
   /**
    * Generate final signed PDF after all signers complete
    */
@@ -77,7 +78,7 @@ export class PDFGenerationService {
 
       // Map signers to schema fields
       const populatedFields = this.populateSchemaFields(documentSchema, signers)
-      
+
       // Generate the final PDF
       const finalPdfUrl = await this.createSignedPDF(
         signingRequest.document.pdf_url || signingRequest.document.file_url,
@@ -117,7 +118,7 @@ export class PDFGenerationService {
 
     schema.fields.forEach(field => {
       const signer = signers.find(s => s.signer_email === field.signer_email)
-      
+
       if (signer && signer.signature_data) {
         const fieldData = {
           id: field.id,
@@ -126,7 +127,7 @@ export class PDFGenerationService {
           position: field.position,
           value: this.getFieldValue(field, signer)
         }
-        
+
         populatedFields.push(fieldData)
       }
     })
@@ -143,19 +144,19 @@ export class PDFGenerationService {
     switch (field.type) {
       case 'signature':
         return signature_data.signature_image
-      
+
       case 'name':
       case 'full_name':
         return signature_data.signer_name
-      
+
       case 'date':
       case 'signed_date':
         return new Date(signature_data.signed_at).toLocaleDateString()
-      
+
       case 'datetime':
       case 'timestamp':
         return new Date(signature_data.signed_at).toLocaleString()
-      
+
       case 'location':
         if (signature_data.location?.address) {
           return signature_data.location.address
@@ -165,69 +166,105 @@ export class PDFGenerationService {
           return `${loc.district || ''}, ${loc.state || ''}`.trim().replace(/^,\s*/, '')
         }
         return 'Location not available'
-      
+
       case 'state':
         return signature_data.profile_location?.state || ''
-      
+
       case 'district':
         return signature_data.profile_location?.district || ''
-      
+
       case 'taluk':
         return signature_data.profile_location?.taluk || ''
-      
+
       case 'email':
         return signer.signer_email
-      
+
       default:
         return field.name || ''
     }
   }
 
   /**
-   * Create the actual signed PDF with populated fields
-   * This is a placeholder - in a real implementation, you would use a PDF library
-   * like PDF-lib, PDFtk, or a service like DocuSign, PandaDoc, etc.
+   * Create the actual signed PDF with populated fields using pdfme-complete
    */
   private static async createSignedPDF(
-    originalPdfUrl: string, 
-    populatedFields: any[], 
+    originalPdfUrl: string,
+    populatedFields: any[],
     requestId: string
   ): Promise<string | null> {
     try {
       console.log('📄 Creating signed PDF with', populatedFields.length, 'populated fields')
-      
-      // TODO: Implement actual PDF generation
-      // This would involve:
-      // 1. Download the original PDF
-      // 2. Use a PDF library to add the signature fields
-      // 3. Upload the final PDF to storage
-      // 4. Return the URL
-      
-      // For now, we'll simulate this by copying the original PDF
-      // and adding a timestamp to make it unique
+
+      // Get the document template to extract the PDF template and schemas
+      const { data: signingRequest, error: requestError } = await supabaseAdmin
+        .from('signing_requests')
+        .select(`
+          *,
+          document:documents!document_template_id(*)
+        `)
+        .eq('id', requestId)
+        .single()
+
+      if (requestError || !signingRequest) {
+        console.error('❌ Error fetching signing request for PDF generation:', requestError)
+        return null
+      }
+
+      // Get the document template data
+      const { data: documentTemplate, error: templateError } = await supabaseAdmin
+        .from('document_templates')
+        .select('*')
+        .eq('id', signingRequest.document_template_id)
+        .single()
+
+      if (templateError || !documentTemplate) {
+        console.error('❌ Error fetching document template:', templateError)
+        return null
+      }
+
+      // Extract template data and schemas
+      const templateData = documentTemplate.template_data || documentTemplate.schemas
+      if (!templateData || !templateData.basePdf || !templateData.schemas) {
+        console.error('❌ Invalid template data structure')
+        return null
+      }
+
+      // Prepare inputs for PDF generation
+      const inputs = this.prepareInputsFromFields(populatedFields)
+
+      // Generate PDF using pdfme-complete
+      const pdfBytes = await generate({
+        template: {
+          basePdf: templateData.basePdf,
+          schemas: templateData.schemas
+        },
+        inputs: [inputs],
+        plugins: { text, image, dateTime, qrcode: barcodes.qrcode },
+      })
+
+      // Upload to Supabase storage
       const timestamp = new Date().getTime()
-      const finalPdfPath = `signed-documents/${requestId}/final-signed-${timestamp}.pdf`
-      
-      // In a real implementation, you would:
-      // const pdfBytes = await fetch(originalPdfUrl).then(res => res.arrayBuffer())
-      // const pdfDoc = await PDFDocument.load(pdfBytes)
-      // 
-      // populatedFields.forEach(field => {
-      //   // Add field to PDF based on position and type
-      //   if (field.type === 'signature') {
-      //     // Add signature image
-      //   } else {
-      //     // Add text field
-      //   }
-      // })
-      //
-      // const finalPdfBytes = await pdfDoc.save()
-      // Upload to Supabase storage and return URL
-      
-      // For demo purposes, return a placeholder URL
-      const finalPdfUrl = `https://gzxfsojbbfipzvjxucci.supabase.co/storage/v1/object/public/documents/${finalPdfPath}`
-      
-      console.log('✅ Signed PDF created (simulated):', finalPdfUrl)
+      const fileName = `signed-${requestId}-${timestamp}.pdf`
+
+      const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
+        .from('signed')
+        .upload(fileName, pdfBytes, {
+          contentType: 'application/pdf',
+          upsert: false
+        })
+
+      if (uploadError) {
+        console.error('❌ Error uploading signed PDF:', uploadError)
+        return null
+      }
+
+      // Get public URL
+      const { data: urlData } = supabaseAdmin.storage
+        .from('signed')
+        .getPublicUrl(uploadData.path)
+
+      const finalPdfUrl = urlData.publicUrl
+      console.log('✅ Signed PDF created and uploaded:', finalPdfUrl)
       return finalPdfUrl
 
     } catch (error) {
@@ -237,19 +274,34 @@ export class PDFGenerationService {
   }
 
   /**
+   * Prepare inputs for pdfme-complete from populated fields
+   */
+  private static prepareInputsFromFields(populatedFields: any[]): Record<string, any> {
+    const inputs: Record<string, any> = {}
+
+    populatedFields.forEach(field => {
+      if (field.name && field.value !== undefined) {
+        inputs[field.name] = field.value
+      }
+    })
+
+    return inputs
+  }
+
+  /**
    * Trigger PDF generation for a completed signing request
    */
   static async triggerPDFGeneration(requestId: string) {
     try {
       // This could be called from the signing API or as a background job
       const finalPdfUrl = await this.generateFinalPDF(requestId)
-      
+
       if (finalPdfUrl) {
         console.log('🎉 PDF generation completed for request:', requestId)
-        
+
         // TODO: Send notification emails to all parties
         // await this.sendCompletionNotifications(requestId, finalPdfUrl)
-        
+
         return { success: true, finalPdfUrl }
       } else {
         console.error('❌ PDF generation failed for request:', requestId)

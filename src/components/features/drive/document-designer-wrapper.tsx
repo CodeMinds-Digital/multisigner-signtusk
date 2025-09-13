@@ -1232,18 +1232,31 @@ export function DocumentDesignerWrapper({
     console.log('User ID type:', typeof user.id)
     console.log('Document:', document)
 
-    // Verify current authentication
+    // Verify current authentication using the secure auth system
     try {
-      const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser()
-      console.log('Current authenticated user:', currentUser)
-      console.log('Auth error:', authError)
-
-      if (authError || !currentUser) {
-        throw new Error('User not authenticated')
+      // Check if user is authenticated via the secure auth provider
+      if (!user || !user.id) {
+        throw new Error('User not authenticated via secure auth provider')
       }
 
-      if (currentUser.id !== user.id) {
-        console.warn('User ID mismatch:', { contextUser: user.id, authUser: currentUser.id })
+      // Verify the session is still valid by making an authenticated API call
+      const response = await fetch('/api/auth/verify', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Authentication session invalid')
+      }
+
+      const authData = await response.json()
+      console.log('Authentication verified:', authData)
+
+      if (authData.user?.id !== user.id) {
+        console.warn('User ID mismatch:', { contextUser: user.id, authUser: authData.user?.id })
       }
     } catch (authCheckError) {
       console.error('Authentication check failed:', authCheckError)
@@ -1387,14 +1400,7 @@ export function DocumentDesignerWrapper({
       console.log('🔍 Extracted schemas for database:', schemas)
 
       // Save template JSON to storage
-      // Test storage access first
-      console.log('Testing storage access...')
-      const storageTest = await DriveService.testStorageAccess(user.id)
-      console.log('Storage test result:', storageTest)
-
-      if (!storageTest.success) {
-        throw new Error(`Storage access test failed: ${storageTest.error}`)
-      }
+      console.log('Saving template to storage...')
 
       console.log('Saving template to storage...')
       console.log('Template to save:', currentTemplate)
@@ -1577,8 +1583,17 @@ export function DocumentDesignerWrapper({
                 disabled={saving || !template}
                 className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <Save className="w-4 h-4 mr-2" />
-                {saving ? 'Saving...' : 'Save Template'}
+                {saving ? (
+                  <>
+                    <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-4 h-4 mr-2" />
+                    Save Template
+                  </>
+                )}
               </button>
             </div>
           </div>

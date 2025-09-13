@@ -25,6 +25,12 @@ interface RequestDetailsModalProps {
       status: string
       viewed_at?: string
       signed_at?: string
+      declined_at?: string
+      decline_reason?: string
+      signature_data?: any
+      location?: any
+      ip_address?: string
+      user_agent?: string
     }>
     initiated_at: string
     expires_at?: string
@@ -148,22 +154,75 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
   const handleSignatureAccept = async (signatureData: any) => {
     try {
       console.log('✅ Signature accepted:', signatureData)
-      // TODO: Implement signature acceptance logic
+
+      const response = await fetch('/api/signature-requests/sign', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requestId: request.id,
+          signatureData
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to save signature')
+      }
+
+      const result = await response.json()
+      console.log('✅ Signature saved successfully:', result)
+
+      // Show success message
+      alert(`Signature saved successfully! ${result.allSignersCompleted ? 'All signers have completed. Final PDF will be generated.' : `${result.signedCount}/${result.totalSigners} signers completed.`}`)
+
       setShowSigningScreen(false)
       onClose()
+
+      // Refresh the page to show updated status
+      window.location.reload()
     } catch (error) {
       console.error('❌ Error accepting signature:', error)
+      alert(`Error saving signature: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
   const handleSignatureDecline = async (reason: string) => {
     try {
       console.log('❌ Signature declined:', reason)
-      // TODO: Implement signature decline logic
+
+      const response = await fetch('/api/signature-requests/decline', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requestId: request.id,
+          reason
+        })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Failed to decline signature')
+      }
+
+      const result = await response.json()
+      console.log('✅ Signature declined successfully:', result)
+
+      alert('Document declined successfully. All other signers have been notified.')
+
       setShowSigningScreen(false)
       onClose()
+
+      // Refresh the page to show updated status
+      window.location.reload()
     } catch (error) {
       console.error('❌ Error declining signature:', error)
+      alert(`Error declining signature: ${error instanceof Error ? error.message : 'Unknown error'}`)
     }
   }
 
@@ -283,13 +342,74 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
                           </Badge>
                         </div>
 
-                        {/* Signer Timeline */}
-                        <div className="text-xs text-gray-600 space-y-1">
-                          {signer.viewed_at && (
-                            <p>👁️ Viewed: {formatDate(signer.viewed_at)}</p>
+                        {/* Signer Details */}
+                        <div className="space-y-3">
+                          {/* Timeline */}
+                          <div className="text-xs text-gray-600 space-y-1">
+                            {signer.viewed_at && (
+                              <p>👁️ Viewed: {formatDate(signer.viewed_at)}</p>
+                            )}
+                            {signer.signed_at && (
+                              <p>✅ Signed: {formatDate(signer.signed_at)}</p>
+                            )}
+                            {signer.declined_at && (
+                              <p>❌ Declined: {formatDate(signer.declined_at)}</p>
+                            )}
+                          </div>
+
+                          {/* Signature Image */}
+                          {signer.signature_data && signer.status === 'signed' && (
+                            <div className="mt-3">
+                              <p className="text-xs font-medium text-gray-700 mb-2">Signature:</p>
+                              <div className="bg-white border border-gray-200 rounded p-2 max-w-xs">
+                                {typeof signer.signature_data === 'string' ? (
+                                  <img
+                                    src={signer.signature_data}
+                                    alt="Signature"
+                                    className="max-h-12 max-w-full object-contain"
+                                  />
+                                ) : signer.signature_data.signature_image ? (
+                                  <img
+                                    src={signer.signature_data.signature_image}
+                                    alt="Signature"
+                                    className="max-h-12 max-w-full object-contain"
+                                  />
+                                ) : (
+                                  <p className="text-xs text-gray-500">Signature data available</p>
+                                )}
+                              </div>
+                            </div>
                           )}
-                          {signer.signed_at && (
-                            <p>✅ Signed: {formatDate(signer.signed_at)}</p>
+
+                          {/* Location Information */}
+                          {signer.location && signer.status === 'signed' && (
+                            <div className="mt-3">
+                              <p className="text-xs font-medium text-gray-700 mb-1">Signing Location:</p>
+                              <div className="text-xs text-gray-600 space-y-1">
+                                {signer.location.address && (
+                                  <p>📍 {signer.location.address}</p>
+                                )}
+                                {signer.location.latitude && signer.location.longitude && (
+                                  <p>🌐 {signer.location.latitude.toFixed(6)}, {signer.location.longitude.toFixed(6)}</p>
+                                )}
+                                {signer.location.timestamp && (
+                                  <p>⏰ {formatDate(signer.location.timestamp)}</p>
+                                )}
+                                {signer.ip_address && (
+                                  <p>🌐 IP: {signer.ip_address}</p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Decline Reason */}
+                          {signer.decline_reason && signer.status === 'declined' && (
+                            <div className="mt-3">
+                              <p className="text-xs font-medium text-gray-700 mb-1">Decline Reason:</p>
+                              <p className="text-xs text-red-600 bg-red-50 p-2 rounded border border-red-200">
+                                {signer.decline_reason}
+                              </p>
+                            </div>
                           )}
                         </div>
                       </div>

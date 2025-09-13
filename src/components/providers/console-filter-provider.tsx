@@ -16,7 +16,9 @@ export function ConsoleFilterProvider({ children }: { children: React.ReactNode 
       /antd v5 support React is 16 ~ 18/,
       /\[antd: compatible\]/,
       /see https:\/\/u\.ant\.design\/v5-for-19 for compatible/,
-      /Warning: \[antd: compatible\]/
+      /Warning: \[antd: compatible\]/,
+      /Accessing element\.ref was removed in React 19/,
+      /ref is now a regular prop/
     ]
 
     // Filter function to check if a message should be suppressed

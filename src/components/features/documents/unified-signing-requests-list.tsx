@@ -285,17 +285,49 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             document_url: request.document_url,
             final_pdf_url: request.final_pdf_url,
             file_url: (request as any).file_url,
+            status: request.status,
+            document_status: request.document_status,
             full_request: request
         })
 
         try {
-            // Based on terminal logs, the document data is already available in request.document
-            // Let's try to get the file path directly from the nested document object first
-            console.log('🔍 Checking for document in request object...')
-            console.log('📄 request.document:', (request as any).document)
-            console.log('📄 Available keys in request:', Object.keys(request))
+            // Check if all signers have completed and final PDF is available
+            const isCompleted = request.status === 'completed' || request.document_status === 'completed'
+            const hasFinalPdf = request.final_pdf_url && request.final_pdf_url.trim() !== ''
 
-            // Check multiple possible data structures
+            console.log('🔍 Signing status check:', {
+                isCompleted,
+                hasFinalPdf,
+                status: request.status,
+                document_status: request.document_status,
+                final_pdf_url: request.final_pdf_url
+            })
+
+            // If completed and final PDF exists, show final PDF
+            if (isCompleted && hasFinalPdf) {
+                console.log('✅ Showing final signed PDF:', request.final_pdf_url)
+                window.open(request.final_pdf_url, '_blank')
+
+                // Mark as viewed if this is a received request
+                if (request.type === 'received') {
+                    try {
+                        await fetch('/api/signature-requests/track-view', {
+                            method: 'POST',
+                            credentials: 'include',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ requestId: request.id })
+                        })
+                    } catch (error) {
+                        console.error('Error marking request as viewed:', error)
+                    }
+                }
+                return
+            }
+
+            // Otherwise, show original document
+            console.log('🔍 Showing original document...')
+
+            // Check multiple possible data structures for original document
             const documentObj = (request as any).document
             const documentUrl = (request as any).document_url
             const documentId = (request as any).document_id

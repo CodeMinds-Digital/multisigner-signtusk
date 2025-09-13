@@ -53,12 +53,12 @@ interface LocationData {
   accuracy?: number
 }
 
-export function PDFSigningScreen({ 
-  request, 
-  currentUserEmail, 
-  onClose, 
-  onSign, 
-  onDecline 
+export function PDFSigningScreen({
+  request,
+  currentUserEmail,
+  onClose,
+  onSign,
+  onDecline
 }: PDFSigningScreenProps) {
   const [showDeclineModal, setShowDeclineModal] = useState(false)
   const [declineReason, setDeclineReason] = useState('')
@@ -87,7 +87,7 @@ export function PDFSigningScreen({
       const response = await fetch('/api/user/profile', {
         credentials: 'include'
       })
-      
+
       if (response.ok) {
         const profile = await response.json()
         setUserProfile(profile)
@@ -163,8 +163,8 @@ export function PDFSigningScreen({
   }
 
   const validateProfile = () => {
-    const isValid = profileForm.full_name && 
-                   profileForm.signature_image
+    const isValid = profileForm.full_name &&
+      profileForm.signature_image
 
     if (!isValid) {
       setShowProfileValidation(true)
@@ -199,6 +199,7 @@ export function PDFSigningScreen({
       }
     }
 
+    console.log('🖊️ Signing with data:', signatureData)
     onSign(signatureData)
   }
 
@@ -283,8 +284,8 @@ export function PDFSigningScreen({
                 <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                 <p className="text-gray-600">PDF Viewer will be implemented here</p>
                 <p className="text-sm text-gray-500 mt-2">Document: {request.title}</p>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="mt-4"
                   onClick={() => window.open(request.document_url, '_blank')}
                 >
@@ -322,9 +323,9 @@ export function PDFSigningScreen({
                 {locationError && (
                   <div className="text-sm text-red-600">
                     ❌ {locationError}
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
+                    <Button
+                      variant="outline"
+                      size="sm"
                       className="mt-2 w-full"
                       onClick={captureCurrentLocation}
                     >
@@ -353,7 +354,7 @@ export function PDFSigningScreen({
                   <div className="flex items-center">
                     <MapPin className="w-4 h-4 text-gray-400 mr-2" />
                     <span className="text-sm">
-                      {profileForm.state && profileForm.district 
+                      {profileForm.state && profileForm.district
                         ? `${profileForm.district}, ${profileForm.state}`
                         : 'Location not set'
                       }
@@ -383,7 +384,7 @@ export function PDFSigningScreen({
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Accept & Sign
               </Button>
-              
+
               <Button
                 variant="outline"
                 className="w-full border-red-200 text-red-600 hover:bg-red-50"
@@ -437,7 +438,7 @@ export function PDFSigningScreen({
               <Button variant="outline" onClick={() => setShowDeclineModal(false)}>
                 Cancel
               </Button>
-              <Button 
+              <Button
                 className="bg-red-600 hover:bg-red-700"
                 onClick={handleDecline}
               >
@@ -477,9 +478,9 @@ export function PDFSigningScreen({
                       if (file) {
                         const reader = new FileReader()
                         reader.onload = (e) => {
-                          setProfileForm(prev => ({ 
-                            ...prev, 
-                            signature_image: e.target?.result as string 
+                          setProfileForm(prev => ({
+                            ...prev,
+                            signature_image: e.target?.result as string
                           }))
                         }
                         reader.readAsDataURL(file)
@@ -487,9 +488,9 @@ export function PDFSigningScreen({
                     }}
                   />
                   {profileForm.signature_image && (
-                    <img 
-                      src={profileForm.signature_image} 
-                      alt="Signature" 
+                    <img
+                      src={profileForm.signature_image}
+                      alt="Signature"
                       className="mt-2 max-h-20 border rounded"
                     />
                   )}

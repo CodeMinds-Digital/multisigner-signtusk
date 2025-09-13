@@ -352,9 +352,17 @@ export class SigningWorkflowService {
       signers: (request.signers || []).map((signer: any) => ({
         name: signer.signer_name,
         email: signer.signer_email,
-        status: signer.status,
+        status: signer.status || signer.signer_status,
         viewed_at: signer.viewed_at,
-        signed_at: signer.signed_at
+        signed_at: signer.signed_at,
+        declined_at: signer.declined_at,
+        decline_reason: signer.decline_reason,
+        signature_data: signer.signature_data ?
+          (typeof signer.signature_data === 'string' ?
+            JSON.parse(signer.signature_data) : signer.signature_data) : null,
+        location: signer.location,
+        ip_address: signer.ip_address,
+        user_agent: signer.user_agent
       })),
       initiated_at: request.initiated_at,
       expires_at: request.expires_at,

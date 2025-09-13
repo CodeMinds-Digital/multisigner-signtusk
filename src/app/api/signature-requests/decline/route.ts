@@ -47,21 +47,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if already processed
-    if (signer.signer_status === 'declined' || signer.signer_status === 'signed') {
+    // Check if already processed (check both status fields)
+    if (signer.status === 'declined' || signer.signer_status === 'declined' ||
+      signer.status === 'signed' || signer.signer_status === 'signed') {
       return new Response(
         JSON.stringify({ error: 'Document already processed by this user' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
+    // Get client IP and user agent for audit trail
+    const clientIP = request.headers.get('x-forwarded-for') ||
+      request.headers.get('x-real-ip') ||
+      'unknown'
+    const userAgent = request.headers.get('user-agent') || 'unknown'
+
     // Update the declining signer's record
     const { error: updateSignerError } = await supabaseAdmin
       .from('signing_request_signers')
       .update({
+        status: 'declined',
         signer_status: 'declined',
         decline_reason: reason,
         declined_at: new Date().toISOString(),
+        ip_address: clientIP,
+        user_agent: userAgent,
         updated_at: new Date().toISOString()
       })
       .eq('id', signer.id)
@@ -90,11 +100,13 @@ export async function POST(request: NextRequest) {
 
     // Update all other signers to declined status (if not already signed)
     const updatePromises = allSigners
-      .filter(s => s.id !== signer.id && s.signer_status !== 'signed')
-      .map(s => 
+      .filter(s => s.id !== signer.id &&
+        s.status !== 'signed' && s.signer_status !== 'signed')
+      .map(s =>
         supabaseAdmin
           .from('signing_request_signers')
           .update({
+            status: 'declined',
             signer_status: 'declined',
             decline_reason: `Document declined by ${signer.signer_name || userEmail}`,
             updated_at: new Date().toISOString()
@@ -108,6 +120,7 @@ export async function POST(request: NextRequest) {
     const { error: requestUpdateError } = await supabaseAdmin
       .from('signing_requests')
       .update({
+        status: 'declined',
         document_status: 'declined',
         declined_at: new Date().toISOString(),
         decline_reason: reason,
@@ -137,7 +150,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error processing decline:', error)
-    
+
     if (error instanceof Error && error.message.includes('token')) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),

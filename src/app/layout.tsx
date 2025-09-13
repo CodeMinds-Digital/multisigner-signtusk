@@ -20,13 +20,15 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className} suppressHydrationWarning={true}>
-        <ConsoleFilterProvider>
-          <SecureAuthProvider>
-            <ToastProvider>
-              {children}
-            </ToastProvider>
-          </SecureAuthProvider>
-        </ConsoleFilterProvider>
+        <div id="root">
+          <ConsoleFilterProvider>
+            <SecureAuthProvider>
+              <ToastProvider>
+                {children}
+              </ToastProvider>
+            </SecureAuthProvider>
+          </ConsoleFilterProvider>
+        </div>
       </body>
     </html>
   );
