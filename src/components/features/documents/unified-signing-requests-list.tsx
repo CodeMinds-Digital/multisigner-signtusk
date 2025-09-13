@@ -4,12 +4,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { File, Clock, CheckCircle, AlertTriangle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Calendar, Send, Inbox, Filter, Timer, Info, X } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { type SigningRequestListItem } from '@/lib/signing-workflow-service'
+import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorAlert } from '@/components/ui/alert'
 import { RequestDetailsModal } from './request-details-modal'
+import { PDFSigningScreen } from './pdf-signing-screen'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -65,6 +67,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const [timeRange, setTimeRange] = useState<TimeRange>('30d')
     const [viewingRequest, setViewingRequest] = useState<UnifiedSigningRequest | null>(null)
     const [showSignersSheet, setShowSignersSheet] = useState<UnifiedSigningRequest | null>(null)
+    const [signingRequest, setSigningRequest] = useState<UnifiedSigningRequest | null>(null)
     const { user } = useAuth()
 
     const getDateFilter = (range: TimeRange): Date => {
@@ -224,10 +227,79 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         console.log('✅ ViewingRequest state set, modal should open')
     }
 
-    const handleSign = (request: UnifiedSigningRequest) => {
+    const handleSign = async (request: UnifiedSigningRequest) => {
         console.log('🖊️ Sign document clicked:', request.title)
-        // Open the request details modal which will show the Sign Document button
-        setViewingRequest(request)
+
+        try {
+            // Get the PDF URL using the same logic as the Eye icon
+            let documentPath = null
+
+            // Check multiple possible data structures for original document
+            const documentObj = (request as any).document
+            const documentUrl = (request as any).document_url
+            const documentId = (request as any).document_id
+            const documentTemplateId = (request as any).document_template_id
+
+            console.log('🔍 Document object type:', typeof documentObj)
+            console.log('🔍 Document object value:', documentObj)
+            console.log('🔍 Document URL:', documentUrl)
+            console.log('🔍 Document ID:', documentId)
+            console.log('🔍 Document Template ID:', documentTemplateId)
+
+            // First try: nested document object
+            if (documentObj?.file_url || documentObj?.pdf_url) {
+                documentPath = documentObj.file_url || documentObj.pdf_url
+                console.log('✅ Found document path in nested object:', documentPath)
+            }
+            // Second try: direct document_url field
+            else if (documentUrl) {
+                documentPath = documentUrl
+                console.log('✅ Found document path in document_url field:', documentPath)
+            }
+
+            if (documentPath) {
+                // Get the PDF URL from storage
+                const buckets = ['documents']
+                let pdfUrl = null
+
+                for (const bucket of buckets) {
+                    try {
+                        console.log(`🔍 Checking bucket: ${bucket} for path: ${documentPath}`)
+                        const { data } = supabase.storage.from(bucket).getPublicUrl(documentPath)
+
+                        if (data?.publicUrl) {
+                            // Test if the URL is accessible
+                            const response = await fetch(data.publicUrl, { method: 'HEAD' })
+                            if (response.ok) {
+                                pdfUrl = data.publicUrl
+                                console.log(`✅ Found accessible PDF in ${bucket}:`, pdfUrl)
+                                break
+                            }
+                        }
+                    } catch (error) {
+                        console.log(`❌ Error checking ${bucket}:`, error)
+                    }
+                }
+
+                if (pdfUrl) {
+                    // Open PDF signing screen with the PDF URL
+                    const requestWithPdfUrl = {
+                        ...request,
+                        document_url: pdfUrl
+                    }
+                    setSigningRequest(requestWithPdfUrl)
+                } else {
+                    console.log('📋 PDF not found in any bucket')
+                    alert(`PDF not accessible for "${request.title}". The document may be in a different storage location.`)
+                }
+            } else {
+                console.log('❌ No document path found')
+                alert(`No document path found for "${request.title}".`)
+            }
+        } catch (error) {
+            console.error('❌ Error in handleSign:', error)
+            alert('Error accessing document for signing.')
+        }
     }
 
     const handleShare = (request: UnifiedSigningRequest) => {
@@ -419,6 +491,78 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const handleFromToClick = (request: UnifiedSigningRequest) => {
         console.log('👥 From/To clicked for:', request.title)
         setShowSignersSheet(request)
+    }
+
+    const handleSignatureAccept = async (signatureData: any) => {
+        try {
+            console.log('✅ Signature accepted:', signatureData)
+
+            const response = await fetch('/api/signature-requests/sign', {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    requestId: signingRequest?.id,
+                    signatureData
+                })
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'Failed to save signature')
+            }
+
+            const result = await response.json()
+            console.log('✅ Signature saved successfully:', result)
+
+            // Show success message
+            alert(`Signature saved successfully! ${result.allSignersCompleted ? 'All signers have completed. Final PDF will be generated.' : `${result.signedCount}/${result.totalSigners} signers completed.`}`)
+
+            setSigningRequest(null)
+
+            // Refresh the page to show updated status
+            window.location.reload()
+        } catch (error) {
+            console.error('❌ Error accepting signature:', error)
+            alert(`Error saving signature: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        }
+    }
+
+    const handleSignatureDecline = async (reason: string) => {
+        try {
+            console.log('❌ Signature declined:', reason)
+
+            const response = await fetch('/api/signature-requests/decline', {
+                method: 'POST',
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    requestId: signingRequest?.id,
+                    reason
+                })
+            })
+
+            if (!response.ok) {
+                const errorData = await response.json()
+                throw new Error(errorData.error || 'Failed to decline signature')
+            }
+
+            const result = await response.json()
+            console.log('✅ Signature declined successfully:', result)
+
+            alert('Signature declined successfully.')
+            setSigningRequest(null)
+
+            // Refresh the page to show updated status
+            window.location.reload()
+        } catch (error) {
+            console.error('❌ Error declining signature:', error)
+            alert(`Error declining signature: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        }
     }
 
     const getFromToDisplay = (request: UnifiedSigningRequest) => {
@@ -782,6 +926,29 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* PDF Signing Screen */}
+            {signingRequest && (
+                <PDFSigningScreen
+                    request={{
+                        id: signingRequest.id,
+                        title: signingRequest.title,
+                        document_url: signingRequest.document_url || '',
+                        expires_at: signingRequest.expires_at || '',
+                        signers: signingRequest.signers.map(s => ({
+                            id: s.email,
+                            name: s.name,
+                            email: s.email,
+                            status: s.status,
+                            signing_order: 1
+                        }))
+                    }}
+                    currentUserEmail={user?.email || ''}
+                    onClose={() => setSigningRequest(null)}
+                    onSign={handleSignatureAccept}
+                    onDecline={handleSignatureDecline}
+                />
             )}
         </div>
     )

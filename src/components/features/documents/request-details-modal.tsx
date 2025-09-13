@@ -444,27 +444,7 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
                   </Button>
                 </>
               )}
-              {request.type === 'received' && (
-                <>
-                  <Button
-                    size="sm"
-                    className="bg-blue-600 hover:bg-blue-700"
-                    onClick={handleOpenDocument}
-                    disabled={!request.document_url}
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Open Document
-                  </Button>
-                  <Button
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700"
-                    onClick={() => setShowSigningScreen(true)}
-                  >
-                    <FileText className="w-4 h-4 mr-2" />
-                    Sign Document
-                  </Button>
-                </>
-              )}
+              {/* Removed Open Document & Sign Document buttons from info popup as requested */}
             </div>
 
             <Button variant="outline" onClick={onClose}>

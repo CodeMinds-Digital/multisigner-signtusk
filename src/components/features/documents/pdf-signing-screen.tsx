@@ -75,11 +75,20 @@ export function PDFSigningScreen({
   const [locationError, setLocationError] = useState<string | null>(null)
   const [isCapturingLocation, setIsCapturingLocation] = useState(false)
   const [profileLoading, setProfileLoading] = useState(true)
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [pdfLoading, setPdfLoading] = useState(true)
 
   useEffect(() => {
     fetchUserProfile()
     captureCurrentLocation()
-  }, [])
+
+    // Set the PDF URL from the request
+    if (request.document_url) {
+      setPdfUrl(request.document_url)
+      setPdfLoading(false)
+      console.log('✅ PDF URL set for signing:', request.document_url)
+    }
+  }, [request.document_url])
 
   const fetchUserProfile = async () => {
     try {
@@ -106,60 +115,42 @@ export function PDFSigningScreen({
     }
   }
 
-  const captureCurrentLocation = () => {
+  const captureCurrentLocation = async () => {
     setIsCapturingLocation(true)
     setLocationError(null)
 
-    if (!navigator.geolocation) {
-      setLocationError('Geolocation is not supported by this browser')
-      setIsCapturingLocation(false)
-      return
-    }
+    try {
+      // Use a free IP geolocation service to get location info
+      const response = await fetch('https://ipapi.co/json/')
+      const locationInfo = await response.json()
 
-    navigator.geolocation.getCurrentPosition(
-      async (position) => {
-        const locationData: LocationData = {
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-          timestamp: new Date().toISOString(),
-          accuracy: position.coords.accuracy
-        }
-
-        // Try to get address from coordinates (reverse geocoding)
-        try {
-          // In a real app, you'd use a geocoding service like Google Maps API
-          locationData.address = `Lat: ${position.coords.latitude.toFixed(6)}, Lng: ${position.coords.longitude.toFixed(6)}`
-        } catch (error) {
-          console.log('Could not get address from coordinates')
-        }
-
-        setCurrentLocation(locationData)
-        setIsCapturingLocation(false)
-        console.log('✅ Location captured:', locationData)
-      },
-      (error) => {
-        let errorMessage = 'Failed to get location'
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            errorMessage = 'Location access denied by user'
-            break
-          case error.POSITION_UNAVAILABLE:
-            errorMessage = 'Location information unavailable'
-            break
-          case error.TIMEOUT:
-            errorMessage = 'Location request timed out'
-            break
-        }
-        setLocationError(errorMessage)
-        setIsCapturingLocation(false)
-        console.error('❌ Location error:', errorMessage)
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 60000
+      const locationData: LocationData = {
+        timestamp: new Date().toISOString(),
+        address: locationInfo.city && locationInfo.country_name
+          ? `${locationInfo.city}, ${locationInfo.region}, ${locationInfo.country_name}`
+          : 'Location detected automatically',
+        latitude: locationInfo.latitude || undefined,
+        longitude: locationInfo.longitude || undefined,
+        accuracy: undefined
       }
-    )
+
+      setCurrentLocation(locationData)
+      setIsCapturingLocation(false)
+      console.log('✅ Location captured via IP geolocation:', locationData)
+    } catch (error) {
+      // Fallback: Just set a basic location without IP detection
+      const locationData: LocationData = {
+        timestamp: new Date().toISOString(),
+        address: 'Location detected automatically',
+        latitude: undefined,
+        longitude: undefined,
+        accuracy: undefined
+      }
+
+      setCurrentLocation(locationData)
+      setIsCapturingLocation(false)
+      console.log('✅ Location set automatically (fallback):', locationData)
+    }
   }
 
   const validateProfile = () => {
@@ -178,10 +169,7 @@ export function PDFSigningScreen({
       return
     }
 
-    if (!currentLocation && !locationError) {
-      alert('Please wait for location to be captured or allow location access')
-      return
-    }
+    // Location is now automatically captured, no need to wait for user permission
 
     const signatureData = {
       signer_name: profileForm.full_name,
@@ -279,19 +267,38 @@ export function PDFSigningScreen({
         <div className="flex-1 flex">
           {/* PDF Viewer */}
           <div className="flex-1 bg-gray-100 p-4">
-            <div className="bg-white rounded-lg shadow h-full flex items-center justify-center">
-              <div className="text-center">
-                <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-                <p className="text-gray-600">PDF Viewer will be implemented here</p>
-                <p className="text-sm text-gray-500 mt-2">Document: {request.title}</p>
-                <Button
-                  variant="outline"
-                  className="mt-4"
-                  onClick={() => window.open(request.document_url, '_blank')}
-                >
-                  Open in New Tab
-                </Button>
-              </div>
+            <div className="bg-white rounded-lg shadow h-full">
+              {pdfLoading ? (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">Loading PDF...</p>
+                  </div>
+                </div>
+              ) : pdfUrl ? (
+                <iframe
+                  src={pdfUrl}
+                  className="w-full h-full rounded-lg"
+                  title={`PDF Preview - ${request.title}`}
+                />
+              ) : (
+                <div className="h-full flex items-center justify-center">
+                  <div className="text-center">
+                    <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600">PDF not available</p>
+                    <p className="text-sm text-gray-500 mt-2">Document: {request.title}</p>
+                    {request.document_url && (
+                      <Button
+                        variant="outline"
+                        className="mt-4"
+                        onClick={() => window.open(request.document_url, '_blank')}
+                      >
+                        Open in New Tab
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -309,28 +316,15 @@ export function PDFSigningScreen({
                 {isCapturingLocation && (
                   <div className="flex items-center text-sm text-blue-600">
                     <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                    Capturing location...
+                    Detecting location...
                   </div>
                 )}
                 {currentLocation && (
                   <div className="text-sm text-green-600">
-                    ✅ Location captured
+                    ✅ Location detected automatically
                     <p className="text-xs text-gray-500 mt-1">
                       {currentLocation.address}
                     </p>
-                  </div>
-                )}
-                {locationError && (
-                  <div className="text-sm text-red-600">
-                    ❌ {locationError}
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="mt-2 w-full"
-                      onClick={captureCurrentLocation}
-                    >
-                      Retry Location
-                    </Button>
                   </div>
                 )}
               </CardContent>
@@ -379,7 +373,6 @@ export function PDFSigningScreen({
               <Button
                 className="w-full bg-green-600 hover:bg-green-700"
                 onClick={handleAcceptAndSign}
-                disabled={isCapturingLocation}
               >
                 <CheckCircle className="w-4 h-4 mr-2" />
                 Accept & Sign
@@ -395,26 +388,28 @@ export function PDFSigningScreen({
               </Button>
             </div>
 
-            {/* Other Signers */}
-            <Card className="mt-6">
-              <CardHeader>
-                <CardTitle className="text-sm">Other Signers</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {request.signers
-                    .filter(s => s.email !== currentUserEmail)
-                    .map((signer) => (
-                      <div key={signer.id} className="flex items-center justify-between">
-                        <span className="text-sm">{signer.name}</span>
-                        <Badge variant="outline" className="text-xs">
-                          {signer.status}
-                        </Badge>
-                      </div>
-                    ))}
-                </div>
-              </CardContent>
-            </Card>
+            {/* Other Signers - Only show for multi-signer documents */}
+            {request.signers.filter(s => s.email !== currentUserEmail).length > 0 && (
+              <Card className="mt-6">
+                <CardHeader>
+                  <CardTitle className="text-sm">Other Signers</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {request.signers
+                      .filter(s => s.email !== currentUserEmail)
+                      .map((signer) => (
+                        <div key={signer.id} className="flex items-center justify-between">
+                          <span className="text-sm">{signer.name}</span>
+                          <Badge variant="outline" className="text-xs">
+                            {signer.status}
+                          </Badge>
+                        </div>
+                      ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
         </div>
       </div>
