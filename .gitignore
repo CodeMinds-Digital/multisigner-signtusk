@@ -2,6 +2,8 @@
 
 # Dependencies
 /node_modules
+/nextjs-example
+/nextjs-example.zip
 /.pnp
 .pnp.js
 .yarn/install-state.gz

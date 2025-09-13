@@ -253,12 +253,17 @@ function getFieldValue(field: any, signatureData: any, signer: any): any {
     case 'signature':
       return signatureData.signature_image || signatureData.signature || ''
 
+    case 'text':
+      // For text fields, use signer_name as the content
+      return signatureData.signer_name || signer.signer_name || ''
+
     case 'name':
     case 'full_name':
       return signatureData.signer_name || signer.signer_name || ''
 
     case 'date':
     case 'datetime':
+      // Use current timestamp for datetime fields
       return new Date().toLocaleDateString('en-US', {
         year: 'numeric',
         month: 'long',
