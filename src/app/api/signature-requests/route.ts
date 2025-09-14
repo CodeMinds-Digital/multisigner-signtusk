@@ -288,6 +288,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('🚨 CRITICAL DEBUG: Signature request creation API called with new logic')
     // Get access token from cookies
     const { accessToken } = getAuthTokensFromRequest(request)
 
@@ -314,6 +315,15 @@ export async function POST(request: NextRequest) {
       dueDate
     } = body
 
+    console.log('🔍 SIGNATURE REQUEST CREATION DEBUG:', {
+      documentId,
+      documentTitle,
+      signingOrder,
+      signersCount: signers?.length,
+      requestedMode: signingOrder || 'sequential (default)',
+      timestamp: new Date().toISOString()
+    })
+
     if (!documentId || !documentTitle || !signers || signers.length === 0) {
       return new Response(
         JSON.stringify({ error: 'Missing required fields: documentId, documentTitle, and signers' }),
@@ -336,20 +346,50 @@ export async function POST(request: NextRequest) {
 
     // Handle mock document IDs by creating a real document record first
     let realDocumentId = documentId
-    if (documentId.startsWith('mock-')) {
-      console.log('🔄 Creating real document record for mock document:', documentId)
+
+    // BETTER APPROACH: Only create new documents for mock documents
+    // Store signing mode in signature request metadata instead of document settings
+    const shouldCreateNewDocument = documentId.startsWith('mock-')
+
+    if (shouldCreateNewDocument) {
+      const documentType = documentId.startsWith('mock-') ? 'mock document' : 'existing document'
+      console.log(`🔄 Creating new document record for ${documentType}:`, documentId)
+      console.log('🎯 CRITICAL FIX: Creating separate document to prevent signing mode corruption')
+
+      // If it's an existing document, get the original file URLs
+      let originalFileUrl = null
+      let originalPdfUrl = null
+      if (!documentId.startsWith('mock-')) {
+        const { data: originalDoc, error: originalDocError } = await supabaseAdmin
+          .from('documents')
+          .select('file_url, pdf_url, template_url')
+          .eq('id', documentId)
+          .single()
+
+        if (!originalDocError && originalDoc) {
+          originalFileUrl = originalDoc.file_url
+          originalPdfUrl = originalDoc.pdf_url
+          console.log('📄 Copying file URLs from original document:', {
+            originalDocumentId: documentId,
+            fileUrl: originalFileUrl,
+            pdfUrl: originalPdfUrl
+          })
+        }
+      }
 
       const { data: newDocument, error: docError } = await supabaseAdmin
         .from('documents')
         .insert({
-          title: documentTitle,
-          description: `Document created from template: ${documentTitle}`,
+          title: `${documentTitle} (${signingOrder || 'sequential'} mode)`,
+          description: `Document created for ${signingOrder || 'sequential'} signing mode: ${documentTitle}`,
           status: 'draft',
           user_id: userId,
           user_email: userEmail,
           signers: JSON.stringify(signers.map(s => ({ name: s.name, email: s.email }))),
           signature_fields: JSON.stringify([]),
-          settings: JSON.stringify({ signing_order: signingOrder || 'sequential' })
+          settings: JSON.stringify({ signing_order: signingOrder || 'sequential' }),
+          file_url: originalFileUrl, // Copy from original document
+          pdf_url: originalPdfUrl    // Copy from original document
         })
         .select()
         .single()
@@ -362,8 +402,26 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      // CRITICAL DEBUG: Verify document was created with correct settings
+      console.log('🔍 DOCUMENT CREATION VERIFICATION:', {
+        originalDocumentId: documentId,
+        newDocumentId: newDocument.id,
+        requestedSigningOrder: signingOrder,
+        storedSettings: newDocument.settings,
+        parsedStoredSettings: JSON.parse(newDocument.settings || '{}'),
+        title: newDocument.title,
+        success: 'Document created successfully with signing mode settings'
+      })
+
       realDocumentId = newDocument.id
-      console.log('✅ Created real document record:', realDocumentId)
+      console.log('✅ Created new document record:', realDocumentId)
+      console.log('🔍 Document settings stored:', {
+        documentId: realDocumentId,
+        signingOrder: signingOrder || 'sequential',
+        settingsStored: JSON.stringify({ signing_order: signingOrder || 'sequential' }),
+        documentData: newDocument,
+        note: 'Each signature request now gets its own document to prevent mode corruption'
+      })
     }
 
     // Create signature request in database
@@ -378,6 +436,12 @@ export async function POST(request: NextRequest) {
       total_signers: signers.length,
       completed_signers: 0,
       viewed_signers: 0,
+      // Store signing mode in metadata field as JSON
+      metadata: {
+        signing_mode: signingOrder || 'sequential',
+        message: message,
+        created_at: now
+      },
       created_at: now,
       updated_at: now
     }

@@ -456,6 +456,32 @@ export class DriveService {
         throw new Error(error.message)
       }
 
+      // Ensure schemas is always an array
+      let schemas = []
+      if (Array.isArray(document.schemas)) {
+        schemas = document.schemas
+      } else if (document.schemas && typeof document.schemas === 'string') {
+        try {
+          const parsed = JSON.parse(document.schemas)
+          schemas = Array.isArray(parsed) ? parsed : []
+        } catch (e) {
+          console.warn('Failed to parse schemas as JSON:', document.schemas)
+          schemas = []
+        }
+      } else if (document.schemas && typeof document.schemas === 'object') {
+        // If it's an object but not an array, wrap it in an array
+        schemas = [document.schemas]
+      }
+
+      console.log('🔍 DriveService - Document schemas transformation:', {
+        documentId: document.id,
+        originalSchemas: document.schemas,
+        originalType: typeof document.schemas,
+        isArray: Array.isArray(document.schemas),
+        transformedSchemas: schemas,
+        transformedLength: schemas.length
+      })
+
       return {
         id: document.id,
         name: document.title || document.file_name || 'Untitled Document',
@@ -464,8 +490,8 @@ export class DriveService {
         status: document.status,
         pdf_url: document.file_url || document.pdf_url,
         template_url: document.template_url,
-        schemas: document.schemas || [],
-        signers: document.signers || [],
+        schemas: schemas, // Use the safely transformed schemas
+        signers: Array.isArray(document.signers) ? document.signers : [],
         created_at: document.created_at,
         updated_at: document.updated_at,
         user_id: document.user_id,

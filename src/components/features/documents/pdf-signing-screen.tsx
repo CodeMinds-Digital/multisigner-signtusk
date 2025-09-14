@@ -64,6 +64,13 @@ export function PDFSigningScreen({
   const [declineReason, setDeclineReason] = useState('')
   const [showProfileValidation, setShowProfileValidation] = useState(false)
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
+  const [sequentialValidation, setSequentialValidation] = useState<{
+    canSign: boolean
+    signingMode: string
+    error?: string
+    currentSignerOrder?: number
+    pendingSigners?: Array<{ name: string; email: string; order: number }>
+  } | null>(null)
   const [profileForm, setProfileForm] = useState({
     full_name: '',
     signature_image: '',
@@ -79,6 +86,13 @@ export function PDFSigningScreen({
   const [pdfLoading, setPdfLoading] = useState(true)
 
   useEffect(() => {
+    console.log('🔄 PDF Signing Screen useEffect triggered:', {
+      requestId: request.id,
+      currentUserEmail,
+      documentUrl: request.document_url,
+      reason: 'Component mounted or key dependencies changed'
+    })
+
     fetchUserProfile()
     captureCurrentLocation()
 
@@ -91,7 +105,68 @@ export function PDFSigningScreen({
 
     // Track document view when PDF signing screen opens
     trackDocumentView()
-  }, [request.document_url])
+    // Check sequential signing permissions
+    checkSequentialSigningPermissions()
+  }, [request.id, request.document_url, currentUserEmail]) // Fixed: Added missing dependencies
+
+  const checkSequentialSigningPermissions = async () => {
+    try {
+      console.log('🔄 Checking sequential signing permissions for:', request.id)
+      console.log('🔍 Validation context:', {
+        requestId: request.id,
+        currentUserEmail,
+        requestTitle: request.title,
+        timestamp: new Date().toISOString(),
+        note: 'Fresh validation call - should not be cached'
+      })
+
+      const response = await fetch('/api/signature-requests/validate-sequential', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache, no-store, must-revalidate', // Prevent caching
+          'Pragma': 'no-cache',
+          'Expires': '0'
+        },
+        body: JSON.stringify({ requestId: request.id })
+      })
+
+      if (response.ok) {
+        const validation = await response.json()
+        setSequentialValidation(validation)
+        console.log('✅ Sequential validation result:', validation)
+        console.log('🔍 Frontend validation details:', {
+          requestId: request.id,
+          signingMode: validation.signingMode,
+          canSign: validation.canSign,
+          error: validation.error,
+          currentSignerOrder: validation.currentSignerOrder,
+          pendingSigners: validation.pendingSigners,
+          fullValidationObject: JSON.stringify(validation, null, 2)
+        })
+
+        // CRITICAL DEBUG: Log the exact signing mode detected
+        if (validation.signingMode === 'parallel') {
+          console.log('🔵 PARALLEL MODE DETECTED - Any signer can sign at any time')
+        } else if (validation.signingMode === 'sequential') {
+          console.log('🟡 SEQUENTIAL MODE DETECTED - Strict signing order enforced')
+        } else {
+          console.log('❓ UNKNOWN SIGNING MODE:', validation.signingMode)
+        }
+      } else {
+        const errorText = await response.text()
+        console.log('❌ Failed to check sequential permissions:', response.status, errorText)
+        console.log('⚠️ DEFAULTING TO PARALLEL MODE DUE TO API FAILURE')
+        // Default to allowing signing if validation fails
+        setSequentialValidation({ canSign: true, signingMode: 'parallel' })
+      }
+    } catch (error) {
+      console.error('❌ Error checking sequential permissions:', error)
+      // Default to allowing signing if validation fails
+      setSequentialValidation({ canSign: true, signingMode: 'parallel' })
+    }
+  }
 
   const trackDocumentView = async () => {
     try {
@@ -392,14 +467,60 @@ export function PDFSigningScreen({
               </Alert>
             )}
 
+            {/* Signing Mode Alert */}
+            {sequentialValidation && (
+              <Alert className={`mb-4 ${sequentialValidation.signingMode === 'sequential'
+                ? (sequentialValidation.canSign ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50')
+                : 'border-blue-200 bg-blue-50'
+                }`}>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="space-y-2">
+                    <div className="font-medium">
+                      {sequentialValidation.signingMode === 'sequential' ? 'Sequential Signing Mode' : 'Parallel Signing Mode'}
+                      {sequentialValidation.currentSignerOrder && (
+                        <span className="ml-2 text-sm">
+                          (You are signer #{sequentialValidation.currentSignerOrder})
+                        </span>
+                      )}
+                    </div>
+                    {sequentialValidation.signingMode === 'sequential' ? (
+                      sequentialValidation.canSign ? (
+                        <div className="text-green-700">
+                          ✅ It's your turn to sign this document.
+                        </div>
+                      ) : (
+                        <div className="text-yellow-700">
+                          ⏳ Sequential signing: Please wait for previous signers to complete first.
+                          {sequentialValidation.pendingSigners && sequentialValidation.pendingSigners.length > 0 && (
+                            <div className="mt-1 text-sm">
+                              Waiting for: {sequentialValidation.pendingSigners.map(s => s.name).join(', ')}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    ) : (
+                      <div className="text-blue-700">
+                        🔄 Parallel signing: You can sign at any time, regardless of other signers.
+                      </div>
+                    )}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Actions */}
             <div className="space-y-3">
               <Button
-                className="w-full bg-green-600 hover:bg-green-700"
+                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                 onClick={handleAcceptAndSign}
+                disabled={sequentialValidation?.signingMode === 'sequential' && !sequentialValidation?.canSign}
               >
                 <CheckCircle className="w-4 h-4 mr-2" />
-                Accept & Sign
+                {sequentialValidation?.signingMode === 'sequential' && !sequentialValidation?.canSign
+                  ? 'Waiting for Previous Signers'
+                  : 'Accept & Sign'
+                }
               </Button>
 
               <Button

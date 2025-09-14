@@ -28,62 +28,95 @@ export async function DELETE(
 
     console.log('🗑️ Deleting signature request:', requestId, 'by user:', userId)
 
-    // First, verify the user owns this request
+    // First, check if the request exists and get its details
     const { data: signatureRequest, error: fetchError } = await supabaseAdmin
       .from('signing_requests')
       .select('id, title, initiated_by')
       .eq('id', requestId)
-      .eq('initiated_by', userId)
       .single()
 
     if (fetchError || !signatureRequest) {
+      console.log('❌ Signature request not found:', fetchError)
       return new Response(
-        JSON.stringify({ error: 'Signature request not found or access denied' }),
+        JSON.stringify({ error: 'Signature request not found' }),
         { status: 404, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
+    // Verify the user owns this request (only creators can delete)
+    if (signatureRequest.initiated_by !== userId) {
+      console.log('❌ Access denied: User', userId, 'is not the creator of request', requestId)
+      console.log('Request creator:', signatureRequest.initiated_by)
+      return new Response(
+        JSON.stringify({ error: 'Access denied. Only the request creator can delete this signature request.' }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('✅ User authorized to delete request:', signatureRequest.title)
+
     // Delete related signers first (foreign key constraint)
-    const { error: signersError } = await supabaseAdmin
+    console.log('🗑️ Deleting signers for request:', requestId)
+    const { data: deletedSigners, error: signersError } = await supabaseAdmin
       .from('signing_request_signers')
       .delete()
       .eq('signing_request_id', requestId)
+      .select()
 
     if (signersError) {
-      console.error('Error deleting signers:', signersError)
+      console.error('❌ Error deleting signers:', signersError)
       return new Response(
         JSON.stringify({ error: 'Failed to delete signature request signers' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
+    console.log('✅ Deleted', deletedSigners?.length || 0, 'signers')
+
     // Delete the signature request
-    const { error: deleteError } = await supabaseAdmin
+    console.log('🗑️ Deleting signature request:', requestId)
+    const { data: deletedRequest, error: deleteError } = await supabaseAdmin
       .from('signing_requests')
       .delete()
       .eq('id', requestId)
-      .eq('initiated_by', userId)
+      .select()
 
     if (deleteError) {
-      console.error('Error deleting signature request:', deleteError)
+      console.error('❌ Error deleting signature request:', deleteError)
       return new Response(
         JSON.stringify({ error: 'Failed to delete signature request' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
+    if (!deletedRequest || deletedRequest.length === 0) {
+      console.error('❌ No signature request was deleted')
+      return new Response(
+        JSON.stringify({ error: 'Signature request could not be deleted' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
     console.log('✅ Successfully deleted signature request:', requestId)
+    console.log('🎯 Deletion summary:', {
+      requestId,
+      requestTitle: signatureRequest.title,
+      deletedSigners: deletedSigners?.length || 0,
+      deletedRequest: deletedRequest?.length || 0,
+      note: 'This request has been removed from all signers\' inboxes as well'
+    })
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: `Signature request "${signatureRequest.title}" has been deleted successfully` 
+      JSON.stringify({
+        success: true,
+        message: `Signature request "${signatureRequest.title}" has been deleted successfully. It has been removed from all signers' inboxes.`,
+        deletedSigners: deletedSigners?.length || 0
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
   } catch (error) {
     console.error('Error deleting signature request:', error)
-    
+
     if (error instanceof Error && error.message.includes('token')) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),
@@ -159,7 +192,7 @@ export async function GET(
     )
   } catch (error) {
     console.error('Error fetching signature request:', error)
-    
+
     if (error instanceof Error && error.message.includes('token')) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),

@@ -42,12 +42,13 @@ export class MultiSignatureWorkflowService {
       const viewedCount = signers.filter(s => s.viewed_at).length
       const allCompleted = signedCount === totalCount
 
-      // For sequential signing, find next signer
+      // For sequential signing, find next signer in order
       let nextSignerEmail: string | undefined
       if (!allCompleted) {
-        const nextSigner = signers.find(s => 
-          s.status !== 'signed' && 
-          s.signer_status !== 'signed' && 
+        // Find the next signer in signing order who hasn't signed yet
+        const nextSigner = signers.find(s =>
+          s.status !== 'signed' &&
+          s.signer_status !== 'signed' &&
           s.status !== 'declined'
         )
         nextSignerEmail = nextSigner?.signer_email
@@ -72,7 +73,7 @@ export class MultiSignatureWorkflowService {
   static async updateSigningProgress(requestId: string): Promise<boolean> {
     try {
       const status = await this.checkCompletionStatus(requestId)
-      
+
       let documentStatus = 'pending'
       let requestStatus = 'in_progress'
 
@@ -115,32 +116,68 @@ export class MultiSignatureWorkflowService {
     try {
       console.log('🎉 Generating final PDF for completed multi-signature request:', requestId)
 
-      // Trigger PDF generation using the API endpoint
-      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/signature-requests/generate-pdf`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requestId })
-      })
+      // Get signing request with all signers and document info
+      const { data: signingRequest, error: requestError } = await supabaseAdmin
+        .from('signing_requests')
+        .select(`
+          *,
+          signers:signing_request_signers(*),
+          document:documents!document_template_id(*)
+        `)
+        .eq('id', requestId)
+        .single()
 
-      if (response.ok) {
-        const result = await response.json()
-        console.log('✅ Final PDF generated successfully:', result.finalPdfUrl)
-        
-        // Update the signing request with completion timestamp
+      if (requestError || !signingRequest) {
+        console.error('❌ Error fetching signing request:', requestError)
+        return null
+      }
+
+      // Check if all signers have completed
+      const allSigners = signingRequest.signers || []
+      const signedSigners = allSigners.filter(s => s.status === 'signed' || s.signer_status === 'signed')
+
+      if (signedSigners.length !== allSigners.length) {
+        console.error('❌ Not all signers have completed signing')
+        return null
+      }
+
+      // Get the original document URL
+      const document = signingRequest.document
+      if (!document) {
+        console.error('❌ Document not found for signing request')
+        return null
+      }
+
+      const originalPdfUrl = document.pdf_url || document.file_url
+      if (!originalPdfUrl) {
+        console.error('❌ No PDF URL found in document')
+        return null
+      }
+
+      console.log('📄 Original PDF URL:', originalPdfUrl)
+      console.log('👥 Signed signers:', signedSigners.length, 'of', allSigners.length)
+
+      // Call PDF generation service directly
+      const { PDFGenerationService } = await import('@/lib/pdf-generation-service')
+      const finalPdfUrl = await PDFGenerationService.generateFinalPDF(requestId)
+
+      if (finalPdfUrl) {
+        // Update the signing request with completion timestamp and final PDF URL
         await supabaseAdmin
           .from('signing_requests')
           .update({
             completed_at: new Date().toISOString(),
-            final_pdf_url: result.finalPdfUrl
+            final_pdf_url: finalPdfUrl,
+            document_status: 'completed',
+            status: 'completed'
           })
           .eq('id', requestId)
-          
-        return result.finalPdfUrl
-      } else {
-        const errorData = await response.json()
-        console.error('❌ PDF generation failed:', errorData.error)
-        return null
+
+        console.log('✅ Final PDF generated and database updated:', finalPdfUrl)
+        return finalPdfUrl
       }
+
+      return null
     } catch (error) {
       console.error('❌ Error generating final PDF:', error)
       return null
@@ -171,7 +208,7 @@ export class MultiSignatureWorkflowService {
       if (status.allCompleted) {
         // Generate final PDF
         const finalPdfUrl = await this.generateFinalPDF(requestId)
-        
+
         return {
           success: true,
           allCompleted: true,
@@ -181,19 +218,23 @@ export class MultiSignatureWorkflowService {
         // For sequential signing, notify next signer
         const { data: signingRequest } = await supabaseAdmin
           .from('signing_requests')
-          .select('settings')
+          .select(`
+            *,
+            document:documents!document_template_id(*)
+          `)
           .eq('id', requestId)
           .single()
 
-        let signingMode = 'parallel'
-        if (signingRequest?.settings) {
+        // Get signing mode from document settings (since signing_requests.settings doesn't exist)
+        let signingMode = 'sequential' // default to sequential to match creation default
+        if (signingRequest?.document?.settings) {
           try {
-            const settings = typeof signingRequest.settings === 'string' 
-              ? JSON.parse(signingRequest.settings) 
-              : signingRequest.settings
-            signingMode = settings.signing_order || 'parallel'
+            const settings = typeof signingRequest.document.settings === 'string'
+              ? JSON.parse(signingRequest.document.settings)
+              : signingRequest.document.settings
+            signingMode = settings.signing_order || 'sequential'
           } catch (e) {
-            console.log('⚠️ Could not parse signing settings')
+            console.log('⚠️ Could not parse document settings, using sequential mode (default)')
           }
         }
 
@@ -211,6 +252,189 @@ export class MultiSignatureWorkflowService {
     } catch (error) {
       console.error('❌ Error handling signer completion:', error)
       return { success: false, allCompleted: false }
+    }
+  }
+
+  /**
+   * Validate if a signer can sign in sequential mode
+   */
+  static async validateSequentialSigningPermission(requestId: string, signerEmail: string): Promise<{
+    canSign: boolean
+    error?: string
+    signingMode: string
+    currentSignerOrder?: number
+    pendingSigners?: Array<{ name: string; email: string; order: number }>
+  }> {
+    try {
+      // Get signing request with document info to check signing mode
+      console.log('🔍 Fetching signing request and document data for:', requestId)
+      const { data: signingRequest, error: requestError } = await supabaseAdmin
+        .from('signing_requests')
+        .select(`
+          *,
+          document:documents!document_template_id(*)
+        `)
+        .eq('id', requestId)
+        .single()
+
+      console.log('🔍 Database query result:', {
+        requestId,
+        hasSigningRequest: !!signingRequest,
+        hasDocument: !!signingRequest?.document,
+        documentId: signingRequest?.document?.id,
+        documentTitle: signingRequest?.document?.title,
+        rawDocumentSettings: signingRequest?.document?.settings,
+        queryError: requestError
+      })
+
+      if (requestError || !signingRequest) {
+        console.error('❌ Error fetching signing request:', requestError)
+        return {
+          canSign: false,
+          error: 'Signing request not found',
+          signingMode: 'unknown'
+        }
+      }
+
+      // Get signing mode from signature request metadata (better approach)
+      let signingMode = 'sequential' // default to sequential
+
+      console.log('🔍 Signature request metadata debug:', {
+        requestId,
+        signerEmail,
+        hasMetadata: !!signingRequest?.metadata,
+        rawMetadata: signingRequest?.metadata,
+        metadataType: typeof signingRequest?.metadata,
+        timestamp: new Date().toISOString()
+      })
+
+      // First try: Check signature request metadata field
+      if (signingRequest?.metadata) {
+        try {
+          const metadata = typeof signingRequest.metadata === 'string'
+            ? JSON.parse(signingRequest.metadata)
+            : signingRequest.metadata
+
+          if (metadata.signing_mode) {
+            signingMode = metadata.signing_mode
+            console.log('✅ Parsed signing mode from signature request metadata:', signingMode)
+            console.log('🔍 Metadata parsing details:', {
+              rawMetadata: signingRequest.metadata,
+              parsedMetadata: metadata,
+              extractedSigningMode: metadata.signing_mode,
+              finalSigningMode: signingMode
+            })
+          } else {
+            console.log('⚠️ No signing_mode in metadata, trying document settings fallback')
+            // Fallback to document settings for backward compatibility
+            if (signingRequest?.document?.settings) {
+              try {
+                const settings = typeof signingRequest.document.settings === 'string'
+                  ? JSON.parse(signingRequest.document.settings)
+                  : signingRequest.document.settings
+                signingMode = settings.signing_order || 'sequential'
+                console.log('✅ Fallback: Parsed signing mode from document settings:', signingMode)
+              } catch (e2) {
+                console.log('⚠️ Could not parse document settings either, using sequential mode (default)')
+              }
+            }
+          }
+        } catch (e) {
+          console.log('⚠️ Could not parse signature request metadata, trying document settings fallback')
+          // Fallback to document settings
+          if (signingRequest?.document?.settings) {
+            try {
+              const settings = typeof signingRequest.document.settings === 'string'
+                ? JSON.parse(signingRequest.document.settings)
+                : signingRequest.document.settings
+              signingMode = settings.signing_order || 'sequential'
+              console.log('✅ Fallback: Parsed signing mode from document settings:', signingMode)
+            } catch (e2) {
+              console.log('⚠️ Could not parse document settings either, using sequential mode (default)')
+            }
+          }
+        }
+      } else {
+        console.log('⚠️ No signature request metadata found, trying document settings fallback')
+        // Fallback to document settings for backward compatibility
+        if (signingRequest?.document?.settings) {
+          try {
+            const settings = typeof signingRequest.document.settings === 'string'
+              ? JSON.parse(signingRequest.document.settings)
+              : signingRequest.document.settings
+            signingMode = settings.signing_order || 'sequential'
+            console.log('✅ Fallback: Parsed signing mode from document settings:', signingMode)
+          } catch (e) {
+            console.log('⚠️ Could not parse document settings, using sequential mode (default)')
+          }
+        } else {
+          console.log('⚠️ No document settings found either, using sequential mode (default)')
+        }
+      }
+
+      // For parallel mode, always allow signing (any order)
+      if (signingMode === 'parallel') {
+        return { canSign: true, signingMode }
+      }
+
+      // For sequential mode, enforce strict signing order
+      const { data: allSigners, error: signersError } = await supabaseAdmin
+        .from('signing_request_signers')
+        .select('*')
+        .eq('signing_request_id', requestId)
+        .order('signing_order', { ascending: true })
+
+      if (signersError || !allSigners) {
+        return {
+          canSign: false,
+          error: 'Failed to validate signing order',
+          signingMode
+        }
+      }
+
+      // Find current signer
+      const currentSigner = allSigners.find(s => s.signer_email === signerEmail)
+      if (!currentSigner) {
+        return {
+          canSign: false,
+          error: 'Signer not found in request',
+          signingMode
+        }
+      }
+
+      // Check if previous signers have completed
+      const currentSignerIndex = allSigners.findIndex(s => s.signer_email === signerEmail)
+      const previousSigners = allSigners.slice(0, currentSignerIndex)
+      const incompletePreviousSigners = previousSigners.filter(s =>
+        s.status !== 'signed' && s.signer_status !== 'signed'
+      )
+
+      if (incompletePreviousSigners.length > 0) {
+        return {
+          canSign: false,
+          error: `Sequential signing: Previous signers must complete first.`,
+          signingMode,
+          currentSignerOrder: currentSigner.signing_order,
+          pendingSigners: incompletePreviousSigners.map(s => ({
+            name: s.signer_name || s.signer_email,
+            email: s.signer_email,
+            order: s.signing_order
+          }))
+        }
+      }
+
+      return {
+        canSign: true,
+        signingMode,
+        currentSignerOrder: currentSigner.signing_order
+      }
+    } catch (error) {
+      console.error('❌ Error validating sequential signing permission:', error)
+      return {
+        canSign: false,
+        error: 'Failed to validate signing permission',
+        signingMode: 'unknown'
+      }
     }
   }
 

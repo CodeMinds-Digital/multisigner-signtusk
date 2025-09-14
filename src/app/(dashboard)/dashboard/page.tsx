@@ -181,6 +181,19 @@ export default function DashboardPage() {
                     <div className="flex-shrink-0">
                       {(() => {
                         const config = getStatusConfig(doc.status as any)
+                        // Defensive check for undefined config or missing icon
+                        if (!config || !config.icon) {
+                          console.warn('Invalid document status or missing config:', doc.status, config)
+                          // Fallback to a default config
+                          const Icon = FileText
+                          return (
+                            <span className="px-2 py-1 text-xs font-medium rounded-full inline-flex items-center bg-gray-50 text-gray-800">
+                              <Icon className="w-3 h-3 text-gray-600 mr-1" />
+                              {doc.status || 'Unknown'}
+                            </span>
+                          )
+                        }
+
                         const Icon = config.icon
                         return (
                           <span className={`px-2 py-1 text-xs font-medium rounded-full inline-flex items-center ${config.bgColor} ${config.textColor}`}>

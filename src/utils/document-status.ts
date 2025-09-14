@@ -10,7 +10,7 @@ import {
   Calendar,
   Archive
 } from 'lucide-react'
-import { DocumentStatus } from '@/types/document-management'
+import { DocumentStatus } from '@/types/documents'
 
 export interface StatusConfig {
   label: string
@@ -33,16 +33,6 @@ export const DOCUMENT_STATUS_CONFIG: Record<DocumentStatus, StatusConfig> = {
     borderColor: 'border-blue-200',
     textColor: 'text-blue-800',
     badgeVariant: 'outline'
-  },
-  ready: {
-    label: 'Ready to Sign',
-    description: 'Document is ready for signatures',
-    icon: Send,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-    borderColor: 'border-green-200',
-    textColor: 'text-green-800',
-    badgeVariant: 'default'
   },
   pending: {
     label: 'Pending Signatures',
@@ -83,16 +73,6 @@ export const DOCUMENT_STATUS_CONFIG: Record<DocumentStatus, StatusConfig> = {
     borderColor: 'border-gray-200',
     textColor: 'text-gray-800',
     badgeVariant: 'outline'
-  },
-  archived: {
-    label: 'Archived',
-    description: 'Document has been archived',
-    icon: Archive,
-    color: 'text-gray-600',
-    bgColor: 'bg-gray-50',
-    borderColor: 'border-gray-200',
-    textColor: 'text-gray-800',
-    badgeVariant: 'secondary'
   }
 }
 
@@ -117,27 +97,54 @@ export const STATUS_GROUPS: StatusGroupConfig[] = [
     priority: 1
   },
   {
-    label: 'Ready to Send',
-    description: 'Documents ready for signatures',
-    icon: Send,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-    statuses: ['ready'],
+    label: 'Pending Signatures',
+    description: 'Documents waiting for signatures',
+    icon: Clock,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50',
+    statuses: ['pending'],
     priority: 2
   },
   {
-    label: 'Archived',
-    description: 'Archived documents',
-    icon: Archive,
+    label: 'Completed',
+    description: 'Completed documents',
+    icon: CheckCircle,
+    color: 'text-green-600',
+    bgColor: 'bg-green-50',
+    statuses: ['completed'],
+    priority: 3
+  },
+  {
+    label: 'Inactive',
+    description: 'Expired or cancelled documents',
+    icon: XCircle,
     color: 'text-gray-600',
     bgColor: 'bg-gray-50',
-    statuses: ['archived'],
-    priority: 3
+    statuses: ['expired', 'cancelled'],
+    priority: 4
   }
 ]
 
 export function getStatusConfig(status: DocumentStatus): StatusConfig {
-  return DOCUMENT_STATUS_CONFIG[status]
+  // Return the config if it exists, otherwise return a default config
+  const config = DOCUMENT_STATUS_CONFIG[status]
+
+  if (!config) {
+    console.warn('Unknown document status:', status)
+    // Return a default config for unknown statuses
+    return {
+      label: status || 'Unknown',
+      description: 'Unknown document status',
+      icon: FileText,
+      color: 'text-gray-600',
+      bgColor: 'bg-gray-50',
+      borderColor: 'border-gray-200',
+      textColor: 'text-gray-800',
+      badgeVariant: 'outline'
+    }
+  }
+
+  return config
 }
 
 export function getStatusGroup(status: DocumentStatus): StatusGroupConfig | undefined {

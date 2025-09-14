@@ -349,9 +349,41 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         console.log('Send reminder for request:', request)
     }
 
-    const handleDelete = (request: UnifiedSigningRequest) => {
-        if (confirm('Are you sure you want to delete this request?')) {
-            console.log('Delete request:', request)
+    const handleDelete = async (request: UnifiedSigningRequest) => {
+        if (confirm('Are you sure you want to delete this request? This action cannot be undone.')) {
+            try {
+                console.log('🗑️ Deleting signature request:', request.id)
+
+                const response = await fetch(`/api/signature-requests/${request.id}`, {
+                    method: 'DELETE',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                })
+
+                if (response.ok) {
+                    const result = await response.json()
+                    console.log('✅ Successfully deleted signature request:', result.message)
+                    console.log('🎯 Deletion details:', {
+                        deletedSigners: result.deletedSigners,
+                        note: 'Request removed from all signers\' inboxes'
+                    })
+
+                    // Show success message
+                    alert(result.message || 'Signature request deleted successfully')
+
+                    // Refresh the list to reflect changes
+                    onRefresh()
+                } else {
+                    const error = await response.json()
+                    console.error('❌ Failed to delete signature request:', error)
+                    alert(error.error || 'Failed to delete signature request')
+                }
+            } catch (error) {
+                console.error('❌ Error deleting signature request:', error)
+                alert('An error occurred while deleting the signature request')
+            }
         }
     }
 

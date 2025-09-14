@@ -54,29 +54,76 @@ export class PDFGenerationService {
         return null
       }
 
-      // Get all signers with their signature data
-      const { data: signers, error: signersError } = await supabaseAdmin
+      // Get all signers with their signature data (check both status fields for compatibility)
+      const { data: allSigners, error: signersError } = await supabaseAdmin
         .from('signing_request_signers')
         .select('*')
         .eq('signing_request_id', requestId)
-        .eq('signer_status', 'signed')
 
-      if (signersError || !signers || signers.length === 0) {
-        console.error('❌ Error fetching signers or no signed signers found:', signersError)
+      if (signersError || !allSigners) {
+        console.error('❌ Error fetching signers:', signersError)
+        return null
+      }
+
+      // Filter for signed signers (check both status fields for compatibility)
+      const signers = allSigners.filter(s =>
+        s.status === 'signed' || s.signer_status === 'signed'
+      )
+
+      if (signers.length === 0) {
+        console.error('❌ No signed signers found')
         return null
       }
 
       console.log('📋 Found', signers.length, 'signed signers')
 
-      // Get document schema
-      const documentSchema = signingRequest.document?.schema as DocumentSchema
-      if (!documentSchema || !documentSchema.fields) {
-        console.error('❌ No document schema found')
+      // Get document schema from signature_fields
+      const signatureFields = signingRequest.document?.signature_fields
+      if (!signatureFields || !Array.isArray(signatureFields) || signatureFields.length === 0) {
+        console.error('❌ No signature fields found in document')
         return null
       }
 
+      // Convert signature_fields to DocumentSchema format
+      const documentSchema: DocumentSchema = {
+        fields: signatureFields.map((field: any) => ({
+          id: field.id || `field-${Date.now()}-${Math.random()}`,
+          type: field.type || 'signature',
+          name: field.name || 'Signature',
+          required: field.required !== false,
+          signer_email: field.signer_email,
+          position: field.position
+        }))
+      }
+
+      console.log('📋 Document schema fields:', documentSchema.fields.length)
+
+      // Transform signers data to match SignerData interface
+      const transformedSigners: SignerData[] = signers.map(signer => {
+        let parsedSignatureData
+        try {
+          parsedSignatureData = typeof signer.signature_data === 'string'
+            ? JSON.parse(signer.signature_data)
+            : signer.signature_data
+        } catch (e) {
+          console.error('❌ Error parsing signature data for signer:', signer.signer_email, e)
+          parsedSignatureData = {}
+        }
+
+        return {
+          id: signer.id,
+          signer_name: signer.signer_name || parsedSignatureData.signer_name || signer.signer_email,
+          signer_email: signer.signer_email,
+          signature_data: parsedSignatureData,
+          location: signer.location,
+          signed_at: signer.signed_at
+        }
+      })
+
+      console.log('🔄 Transformed signers for PDF generation:', transformedSigners.length)
+
       // Map signers to schema fields
-      const populatedFields = this.populateSchemaFields(documentSchema, signers)
+      const populatedFields = this.populateSchemaFields(documentSchema, transformedSigners)
 
       // Generate the final PDF
       const finalPdfUrl = await this.createSignedPDF(

@@ -70,23 +70,36 @@ export class SignatureRecipientService {
         (signers || []).map(async (signer: any) => {
           const request = signer.signature_requests
 
-          // For multi-signature, check if it's this signer's turn
+          // For multi-signature, check signing permissions based on mode
           let canSign = false
           if (request.signature_type === 'single') {
             canSign = signer.status === 'pending' && request.status === 'pending'
           } else {
-            // For multi-signature, check if previous signers have signed
-            const { data: allSigners } = await supabase
-              .from(this.SIGNATURE_REQUEST_SIGNERS_TABLE)
-              .select('order_index, status')
-              .eq('signature_request_id', request.id)
-              .order('order_index', { ascending: true })
+            // For multi-signature, check signing mode from document settings
+            let signingMode = 'sequential' // default to sequential to match creation default
 
-            if (allSigners) {
-              const currentSignerIndex = signer.order_index
-              const previousSigners = allSigners.filter(s => s.order_index < currentSignerIndex)
-              const allPreviousSigned = previousSigners.every(s => s.status === 'signed')
-              canSign = signer.status === 'pending' && allPreviousSigned && request.status !== 'cancelled'
+            // Note: signing_requests.settings doesn't exist, so we need to get it from document
+            // For now, we'll assume sequential mode as default since we can't easily access document here
+            // This will be properly handled when the database schema is updated
+            signingMode = 'sequential'
+
+            if (signingMode === 'parallel') {
+              // Parallel mode: any signer can sign at any time
+              canSign = signer.status === 'pending' && request.status !== 'cancelled'
+            } else {
+              // Sequential mode: check if previous signers have signed
+              const { data: allSigners } = await supabase
+                .from(this.SIGNATURE_REQUEST_SIGNERS_TABLE)
+                .select('order_index, status, signing_order')
+                .eq('signature_request_id', request.id)
+                .order('signing_order', { ascending: true })
+
+              if (allSigners) {
+                const currentSignerIndex = allSigners.findIndex(s => s.order_index === signer.order_index)
+                const previousSigners = allSigners.slice(0, currentSignerIndex)
+                const allPreviousSigned = previousSigners.every(s => s.status === 'signed')
+                canSign = signer.status === 'pending' && allPreviousSigned && request.status !== 'cancelled'
+              }
             }
           }
 

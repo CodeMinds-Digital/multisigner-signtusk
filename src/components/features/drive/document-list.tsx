@@ -17,6 +17,17 @@ interface DocumentListProps {
 }
 
 export function DocumentList({ documents, onEdit, onDelete, onArchive, onUnarchive, loading }: DocumentListProps) {
+  // Debug document structure
+  React.useEffect(() => {
+    if (documents && documents.length > 0) {
+      console.log('🔍 DocumentList - First document structure:', {
+        document: documents[0],
+        schemasType: typeof documents[0]?.schemas,
+        schemasValue: documents[0]?.schemas,
+        isArray: Array.isArray(documents[0]?.schemas)
+      })
+    }
+  }, [documents])
   const handlePreview = async (document: DocumentTemplate) => {
     try {
       console.log('🔍 Drive PDF Preview - Document:', document)
@@ -153,21 +164,27 @@ export function DocumentList({ documents, onEdit, onDelete, onArchive, onUnarchi
             </div>
 
             {/* Schemas */}
-            {document.schemas.length > 0 && (
+            {Array.isArray(document.schemas) && document.schemas.length > 0 && (
               <div className="mb-4">
                 <p className="text-sm text-gray-600 mb-2">
-                  Schemas ({document.schemas.length}):
+                  Schemas ({Array.isArray(document.schemas) ? document.schemas.length : 0}):
                 </p>
                 <div className="flex flex-wrap gap-1">
-                  {document.schemas.slice(0, 3).map((schema, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-700"
-                    >
-                      {schema.type}
+                  {Array.isArray(document.schemas) && document.schemas.length > 0 ? (
+                    document.schemas.slice(0, 3).map((schema, index) => (
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-700"
+                      >
+                        {schema.type}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
+                      No schemas available
                     </span>
-                  ))}
-                  {document.schemas.length > 3 && (
+                  )}
+                  {Array.isArray(document.schemas) && document.schemas.length > 3 && (
                     <span className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-700">
                       +{document.schemas.length - 3} more
                     </span>
