@@ -531,18 +531,53 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Verified signature request exists:', verifyRequest)
 
-    // Create signer records
-    const signerInserts = signers.map((signer: any, index: number) => ({
-      signing_request_id: signatureRequest.id, // Correct foreign key column
-      signer_email: signer.email.trim(),
-      signer_name: signer.name.trim(),
-      signing_order: index + 1,
-      status: 'pending',
-      signer_status: 'initiated',
-      reminder_count: 0,
-      created_at: now,
-      updated_at: now
-    }))
+    // Extract unique signerIds from document schemas to properly map signers
+    let schemaSignerIds: string[] = []
+    try {
+      const { data: documentData, error: docError } = await supabaseAdmin
+        .from('documents')
+        .select('schemas')
+        .eq('id', realDocumentId)
+        .single()
+
+      if (!docError && documentData?.schemas) {
+        const signatureFields = new Set<string>()
+
+        // Extract unique signer IDs from signature fields
+        if (Array.isArray(documentData.schemas)) {
+          documentData.schemas.forEach((field: any) => {
+            const signerId = field.properties?._originalConfig?.signerId
+            if (signerId && (field.type === 'signature' || field.type === 'text')) {
+              signatureFields.add(signerId)
+            }
+          })
+        }
+
+        schemaSignerIds = Array.from(signatureFields).sort()
+        console.log('📋 Extracted schema signerIds:', schemaSignerIds)
+      }
+    } catch (error) {
+      console.error('❌ Error extracting schema signerIds:', error)
+    }
+
+    // Create signer records with proper schema_signer_id mapping
+    const signerInserts = signers.map((signer: any, index: number) => {
+      // Map signer to schema signerId based on order
+      const schemaSigner = schemaSignerIds[index] || `signer_${index + 1}`
+
+      return {
+        signing_request_id: signatureRequest.id, // Correct foreign key column
+        signer_email: signer.email.trim(),
+        signer_name: signer.name.trim(),
+        signing_order: index + 1,
+        schema_signer_id: schemaSigner, // NEW: Map to schema signerId
+        status: 'pending',
+        signer_status: 'initiated',
+        reminder_count: 0,
+        created_at: now,
+        updated_at: now
+      }
+    })
 
     console.log('🔍 Inserting signers (v7 - FINAL):', signerInserts)
 

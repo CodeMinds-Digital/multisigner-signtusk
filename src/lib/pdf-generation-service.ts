@@ -84,21 +84,31 @@ export class PDFGenerationService {
         return null
       }
 
-      // Create signer mapping: signerId -> signer_email based on signing_order
+      // Create signer mapping: signerId -> signer_email using stored schema_signer_id
       const signerMapping: { [key: string]: string } = {}
 
-      // Sort signers by signing_order to ensure correct mapping
-      const sortedSigners = [...signers].sort((a, b) => {
-        const orderA = a.signing_order || 999
-        const orderB = b.signing_order || 999
-        return orderA - orderB
+      // Use the stored schema_signer_id mapping if available
+      signers.forEach((signer) => {
+        if (signer.schema_signer_id) {
+          signerMapping[signer.schema_signer_id] = signer.signer_email
+        }
       })
 
-      sortedSigners.forEach((signer, index) => {
-        signerMapping[`signer_${index + 1}`] = signer.signer_email
-      })
+      // Fallback: if no schema_signer_id, use signing_order based mapping
+      if (Object.keys(signerMapping).length === 0) {
+        console.log('⚠️ No schema_signer_id found, falling back to signing_order mapping')
+        const sortedSigners = [...signers].sort((a, b) => {
+          const orderA = a.signing_order || 999
+          const orderB = b.signing_order || 999
+          return orderA - orderB
+        })
 
-      console.log('🔗 Signer mapping (by signing order):', signerMapping)
+        sortedSigners.forEach((signer, index) => {
+          signerMapping[`signer_${index + 1}`] = signer.signer_email
+        })
+      }
+
+      console.log('🔗 Signer mapping (using schema_signer_id):', signerMapping)
 
       // Convert schemas to DocumentSchema format
       const documentSchema: DocumentSchema = {

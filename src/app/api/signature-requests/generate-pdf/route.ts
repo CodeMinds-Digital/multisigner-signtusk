@@ -220,22 +220,30 @@ async function populateSchemaWithSignatures(schema: any[], signers: any[], reque
     if (!fieldName) continue
 
     // Find the appropriate signer for this field
-    // Check if field has signer assignment (signer_email or signer_id)
+    // Priority: schema signerId > signer_email > signer_id > signing_order > fallback
     let targetSigner = null
 
-    if (field.signer_email) {
+    // First, try to match by schema signerId (NEW: Primary method)
+    const fieldSignerId = field.signerId || field.properties?._originalConfig?.signerId
+    if (fieldSignerId) {
+      targetSigner = signers.find(s => s.schema_signer_id === fieldSignerId)
+      console.log(`🎯 Field ${fieldName} assigned to schema signerId: ${fieldSignerId}`)
+    }
+
+    // Fallback methods if schema signerId doesn't work
+    if (!targetSigner && field.signer_email) {
       // Field is assigned to specific signer by email
       targetSigner = signers.find(s => s.signer_email === field.signer_email)
       console.log(`🎯 Field ${fieldName} assigned to signer: ${field.signer_email}`)
-    } else if (field.signer_id) {
+    } else if (!targetSigner && field.signer_id) {
       // Field is assigned to specific signer by ID
       targetSigner = signers.find(s => s.id === field.signer_id)
       console.log(`🎯 Field ${fieldName} assigned to signer ID: ${field.signer_id}`)
-    } else if (field.signing_order !== undefined) {
+    } else if (!targetSigner && field.signing_order !== undefined) {
       // Field is assigned by signing order
       targetSigner = signers.find(s => s.signing_order === field.signing_order)
       console.log(`🎯 Field ${fieldName} assigned to signing order: ${field.signing_order}`)
-    } else {
+    } else if (!targetSigner) {
       // No specific assignment - use first available signed signer
       targetSigner = signers.find(s => s.status === 'signed' || s.signer_status === 'signed')
       console.log(`🎯 Field ${fieldName} using first available signed signer`)
