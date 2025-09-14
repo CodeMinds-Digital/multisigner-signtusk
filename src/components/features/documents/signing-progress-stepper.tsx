@@ -32,13 +32,13 @@ export function SigningProgressStepper({ progress, status, className }: SigningP
       id: 'viewed',
       label: 'Viewed',
       icon: Eye,
-      description: `${progress.viewed}/${progress.total} signers viewed`
+      description: `${progress.viewed}/${progress.total} signers Viewed`
     },
     {
       id: 'signed',
       label: 'Signed',
       icon: FileSignature,
-      description: `${progress.signed}/${progress.total} signers completed`
+      description: `${progress.signed}/${progress.total} signers Signed`
     }
   ]
 
@@ -96,20 +96,21 @@ export function SigningProgressStepper({ progress, status, className }: SigningP
             {progress.total} signer{progress.total !== 1 ? 's' : ''}
           </div>
         </div>
-        
+
         {/* Progress Bar */}
         <div className="w-full bg-gray-200 rounded-full h-2 mb-2">
-          <div 
+          <div
             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-            style={{ 
-              width: `${progress.total > 0 ? (progress.signed / progress.total) * 100 : 0}%` 
+            style={{
+              width: `${progress.total > 0 ? (progress.signed / progress.total) * 100 : 0}%`
             }}
           />
         </div>
-        
+
+        {/* Progress counts with proper capitalization */}
         <div className="flex justify-between text-xs text-gray-600">
-          <span>{progress.viewed} viewed</span>
-          <span>{progress.signed} signed</span>
+          <span>{progress.viewed} Viewed</span>
+          <span>{progress.signed} Signed</span>
         </div>
       </div>
 
@@ -144,28 +145,28 @@ export function SigningProgressStepper({ progress, status, className }: SigningP
                     <h4 className={cn(
                       'text-sm font-medium',
                       stepStatus === 'completed' ? 'text-green-900' :
-                      stepStatus === 'in-progress' ? 'text-blue-900' :
-                      stepStatus === 'pending' ? 'text-yellow-900' :
-                      'text-gray-500'
+                        stepStatus === 'in-progress' ? 'text-blue-900' :
+                          stepStatus === 'pending' ? 'text-yellow-900' :
+                            'text-gray-500'
                     )}>
                       {step.label}
                     </h4>
-                    
+
                     {/* Status Badge */}
                     <span className={cn(
                       'px-2 py-1 text-xs font-medium rounded-full',
                       stepStatus === 'completed' ? 'bg-green-100 text-green-800' :
-                      stepStatus === 'in-progress' ? 'bg-blue-100 text-blue-800' :
-                      stepStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-600'
+                        stepStatus === 'in-progress' ? 'bg-blue-100 text-blue-800' :
+                          stepStatus === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                            'bg-gray-100 text-gray-600'
                     )}>
                       {stepStatus === 'completed' ? 'Complete' :
-                       stepStatus === 'in-progress' ? 'In Progress' :
-                       stepStatus === 'pending' ? 'Pending' :
-                       'Not Started'}
+                        stepStatus === 'in-progress' ? 'In Progress' :
+                          stepStatus === 'pending' ? 'Pending' :
+                            'Not Started'}
                     </span>
                   </div>
-                  
+
                   <p className="text-sm text-gray-600 mt-1">
                     {step.description}
                   </p>
@@ -193,7 +194,7 @@ export function SigningProgressStepper({ progress, status, className }: SigningP
             Current Status: {status}
           </span>
           <span className="text-sm text-blue-700">
-            {progress.signed === progress.total ? 
+            {progress.signed === progress.total ?
               'All signatures completed!' :
               `${progress.total - progress.signed} signature${progress.total - progress.signed !== 1 ? 's' : ''} remaining`
             }

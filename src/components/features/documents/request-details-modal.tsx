@@ -338,7 +338,11 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
                             </div>
                           </div>
                           <Badge className={getSignerStatusColor(signer.status)}>
-                            {signer.status}
+                            {signer.status === 'signed' ? 'Signed' :
+                              signer.status === 'viewed' ? 'Viewed' :
+                                signer.status === 'declined' ? 'Declined' :
+                                  signer.status === 'pending' ? 'Pending' :
+                                    signer.status}
                           </Badge>
                         </div>
 

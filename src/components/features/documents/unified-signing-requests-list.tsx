@@ -1018,7 +1018,11 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                                         signer.status === 'declined' ? 'bg-red-100 text-red-800' :
                                                             'bg-yellow-100 text-yellow-800'
                                                     }`}>
-                                                    {signer.status || 'Pending'}
+                                                    {/* Display proper capitalized status */}
+                                                    {signer.status === 'signed' ? 'Signed' :
+                                                        signer.status === 'viewed' ? 'Viewed' :
+                                                            signer.status === 'declined' ? 'Declined' :
+                                                                signer.status || 'Pending'}
                                                 </span>
                                             </div>
                                         </div>

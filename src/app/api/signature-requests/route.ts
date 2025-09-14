@@ -133,7 +133,7 @@ export async function GET(request: NextRequest) {
 
     // Transform data to match UI expectations with enhanced status tracking
     const transformToListItem = (request: any, isReceived = false) => {
-      const { total_signers, viewed_count, signed_count, document_status } = request
+      const { total_signers, viewed_signers, completed_signers, document_status } = request
 
       let displayStatus = 'Initiated'
       let canSign = false
@@ -146,9 +146,9 @@ export async function GET(request: NextRequest) {
         displayStatus = 'Declined'
         declineReason = request.decline_reason
       } else if (document_status === 'partially_signed') {
-        displayStatus = `Signed (${signed_count}/${total_signers})`
-      } else if (viewed_count > 0) {
-        displayStatus = `Viewed (${viewed_count}/${total_signers})`
+        displayStatus = `Signed (${completed_signers}/${total_signers})`
+      } else if (viewed_signers > 0) {
+        displayStatus = `Viewed (${viewed_signers}/${total_signers})`
       }
 
       // For received requests, use the user's signer status if available
@@ -216,8 +216,8 @@ export async function GET(request: NextRequest) {
         can_sign: canSign,
         decline_reason: declineReason,
         progress: {
-          viewed: request.viewed_count || 0,
-          signed: request.signed_count || 0,
+          viewed: request.viewed_signers || 0,
+          signed: request.completed_signers || 0,
           total: request.total_signers || 0
         },
         signers: (request.signers || []).map((signer: any) => ({
