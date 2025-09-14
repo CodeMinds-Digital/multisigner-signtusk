@@ -95,11 +95,10 @@ export async function generatePDFWithPDFMe(requestId: string): Promise<string | 
     // Populate schema with signature data
     const populatedInputs = await populateSchemaWithSignatures(schemas[0], signedSigners, requestId)
 
-    console.log('🎨 Generating PDF with @pdfme/generator...')
+    console.log('🎨 Generating PDF with pdfme-complete...')
 
-    // Import @pdfme/generator (server-side compatible)
-    const { generate } = await import('@pdfme/generator')
-    const { text, image, barcodes } = await import('@pdfme/schemas')
+    // Import pdfme-complete (server-side compatible)
+    const { generate, text, image, barcodes } = await import('@codeminds-digital/pdfme-complete')
 
     // Convert signature fields to image fields for server-side generation
     const serverSchemas = schemas.map((schema: any[]) =>

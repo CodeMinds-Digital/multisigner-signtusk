@@ -10,6 +10,9 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "SignTusk - Digital Document Signing Platform",
   description: "Secure digital document signing and management platform",
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({

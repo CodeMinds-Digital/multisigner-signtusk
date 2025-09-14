@@ -11,11 +11,8 @@
     "lint": "eslint"
   },
   "dependencies": {
-    "@codeminds-digital/pdfme-complete": "^0.0.4",
+    "@codeminds-digital/pdfme-complete": "^0.0.5",
     "@hugocxl/react-to-image": "^0.0.9",
-    "@pdfme/common": "^5.4.5",
-    "@pdfme/generator": "^5.4.5",
-    "@pdfme/schemas": "^5.4.5",
     "@radix-ui/react-dropdown-menu": "^2.1.16",
     "@radix-ui/react-label": "^2.1.7",
     "@radix-ui/react-select": "^2.2.6",
@@ -39,7 +36,6 @@
     "jose": "^6.1.0",
     "lucide-react": "^0.541.0",
     "next": "15.5.0",
-    "pdf-lib": "^1.17.1",
     "pdf-to-base64": "^1.0.3",
     "qr-code-styling": "^1.9.2",
     "qrcode": "^1.5.4",

@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase-admin'
+import { PDFDocument, rgb, StandardFonts } from '@codeminds-digital/pdfme-complete'
 
 interface SignerData {
   id: string
