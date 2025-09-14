@@ -157,9 +157,8 @@ export class MultiSignatureWorkflowService {
       console.log('📄 Original PDF URL:', originalPdfUrl)
       console.log('👥 Signed signers:', signedSigners.length, 'of', allSigners.length)
 
-      // Call PDF generation service directly
-      const { PDFGenerationService } = await import('@/lib/pdf-generation-service')
-      const finalPdfUrl = await PDFGenerationService.generateFinalPDF(requestId)
+      // Call the working PDF generation API endpoint
+      const finalPdfUrl = await this.callPDFGenerationAPI(requestId)
 
       if (finalPdfUrl) {
         // Update the signing request with completion timestamp and final PDF URL
@@ -183,6 +182,35 @@ export class MultiSignatureWorkflowService {
       return null
     }
   }
+
+  /**
+   * Generate PDF using the working pdfme-based logic (directly imported)
+   */
+  private static async callPDFGenerationAPI(requestId: string): Promise<string | null> {
+    try {
+      console.log('📞 Generating PDF using working pdfme logic for request:', requestId)
+
+      // Import the working PDF generation logic directly
+      const { generatePDFWithPDFMe } = await import('@/lib/pdf-generation-pdfme')
+
+      // Call the working PDF generation function
+      const finalPdfUrl = await generatePDFWithPDFMe(requestId)
+
+      if (finalPdfUrl) {
+        console.log('✅ PDF generation succeeded:', finalPdfUrl)
+        return finalPdfUrl
+      } else {
+        console.error('❌ PDF generation failed - no URL returned')
+        return null
+      }
+
+    } catch (error) {
+      console.error('❌ Error in PDF generation:', error)
+      return null
+    }
+  }
+
+
 
   /**
    * Handle signer completion (called after each signature)

@@ -77,23 +77,44 @@ export class PDFGenerationService {
 
       console.log('📋 Found', signers.length, 'signed signers')
 
-      // Get document schema from signature_fields
-      const signatureFields = signingRequest.document?.signature_fields
-      if (!signatureFields || !Array.isArray(signatureFields) || signatureFields.length === 0) {
-        console.error('❌ No signature fields found in document')
+      // Get document schema from schemas field (not signature_fields)
+      const schemas = signingRequest.document?.schemas
+      if (!schemas || !Array.isArray(schemas) || schemas.length === 0) {
+        console.error('❌ No schemas found in document')
         return null
       }
 
-      // Convert signature_fields to DocumentSchema format
+      // Create signer mapping: signerId -> signer_email based on signing_order
+      const signerMapping: { [key: string]: string } = {}
+
+      // Sort signers by signing_order to ensure correct mapping
+      const sortedSigners = [...signers].sort((a, b) => {
+        const orderA = a.signing_order || 999
+        const orderB = b.signing_order || 999
+        return orderA - orderB
+      })
+
+      sortedSigners.forEach((signer, index) => {
+        signerMapping[`signer_${index + 1}`] = signer.signer_email
+      })
+
+      console.log('🔗 Signer mapping (by signing order):', signerMapping)
+
+      // Convert schemas to DocumentSchema format
       const documentSchema: DocumentSchema = {
-        fields: signatureFields.map((field: any) => ({
-          id: field.id || `field-${Date.now()}-${Math.random()}`,
-          type: field.type || 'signature',
-          name: field.name || 'Signature',
-          required: field.required !== false,
-          signer_email: field.signer_email,
-          position: field.position
-        }))
+        fields: schemas.map((field: any) => {
+          const signerId = field.properties?._originalConfig?.signerId
+          const signerEmail = signerId ? signerMapping[signerId] : null
+
+          return {
+            id: field.id,
+            type: field.type,
+            name: field.name,
+            required: field.properties?._originalConfig?.required !== false,
+            signer_email: signerEmail,
+            position: field.position
+          }
+        }).filter(field => field.signer_email) // Only include fields with valid signer mapping
       }
 
       console.log('📋 Document schema fields:', documentSchema.fields.length)
@@ -256,33 +277,26 @@ export class PDFGenerationService {
         return null
       }
 
-      // Get the document template data
-      const { data: documentTemplate, error: templateError } = await supabaseAdmin
-        .from('document_templates')
-        .select('*')
-        .eq('id', signingRequest.document_template_id)
-        .single()
-
-      if (templateError || !documentTemplate) {
-        console.error('❌ Error fetching document template:', templateError)
+      // Use the document data that was already fetched in the join
+      const document = signingRequest.document
+      if (!document) {
+        console.error('❌ Document not found in signing request')
         return null
       }
 
-      // Extract template data and schemas
-      const templateData = documentTemplate.template_data || documentTemplate.schemas
-      if (!templateData || !templateData.basePdf || !templateData.schemas) {
-        console.error('❌ Invalid template data structure')
+      // For PDF generation, we need the original PDF URL
+      const originalPdfUrl = document.pdf_url || document.file_url
+      if (!originalPdfUrl) {
+        console.error('❌ No PDF URL found in document')
         return null
       }
 
-      // Prepare inputs for PDF generation
-      const inputs = this.prepareInputsFromFields(populatedFields)
-
-      // Generate PDF using pdf-lib (server-compatible)
-      console.log('📄 Generating signed PDF with pdf-lib')
-      console.log('📋 Generating PDF with inputs:', inputs)
+      console.log('📄 Using original PDF URL:', originalPdfUrl)
 
       // Create signed PDF using pdf-lib
+      console.log('📄 Generating signed PDF with pdf-lib')
+      console.log('📋 Populated fields for PDF:', populatedFields.length)
+
       const pdfBytes = await this.createSignedPDFWithPdfLib(originalPdfUrl, populatedFields, requestId)
 
       // Upload to Supabase storage
@@ -342,13 +356,50 @@ export class PDFGenerationService {
     try {
       console.log('📄 Loading original PDF from:', originalPdfUrl)
 
-      // Fetch the original PDF
-      const response = await fetch(originalPdfUrl)
-      if (!response.ok) {
-        throw new Error(`Failed to fetch PDF: ${response.statusText}`)
-      }
+      // Download the original PDF using Supabase admin client
+      let originalPdfBytes: ArrayBuffer
 
-      const originalPdfBytes = await response.arrayBuffer()
+      if (originalPdfUrl.startsWith('http')) {
+        // If it's already a full URL, use fetch
+        console.log('📄 Fetching PDF from URL:', originalPdfUrl)
+        const response = await fetch(originalPdfUrl)
+        if (!response.ok) {
+          throw new Error(`Failed to fetch PDF: ${response.statusText}`)
+        }
+        originalPdfBytes = await response.arrayBuffer()
+      } else {
+        // If it's a path, try different buckets to find the file
+        console.log('📄 Downloading PDF from storage path:', originalPdfUrl)
+
+        let fileData: Blob | null = null
+        let downloadError: any = null
+
+        // Try 'files' bucket first
+        const filesResult = await supabaseAdmin.storage
+          .from('files')
+          .download(originalPdfUrl)
+
+        if (filesResult.data && !filesResult.error) {
+          fileData = filesResult.data
+        } else {
+          // Try 'documents' bucket
+          const documentsResult = await supabaseAdmin.storage
+            .from('documents')
+            .download(originalPdfUrl)
+
+          if (documentsResult.data && !documentsResult.error) {
+            fileData = documentsResult.data
+          } else {
+            downloadError = documentsResult.error || filesResult.error
+          }
+        }
+
+        if (!fileData) {
+          throw new Error(`Failed to download PDF from both 'files' and 'documents' buckets: ${downloadError?.message || 'File not found'}`)
+        }
+
+        originalPdfBytes = await fileData.arrayBuffer()
+      }
       const pdfDoc = await PDFDocument.load(originalPdfBytes)
 
       // Get the first page (assuming single page for now)
