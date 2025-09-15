@@ -36,6 +36,21 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
     const [viewingRequest, setViewingRequest] = useState<SigningRequestListItem | null>(null)
     const { user } = useAuth()
 
+    // Helper function to check if all signers have completed signing
+    const isRequestCompleted = (request: SigningRequestListItem): boolean => {
+        // Check if status is explicitly completed
+        if (request.status === 'Completed' || request.status === 'completed') {
+            return true
+        }
+
+        // Check if all signers have signed (signed equals total)
+        if (request.progress && request.progress.signed >= request.progress.total) {
+            return true
+        }
+
+        return false
+    }
+
     const loadSigningRequests = useCallback(async () => {
         if (!user?.id) return
 
@@ -120,9 +135,30 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
         setViewingRequest(request)
     }
 
-    const handleShare = (request: SigningRequestListItem) => {
-        // TODO: Implement reminder sending
+    const handleShare = async (request: SigningRequestListItem) => {
         console.log('Send reminder for signing request:', request)
+
+        try {
+            const response = await fetch(`/api/signature-requests/${request.id}/remind`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+
+            const result = await response.json()
+
+            if (response.ok) {
+                alert(result.message || 'Reminder sent successfully!')
+                // Refresh the list
+                fetchSigningRequests()
+            } else {
+                alert(result.error || 'Failed to send reminder')
+            }
+        } catch (error) {
+            console.error('Error sending reminder:', error)
+            alert('Failed to send reminder. Please try again.')
+        }
     }
 
     if (loading) {
@@ -250,31 +286,37 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="ghost" size="sm">
-                                                    <MoreHorizontal className="w-4 h-4" />
-                                                </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end">
-                                                <DropdownMenuItem onClick={() => handleView(request)}>
-                                                    <Eye className="w-4 h-4 mr-2" />
-                                                    View Details
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => handleShare(request)}>
-                                                    <Share2 className="w-4 h-4 mr-2" />
-                                                    Send Reminder
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem
-                                                    onClick={() => handleCancel(request.id)}
-                                                    className="text-red-600"
-                                                    disabled={request.status === 'Completed' || request.status === 'Cancelled'}
-                                                >
-                                                    <Trash2 className="w-4 h-4 mr-2" />
-                                                    Cancel Request
-                                                </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
+                                        {!isRequestCompleted(request) ? (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="sm" title="Document Actions">
+                                                        <MoreHorizontal className="w-4 h-4" />
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem onClick={() => handleView(request)}>
+                                                        <Eye className="w-4 h-4 mr-2" />
+                                                        View Details
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => handleShare(request)}>
+                                                        <Share2 className="w-4 h-4 mr-2" />
+                                                        Send Reminder
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem
+                                                        onClick={() => handleCancel(request.id)}
+                                                        className="text-red-600"
+                                                        disabled={request.status === 'Completed' || request.status === 'Cancelled'}
+                                                    >
+                                                        <Trash2 className="w-4 h-4 mr-2" />
+                                                        Cancel Request
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        ) : (
+                                            <span className="text-sm text-green-600 font-medium">
+                                                ✓ Completed
+                                            </span>
+                                        )}
                                     </TableCell>
                                 </TableRow>
                             ))}

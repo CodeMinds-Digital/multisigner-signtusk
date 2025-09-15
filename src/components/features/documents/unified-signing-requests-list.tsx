@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorAlert } from '@/components/ui/alert'
 import { RequestDetailsModal } from './request-details-modal'
 import { PDFSigningScreen } from './pdf-signing-screen'
+import { useToast } from '@/components/ui/toast'
 
 import {
     Select,
@@ -67,7 +68,31 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const [showProfileValidation, setShowProfileValidation] = useState(false)
     const [pendingSigningRequest, setPendingSigningRequest] = useState<UnifiedSigningRequest | null>(null)
     const [userProfile, setUserProfile] = useState<any>(null)
+
+    // Safely get toast context with fallback
+    let toast: any = null
+    try {
+        toast = useToast()
+    } catch (error) {
+        console.warn('Toast context not available, using fallback notifications')
+    }
+
     const { user } = useAuth()
+
+    // Helper function to check if all signers have completed signing
+    const isRequestCompleted = (request: UnifiedSigningRequest): boolean => {
+        // Check if status is explicitly completed
+        if (request.status === 'completed' || request.document_status === 'completed') {
+            return true
+        }
+
+        // Check if all signers have signed (completed_signers equals total_signers)
+        if (request.completed_signers && request.total_signers) {
+            return request.completed_signers >= request.total_signers
+        }
+
+        return false
+    }
 
     const getDateFilter = (range: TimeRange): Date => {
         const now = new Date()
@@ -345,8 +370,47 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         }
     }
 
-    const handleShare = (request: UnifiedSigningRequest) => {
+    const handleShare = async (request: UnifiedSigningRequest) => {
         console.log('Send reminder for request:', request)
+
+        try {
+            const response = await fetch(`/api/signature-requests/${request.id}/remind`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            })
+
+            const result = await response.json()
+
+            if (response.ok) {
+                // Use toast if available, otherwise fallback to alert
+                if (toast && typeof toast.success === 'function') {
+                    toast.success(result.message || 'Reminder sent successfully!')
+                } else {
+                    alert(result.message || 'Reminder sent successfully!')
+                }
+                // Refresh the list to update any status changes
+                if (onRefresh) {
+                    onRefresh()
+                }
+            } else {
+                // Use toast if available, otherwise fallback to alert
+                if (toast && typeof toast.error === 'function') {
+                    toast.error(result.error || 'Failed to send reminder')
+                } else {
+                    alert(result.error || 'Failed to send reminder')
+                }
+            }
+        } catch (error) {
+            console.error('Error sending reminder:', error)
+            // Use toast if available, otherwise fallback to alert
+            if (toast && typeof toast.error === 'function') {
+                toast.error('Failed to send reminder. Please try again.')
+            } else {
+                alert('Failed to send reminder. Please try again.')
+            }
+        }
     }
 
     const handleDelete = async (request: UnifiedSigningRequest) => {
@@ -939,14 +1003,20 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                                         Final PDF
                                                     </Button>
                                                 )}
-                                                {request.type === 'sent' && (
+                                                {request.type === 'sent' && !isRequestCompleted(request) && (
                                                     <Button
                                                         variant="outline"
                                                         size="sm"
                                                         onClick={() => setShowActionsSheet(request)}
+                                                        title="Document Actions"
                                                     >
                                                         <MoreHorizontal className="w-4 h-4" />
                                                     </Button>
+                                                )}
+                                                {request.type === 'sent' && isRequestCompleted(request) && (
+                                                    <span className="text-sm text-green-600 font-medium">
+                                                        ✓ Completed
+                                                    </span>
                                                 )}
                                             </div>
                                         </TableCell>
