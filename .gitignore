@@ -3,6 +3,8 @@
 # Dependencies
 /node_modules
 /nextjs-example
+/addqrcode
+/pdfs
 /nextjs-example.zip
 /.pnp
 .pnp.js

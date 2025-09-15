@@ -16,7 +16,8 @@ import {
   CreditCard,
   PenTool,
   Workflow,
-  Settings
+  Settings,
+  QrCode
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -84,6 +85,16 @@ export function Sidebar({
             >
               <PenTool className="w-5 h-5 mr-3" />
               Signatures
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/scan"
+              className={`flex items-center px-3 py-2 rounded-md ${isActive('/scan') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
+                }`}
+            >
+              <QrCode className="w-5 h-5 mr-3" />
+              Scan
             </Link>
           </li>
           <li>

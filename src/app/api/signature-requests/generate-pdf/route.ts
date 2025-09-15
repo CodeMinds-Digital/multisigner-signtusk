@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { QRPDFService } from '@/lib/qr-pdf-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -139,11 +140,22 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate the final PDF
-    const pdfBytes = await generate({
+    let pdfBytes = await generate({
       template: { basePdf: basePdfBytes, schemas: serverSchemas },
       inputs: [populatedInputs],
       plugins
     })
+
+    console.log('🔄 Adding QR code to generated PDF...')
+
+    // Add QR code to PDF (non-breaking enhancement)
+    const qrResult = await QRPDFService.addQRCodeToPDF(pdfBytes, requestId)
+    if (qrResult.success && qrResult.pdfBytes) {
+      pdfBytes = qrResult.pdfBytes
+      console.log('✅ QR code successfully added to PDF')
+    } else {
+      console.log('⚠️ QR code addition failed, continuing with original PDF:', qrResult.error)
+    }
 
     console.log('📤 Uploading signed PDF to storage...')
 
