@@ -3,6 +3,7 @@ import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { resendSignatureRequest } from '@/lib/email-service'
+import { NotificationService } from '@/lib/notification-service'
 // Temporarily disabled database functions until SQL is executed
 // import {
 //   canSendReminder,
@@ -256,6 +257,48 @@ export async function POST(
             }
           } catch (dbError) {
             console.warn(`⚠️ Database update error for ${signer.email}:`, dbError)
+          }
+
+          // Create notification for the signer (if they are a registered user)
+          try {
+            const { data: signerUser } = await supabaseAdmin
+              .from('user_profiles')
+              .select('user_id')
+              .eq('email', signer.email)
+              .single()
+
+            if (signerUser) {
+              await NotificationService.createNotification(
+                signerUser.user_id,
+                'reminder_received',
+                'Signature Reminder',
+                `Reminder: Please sign "${combinedRequest.title}"`,
+                {
+                  request_id: requestId,
+                  document_title: combinedRequest.title,
+                  signer_email: signer.email,
+                  action_url: `/sign/${requestId}?signer=${encodeURIComponent(signer.email)}`
+                }
+              )
+              console.log(`📧 Created reminder notification for: ${signer.email}`)
+            }
+
+            // Create notification for the requester about reminder sent
+            await NotificationService.createNotification(
+              userId,
+              'reminder_sent',
+              'Reminder Sent',
+              `Reminder sent to ${signer.email} for "${combinedRequest.title}"`,
+              {
+                request_id: requestId,
+                document_title: combinedRequest.title,
+                signer_email: signer.email,
+                action_url: `/signature-requests/${requestId}`
+              }
+            )
+            console.log(`📧 Created reminder sent notification for requester`)
+          } catch (notificationError) {
+            console.warn(`⚠️ Failed to create notifications for ${signer.email}:`, notificationError)
           }
         } else {
           console.error(`❌ Failed to send reminder to ${signer.email}:`, result.error)

@@ -7,9 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import {
-  QrCode,
   Upload,
-  Camera,
   CheckCircle,
   AlertTriangle,
   FileText,
@@ -30,8 +28,7 @@ interface VerificationResult {
   error?: string
 }
 
-export default function ScanPage() {
-  const [isScanning, setIsScanning] = useState(false)
+export default function VerifyPage() {
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isVerifying, setIsVerifying] = useState(false)
@@ -70,28 +67,42 @@ export default function ScanPage() {
     }
   }
 
-  const handleQRScan = async () => {
-    setIsScanning(true)
+  const handleDirectVerification = async () => {
+    setIsVerifying(true)
     try {
-      // In a real implementation, you would use a QR scanner library
-      // For now, we'll simulate with a prompt
-      const qrData = prompt('Enter QR code data or verification URL:')
+      console.log('🔄 Starting document verification...')
 
-      if (qrData) {
-        // Extract request ID from URL or use direct ID
-        let requestId = qrData
-        const urlMatch = qrData.match(/\/verify\/([a-f0-9-]{36})/i)
-        if (urlMatch) {
-          requestId = urlMatch[1]
-        }
+      // Prompt user for request ID
+      const requestId = prompt('Please enter the document request ID for verification:')
 
-        await verifyDocument(requestId)
+      if (!requestId) {
+        toast.info('Verification cancelled')
+        setIsVerifying(false)
+        return
       }
+
+      // Clean the request ID if it's a URL
+      let cleanRequestId = requestId.trim()
+      const urlMatch = requestId.match(/\/verify\/([a-f0-9-]{36})/i)
+      if (urlMatch) {
+        cleanRequestId = urlMatch[1]
+      }
+
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      if (!uuidRegex.test(cleanRequestId)) {
+        toast.error('Invalid request ID format. Please enter a valid UUID.')
+        setIsVerifying(false)
+        return
+      }
+
+      await verifyDocument(cleanRequestId)
+
     } catch (error) {
-      console.error('QR scan error:', error)
-      toast.error('QR scan failed')
-    } finally {
-      setIsScanning(false)
+      console.error('Verification error:', error)
+      toast.error('Verification failed')
+      setVerificationResult({ success: false, error: 'Network error' })
+      setIsVerifying(false)
     }
   }
 
@@ -101,61 +112,8 @@ export default function ScanPage() {
       return
     }
 
-    setIsVerifying(true)
-    try {
-      console.log('🔄 Processing PDF for QR extraction...')
-
-      // Create form data for upload
-      const formData = new FormData()
-      formData.append('pdf', uploadedFile)
-
-      // Upload PDF and extract QR code
-      const response = await fetch('/api/scan/upload', {
-        method: 'POST',
-        body: formData
-      })
-
-      const result = await response.json()
-
-      if (result.success) {
-        if (result.data?.verification) {
-          // QR was extracted and verified successfully
-          setVerificationResult(result.data.verification)
-          toast.success('Document verified successfully from PDF')
-        } else if (result.requiresManualInput) {
-          // QR structure detected but needs manual input
-          toast.info('QR-enhanced PDF detected')
-          const requestId = prompt('Please enter the document request ID or verification URL:')
-
-          if (requestId) {
-            // Extract request ID from URL if needed
-            let cleanRequestId = requestId
-            const urlMatch = requestId.match(/\/verify\/([a-f0-9-]{36})/i)
-            if (urlMatch) {
-              cleanRequestId = urlMatch[1]
-            }
-
-            await verifyDocument(cleanRequestId)
-          }
-        }
-      } else {
-        if (result.requiresManualInput) {
-          // QR structure detected but extraction failed
-          const requestId = prompt('QR code detected but could not be read automatically. Please enter the request ID:')
-
-          if (requestId) {
-            await verifyDocument(requestId)
-          }
-        } else {
-          toast.error(result.error || 'Failed to extract QR code from PDF')
-        }
-      }
-    } catch (error) {
-      console.error('PDF verification error:', error)
-      toast.error('PDF verification failed')
-    } finally {
-      setIsVerifying(false)
-    }
+    // For now, just use the direct verification method
+    await handleDirectVerification()
   }
 
   const formatDate = (dateString: string) => {
@@ -183,49 +141,47 @@ export default function ScanPage() {
       <div>
         <h1 className="text-3xl font-bold text-gray-900">Document Verification</h1>
         <p className="text-gray-600 mt-2">
-          Scan QR codes or upload PDFs to verify document authenticity and view signing details.
+          Upload signed PDF documents to verify their authenticity and view signing details.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* QR Code Scanner */}
+      <div className="max-w-2xl space-y-6">
+        {/* Direct Verification */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <QrCode className="w-5 h-5" />
-              QR Code Scanner
+              <Shield className="w-5 h-5" />
+              Document Verification
             </CardTitle>
             <CardDescription>
-              Scan a QR code from a signed document to verify its authenticity
+              Verify a signed document using its request ID
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex flex-col items-center justify-center py-8 border-2 border-dashed border-gray-300 rounded-lg">
-              <Camera className="w-12 h-12 text-gray-400 mb-4" />
-              <p className="text-gray-500 text-center mb-4">
-                Click the button below to scan a QR code
-              </p>
-              <Button
-                onClick={handleQRScan}
-                disabled={isScanning || isVerifying}
-                className="flex items-center gap-2"
-              >
-                <QrCode className="w-4 h-4" />
-                {isScanning ? 'Scanning...' : 'Scan QR Code'}
-              </Button>
+            <div className="text-sm text-gray-600">
+              Enter the document request ID to verify its authenticity and view signing details.
             </div>
+
+            <Button
+              onClick={handleDirectVerification}
+              disabled={isVerifying}
+              className="w-full flex items-center gap-2"
+            >
+              <Shield className="w-4 h-4" />
+              {isVerifying ? 'Verifying...' : 'Verify Document'}
+            </Button>
           </CardContent>
         </Card>
 
-        {/* PDF Upload */}
+        {/* PDF Upload (Optional) */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Upload className="w-5 h-5" />
-              PDF Upload
+              PDF Upload (Optional)
             </CardTitle>
             <CardDescription>
-              Upload a signed PDF document to verify its authenticity
+              Upload a signed PDF document for additional verification
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -253,7 +209,7 @@ export default function ScanPage() {
               className="w-full flex items-center gap-2"
             >
               <Shield className="w-4 h-4" />
-              {isVerifying ? 'Verifying...' : 'Verify Document'}
+              {isVerifying ? 'Verifying...' : 'Verify with PDF'}
             </Button>
           </CardContent>
         </Card>
@@ -326,7 +282,12 @@ export default function ScanPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Signature Requester:</span>
-                        <span className="font-medium">{verificationResult.data.signing_request.document?.user_email || 'N/A'}</span>
+                        <span className="font-medium">
+                          {verificationResult.data.signing_request.user?.email ||
+                            verificationResult.data.signing_request.user?.name ||
+                            verificationResult.data.signing_request.document?.user_email ||
+                            'N/A'}
+                        </span>
                       </div>
                     </div>
                   </div>

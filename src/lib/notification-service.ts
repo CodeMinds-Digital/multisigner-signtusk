@@ -1,13 +1,21 @@
 import { supabase } from './supabase'
 
-export type NotificationType = 
+export type NotificationType =
   | 'signature_request_received'
+  | 'signature_request_updated'
+  | 'signature_request_cancelled'
   | 'signature_request_signed'
   | 'signature_request_declined'
   | 'signature_request_completed'
-  | 'signature_request_cancelled'
   | 'signature_request_expired'
-  | 'signature_request_reminder'
+  | 'document_viewed'
+  | 'document_signed'
+  | 'all_signatures_complete'
+  | 'reminder_sent'
+  | 'reminder_received'
+  | 'expiry_warning'
+  | 'pdf_generated'
+  | 'qr_verification'
   | 'document_created'
   | 'document_updated'
 
@@ -17,10 +25,11 @@ export interface Notification {
   type: NotificationType
   title: string
   message: string
-  data?: any
-  read: boolean
+  metadata?: Record<string, any>
+  action_url?: string
+  is_read: boolean
   created_at: string
-  expires_at?: string
+  updated_at: string
 }
 
 export interface NotificationPreferences {
@@ -443,6 +452,114 @@ export class NotificationService {
 
     return () => {
       subscription.unsubscribe()
+    }
+  }
+
+  /**
+   * Notify when document is viewed
+   */
+  static async notifyDocumentViewed(
+    requesterId: string,
+    signerEmail: string,
+    documentTitle: string,
+    requestId: string
+  ): Promise<void> {
+    try {
+      await this.createNotification(
+        requesterId,
+        'document_viewed',
+        'Document Viewed',
+        `${signerEmail} viewed "${documentTitle}"`,
+        {
+          request_id: requestId,
+          document_title: documentTitle,
+          signer_email: signerEmail,
+          action_url: `/signature-requests/${requestId}`
+        }
+      )
+    } catch (error) {
+      console.error('Error creating document viewed notification:', error)
+    }
+  }
+
+  /**
+   * Notify when PDF is generated
+   */
+  static async notifyPdfGenerated(
+    requesterId: string,
+    documentTitle: string,
+    requestId: string,
+    pdfUrl?: string
+  ): Promise<void> {
+    try {
+      await this.createNotification(
+        requesterId,
+        'pdf_generated',
+        'Final PDF Ready',
+        `Final signed PDF is ready for "${documentTitle}"`,
+        {
+          request_id: requestId,
+          document_title: documentTitle,
+          pdf_url: pdfUrl,
+          action_url: `/signature-requests/${requestId}`
+        }
+      )
+    } catch (error) {
+      console.error('Error creating PDF generated notification:', error)
+    }
+  }
+
+  /**
+   * Notify about QR verification
+   */
+  static async notifyQrVerification(
+    requesterId: string,
+    documentTitle: string,
+    requestId: string,
+    verifierInfo?: string
+  ): Promise<void> {
+    try {
+      await this.createNotification(
+        requesterId,
+        'qr_verification',
+        'Document Verified',
+        `Someone verified "${documentTitle}" using QR code`,
+        {
+          request_id: requestId,
+          document_title: documentTitle,
+          verifier_info: verifierInfo,
+          action_url: `/signature-requests/${requestId}`
+        }
+      )
+    } catch (error) {
+      console.error('Error creating QR verification notification:', error)
+    }
+  }
+
+  /**
+   * Notify about expiry warning
+   */
+  static async notifyExpiryWarning(
+    signerUserId: string,
+    documentTitle: string,
+    requestId: string,
+    hoursRemaining: number
+  ): Promise<void> {
+    try {
+      await this.createNotification(
+        signerUserId,
+        'expiry_warning',
+        'Document Expiring Soon',
+        `"${documentTitle}" expires in ${hoursRemaining} hours`,
+        {
+          request_id: requestId,
+          document_title: documentTitle,
+          hours_remaining: hoursRemaining,
+          action_url: `/sign/${requestId}`
+        }
+      )
+    } catch (error) {
+      console.error('Error creating expiry warning notification:', error)
     }
   }
 }

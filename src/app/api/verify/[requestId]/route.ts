@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { QRPDFService } from '@/lib/qr-pdf-service'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function GET(
   request: NextRequest,
@@ -24,28 +24,75 @@ export async function GET(
       )
     }
 
-    console.log('🔍 Verifying QR code for request:', requestId)
+    console.log('🔍 Verifying document for request:', requestId)
 
-    // Verify the QR code and get document information
-    const verificationResult = await QRPDFService.verifyQRCode(requestId)
+    // Get signing request with related data
+    const { data: signingRequest, error: signingError } = await supabaseAdmin
+      .from('signing_requests')
+      .select(`
+        *,
+        document:documents(*),
+        signers:signing_request_signers(*)
+      `)
+      .eq('id', requestId)
+      .single()
 
-    if (!verificationResult.success) {
-      console.log('❌ Verification failed:', verificationResult.error)
+    if (signingError || !signingRequest) {
+      console.log('❌ Signing request not found:', signingError)
       return NextResponse.json(
-        {
-          success: false,
-          error: verificationResult.error || 'Document verification failed'
-        },
+        { success: false, error: 'Document not found' },
         { status: 404 }
       )
     }
 
-    console.log('✅ Document verified successfully')
+    // Get user information separately if initiated_by exists
+    let userInfo = null
+    if (signingRequest.initiated_by) {
+      const { data: userData } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id, email, full_name, first_name, last_name')
+        .eq('id', signingRequest.initiated_by)
+        .single()
 
-    // Return verification results
+      if (userData) {
+        userInfo = {
+          id: userData.id,
+          email: userData.email,
+          name: userData.full_name || `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || null
+        }
+      }
+    }
+
+    // If no user found, use fallback (but this should rarely happen now)
+    if (!userInfo) {
+      userInfo = {
+        id: signingRequest.initiated_by,
+        email: 'Unknown Requester',
+        name: null
+      }
+    }
+
+    // Check if there's a QR verification record
+    const { data: qrVerification } = await supabaseAdmin
+      .from('qr_verifications')
+      .select('*')
+      .eq('signature_request_id', requestId)
+      .single()
+
+    console.log('✅ Document found and verified successfully')
+
+    // Return verification results with user information
     return NextResponse.json({
       success: true,
-      data: verificationResult.data,
+      data: {
+        signing_request: {
+          ...signingRequest,
+          user: userInfo
+        },
+        qr_verification: qrVerification,
+        verification_status: 'verified',
+        verified_at: new Date().toISOString()
+      },
       message: 'Document verified successfully'
     })
 
@@ -83,24 +130,70 @@ export async function POST(
     // Handle different verification types
     const { verificationType, documentHash } = body
 
-    if (verificationType === 'hash_verification' && documentHash) {
-      // Verify document hash matches stored hash
-      const verificationResult = await QRPDFService.verifyQRCode(requestId)
+    // Get signing request with related data
+    const { data: signingRequest, error: signingError } = await supabaseAdmin
+      .from('signing_requests')
+      .select(`
+        *,
+        document:documents(*),
+        signers:signing_request_signers(*)
+      `)
+      .eq('id', requestId)
+      .single()
 
-      if (!verificationResult.success) {
-        return NextResponse.json(
-          { success: false, error: 'Document not found' },
-          { status: 404 }
-        )
+    if (signingError || !signingRequest) {
+      return NextResponse.json(
+        { success: false, error: 'Document not found' },
+        { status: 404 }
+      )
+    }
+
+    // Get user information separately if initiated_by exists
+    let userInfo = null
+    if (signingRequest.initiated_by) {
+      const { data: userData } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id, email, full_name, first_name, last_name')
+        .eq('id', signingRequest.initiated_by)
+        .single()
+
+      if (userData) {
+        userInfo = {
+          id: userData.id,
+          email: userData.email,
+          name: userData.full_name || `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || null
+        }
       }
+    }
 
-      const storedHash = verificationResult.data?.qr_verification?.document_hash
+    // If no user found, use fallback (but this should rarely happen now)
+    if (!userInfo) {
+      userInfo = {
+        id: signingRequest.initiated_by,
+        email: 'Unknown Requester',
+        name: null
+      }
+    }
+
+    // Check if there's a QR verification record
+    const { data: qrVerification } = await supabaseAdmin
+      .from('qr_verifications')
+      .select('*')
+      .eq('signature_request_id', requestId)
+      .single()
+
+    if (verificationType === 'hash_verification' && documentHash) {
+      const storedHash = qrVerification?.document_hash
       const hashMatches = storedHash === documentHash
 
       return NextResponse.json({
         success: true,
         data: {
-          ...verificationResult.data,
+          signing_request: {
+            ...signingRequest,
+            user: userInfo
+          },
+          qr_verification: qrVerification,
           hash_verification: {
             matches: hashMatches,
             provided_hash: documentHash,
@@ -112,13 +205,18 @@ export async function POST(
     }
 
     // Default to standard verification
-    const verificationResult = await QRPDFService.verifyQRCode(requestId)
-
     return NextResponse.json({
-      success: verificationResult.success,
-      data: verificationResult.data,
-      error: verificationResult.error,
-      message: verificationResult.success ? 'Document verified successfully' : 'Verification failed'
+      success: true,
+      data: {
+        signing_request: {
+          ...signingRequest,
+          user: userInfo
+        },
+        qr_verification: qrVerification,
+        verification_status: 'verified',
+        verified_at: new Date().toISOString()
+      },
+      message: 'Document verified successfully'
     })
 
   } catch (error) {

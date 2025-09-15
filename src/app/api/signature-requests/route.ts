@@ -4,6 +4,7 @@ import { verifyAccessToken } from '@/lib/jwt-utils'
 import { SigningWorkflowService } from '@/lib/signing-workflow-service'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendBulkSignatureRequests } from '@/lib/email-service'
+import { NotificationService } from '@/lib/notification-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -674,6 +675,42 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('✅ Created signers:', signersData?.length || 0)
+
+    // Create notifications for each signer
+    try {
+      console.log('📧 Creating notifications for signers...')
+
+      for (const signerData of signersData || []) {
+        // Find the corresponding user ID for this signer email
+        const { data: signerUser } = await supabaseAdmin
+          .from('user_profiles')
+          .select('user_id')
+          .eq('email', signerData.signer_email)
+          .single()
+
+        if (signerUser) {
+          // Create notification for registered users
+          await NotificationService.createNotification(
+            signerUser.user_id,
+            'signature_request_received',
+            'New Signature Request',
+            `You have been requested to sign "${documentTitle}"`,
+            {
+              request_id: signatureRequest.id,
+              document_title: documentTitle,
+              signer_email: signerData.signer_email,
+              action_url: `/sign/${signatureRequest.id}?signer=${encodeURIComponent(signerData.signer_email)}`
+            }
+          )
+          console.log(`📧 Created notification for registered user: ${signerData.signer_email}`)
+        } else {
+          console.log(`📧 Skipped notification for unregistered user: ${signerData.signer_email}`)
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error creating signer notifications:', error)
+      // Don't fail the request if notifications fail
+    }
 
     // Send emails using Resend
     try {
