@@ -30,6 +30,15 @@ const nextConfig = {
       tls: false,
     }
 
+    // Exclude problematic packages from server-side bundle
+    if (isServer) {
+      config.externals = config.externals || []
+      config.externals.push({
+        '@codeminds-digital/pdfme-complete': '@codeminds-digital/pdfme-complete',
+        'resend': 'resend',
+      })
+    }
+
     return config
   },
 }
