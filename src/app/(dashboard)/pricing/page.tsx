@@ -4,7 +4,6 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Check, X } from 'lucide-react'
-import { useAuth } from '@/components/providers/secure-auth-provider'
 
 const plans = [
     {
@@ -69,7 +68,6 @@ const plans = [
 ]
 
 export default function PricingPage() {
-    const { user } = useAuth()
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
 
     const handleUpgrade = (planName: string) => {

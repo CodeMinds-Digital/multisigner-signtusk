@@ -134,7 +134,7 @@ export class MultiSignatureWorkflowService {
 
       // Check if all signers have completed
       const allSigners = signingRequest.signers || []
-      const signedSigners = allSigners.filter(s => s.status === 'signed' || s.signer_status === 'signed')
+      const signedSigners = allSigners.filter((s: any) => s.status === 'signed' || s.signer_status === 'signed')
 
       if (signedSigners.length !== allSigners.length) {
         console.error('❌ Not all signers have completed signing')

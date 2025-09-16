@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { File, Clock, CheckCircle, AlertTriangle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Calendar, Send, Inbox, Filter, Timer, Info, X } from 'lucide-react'
+import { File, CheckCircle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Send, Inbox, Filter, Info, X } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { type SigningRequestListItem } from '@/lib/signing-workflow-service'
 import { supabase } from '@/lib/supabase'
@@ -12,7 +12,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorAlert } from '@/components/ui/alert'
 import { RequestDetailsModal } from './request-details-modal'
 import { PDFSigningScreen } from './pdf-signing-screen'
-import { useToast } from '@/components/ui/toast'
+
 
 import {
     Select,
@@ -69,13 +69,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const [pendingSigningRequest, setPendingSigningRequest] = useState<UnifiedSigningRequest | null>(null)
     const [userProfile, setUserProfile] = useState<any>(null)
 
-    // Safely get toast context with fallback
-    let toast: any = null
-    try {
-        toast = useToast()
-    } catch (error) {
-        console.warn('Toast context not available, using fallback notifications')
-    }
+    // Note: Toast context may not be available in all contexts
 
     const { user } = useAuth()
 
@@ -87,8 +81,8 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         }
 
         // Check if all signers have signed (completed_signers equals total_signers)
-        if (request.completed_signers && request.total_signers) {
-            return request.completed_signers >= request.total_signers
+        if ((request as any).completed_signers && (request as any).total_signers) {
+            return (request as any).completed_signers >= (request as any).total_signers
         }
 
         return false
@@ -148,10 +142,10 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                         user_status: isSent ? undefined : req.status
                     }
                 })
-                .sort((a, b) => new Date(b.initiated_at).getTime() - new Date(a.initiated_at).getTime())
+                .sort((a: any, b: any) => new Date(b.initiated_at).getTime() - new Date(a.initiated_at).getTime())
 
-            const sentCount = filteredRequests.filter(req => req.type === 'sent').length
-            const receivedCount = filteredRequests.filter(req => req.type === 'received').length
+            const sentCount = filteredRequests.filter((req: any) => req.type === 'sent').length
+            const receivedCount = filteredRequests.filter((req: any) => req.type === 'received').length
 
             setRequests(filteredRequests)
             setStats({
@@ -266,13 +260,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         return `Expires ${fullDateTime}`
     }
 
-    const handleView = (request: UnifiedSigningRequest) => {
-        console.log('👁️ Eye icon clicked! View request:', request.title, 'Status:', request.status)
-        console.log('📊 Request progress:', request.progress)
-        console.log('👥 Request signers:', request.signers)
-        setViewingRequest(request)
-        console.log('✅ ViewingRequest state set, modal should open')
-    }
+
 
     const handleSign = async (request: UnifiedSigningRequest) => {
         console.log('🖊️ Sign document clicked:', request.title)
@@ -384,32 +372,17 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             const result = await response.json()
 
             if (response.ok) {
-                // Use toast if available, otherwise fallback to alert
-                if (toast && typeof toast.success === 'function') {
-                    toast.success(result.message || 'Reminder sent successfully!')
-                } else {
-                    alert(result.message || 'Reminder sent successfully!')
-                }
+                alert(result.message || 'Reminder sent successfully!')
                 // Refresh the list to update any status changes
                 if (onRefresh) {
                     onRefresh()
                 }
             } else {
-                // Use toast if available, otherwise fallback to alert
-                if (toast && typeof toast.error === 'function') {
-                    toast.error(result.error || 'Failed to send reminder')
-                } else {
-                    alert(result.error || 'Failed to send reminder')
-                }
+                alert(result.error || 'Failed to send reminder')
             }
         } catch (error) {
             console.error('Error sending reminder:', error)
-            // Use toast if available, otherwise fallback to alert
-            if (toast && typeof toast.error === 'function') {
-                toast.error('Failed to send reminder. Please try again.')
-            } else {
-                alert('Failed to send reminder. Please try again.')
-            }
+            alert('Failed to send reminder. Please try again.')
         }
     }
 
@@ -438,7 +411,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                     alert(result.message || 'Signature request deleted successfully')
 
                     // Refresh the list to reflect changes
-                    onRefresh()
+                    onRefresh?.()
                 } else {
                     const error = await response.json()
                     console.error('❌ Failed to delete signature request:', error)

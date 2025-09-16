@@ -17,14 +17,14 @@ interface SchemaSetupStepProps {
   canProceed?: boolean
 }
 
-export function SchemaSetupStep({ 
-  data = {}, 
+export function SchemaSetupStep({
+  data = {},
   onDataChange,
   onNext,
-  canProceed 
+  canProceed
 }: SchemaSetupStepProps) {
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error] = useState<string | null>(null)
   const [hasChanges, setHasChanges] = useState(false)
 
   const { file, signatureType, signers = [], schema = [] } = data
@@ -80,7 +80,7 @@ export function SchemaSetupStep({
 
   const getFieldSuggestions = () => {
     const suggestions = []
-    
+
     if (signatureType === 'single') {
       suggestions.push(
         { type: 'signature', label: 'Your Signature' },
@@ -120,8 +120,8 @@ export function SchemaSetupStep({
           </div>
           <p className="text-gray-900 font-medium">Error loading PDF editor</p>
           <p className="text-gray-600 mt-2">{error}</p>
-          <Button 
-            onClick={() => window.location.reload()} 
+          <Button
+            onClick={() => window.location.reload()}
             className="mt-4"
           >
             Retry
@@ -172,7 +172,7 @@ export function SchemaSetupStep({
             <Save className="mr-2 h-4 w-4" />
             Save Schema
           </Button>
-          
+
           <Button
             variant="outline"
             onClick={handleResetSchema}
@@ -195,14 +195,14 @@ export function SchemaSetupStep({
         <div className="bg-gray-100 px-4 py-2 border-b border-gray-200">
           <h4 className="text-sm font-medium text-gray-700">Document Schema Editor</h4>
         </div>
-        
+
         <div className="p-6">
           <div className="bg-white border border-gray-300 rounded-lg p-6">
             <div className="text-center mb-6">
               <h3 className="text-lg font-medium text-gray-900 mb-2">PDF Schema Editor (Development Mode)</h3>
               <p className="text-gray-600">File: {file?.name || 'document.pdf'}</p>
             </div>
-            
+
             <div className="flex justify-center space-x-4 mb-6">
               <Button
                 onClick={() => addField('signature')}
@@ -223,7 +223,7 @@ export function SchemaSetupStep({
                 Add Date Field
               </Button>
             </div>
-            
+
             <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
               <div className="text-gray-400 mb-4">
                 <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -232,7 +232,7 @@ export function SchemaSetupStep({
               </div>
               <h4 className="text-lg font-medium text-gray-900 mb-2">Document Preview</h4>
               <p className="text-gray-500 mb-4">Click the buttons above to add fields to your document</p>
-              
+
               {schema.length > 0 && (
                 <div className="mt-6">
                   <h5 className="text-sm font-medium text-gray-700 mb-3">Configured Fields:</h5>

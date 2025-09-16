@@ -80,7 +80,7 @@ const convertToBase64 = async (url: string) => {
 
 
 
-export default function DocumentEditor({
+function DocumentEditor({
   fileUrl,
   fileName,
   onClose
@@ -473,3 +473,6 @@ export default function DocumentEditor({
     </ErrorBoundary>
   )
 }
+
+export { DocumentEditor }
+export default DocumentEditor

@@ -1,12 +1,63 @@
 import { supabase } from './supabase'
-import { 
-  SignatureRequest, 
-  Signer, 
-  SigningSession, 
-  FieldAssignment, 
-  WorkflowStep,
-  SignatureWorkflowTemplate 
-} from '@/types/drive'
+
+// Define types locally since they're not exported from drive types
+interface SignatureRequest {
+  id: string
+  documentTemplateId: string
+  title: string
+  message?: string
+  status: 'draft' | 'sent' | 'in_progress' | 'completed' | 'cancelled'
+  signers: Signer[]
+  createdBy: string
+  createdAt: string
+  sentAt?: string
+  completedAt?: string
+  settings: {
+    requireAllSigners: boolean
+    signingOrder: 'sequential' | 'parallel'
+    expiresInDays?: number
+  }
+  auditTrail: Array<{
+    event: string
+    timestamp: string
+    userId: string
+    details: any
+  }>
+}
+
+interface Signer {
+  id: string
+  email: string
+  name: string
+  role?: string
+  order: number
+  status: 'pending' | 'sent' | 'signed' | 'declined'
+  signedAt?: string
+  declinedAt?: string
+  declineReason?: string
+  remindersSent?: number
+  lastReminderSent?: string
+  accessCode?: string
+  ipAddress?: string
+  userAgent?: string
+  signatureImage?: string
+  metadata?: any
+}
+
+interface SigningSession {
+  id: string
+  signatureRequestId: string
+  signerId: string
+  signerEmail: string
+  status: 'pending' | 'active' | 'completed' | 'expired'
+  accessToken: string
+  accessCode?: string
+  startedAt?: string
+  completedAt?: string
+  expiresAt: string
+  fieldsToComplete: any[]
+  fieldsCompleted: any[]
+}
 
 export class MultiSignatureService {
   private static readonly SIGNATURE_REQUESTS_TABLE = 'signature_requests'
@@ -36,7 +87,7 @@ export class MultiSignatureService {
           status: 'draft',
           created_by: createdBy,
           settings: JSON.stringify(settings),
-          expires_at: new Date(Date.now() + (settings.reminderSettings.intervalDays || 7) * 24 * 60 * 60 * 1000).toISOString()
+          expires_at: new Date(Date.now() + (settings.expiresInDays || 7) * 24 * 60 * 60 * 1000).toISOString()
         }])
         .select()
         .single()
@@ -107,7 +158,7 @@ export class MultiSignatureService {
       // Update request status to 'sent'
       const { error: updateError } = await supabase
         .from(this.SIGNATURE_REQUESTS_TABLE)
-        .update({ 
+        .update({
           status: 'sent',
           sent_at: new Date().toISOString()
         })
@@ -131,7 +182,7 @@ export class MultiSignatureService {
       }
 
       // Create signing sessions for each signer
-      const sessions = signers.map(signer => ({
+      const sessions = signers.map((signer: any) => ({
         id: crypto.randomUUID(),
         signature_request_id: requestId,
         signer_id: signer.id,
@@ -197,7 +248,7 @@ export class MultiSignatureService {
         title: request.title,
         message: request.message,
         status: request.status,
-        signers: signers?.map(signer => ({
+        signers: signers?.map((signer: any) => ({
           id: signer.id,
           email: signer.email,
           name: signer.name,
@@ -219,7 +270,6 @@ export class MultiSignatureService {
         createdAt: request.created_at,
         sentAt: request.sent_at,
         completedAt: request.completed_at,
-        expiresAt: request.expires_at,
         settings: request.settings ? JSON.parse(request.settings) : {},
         auditTrail: request.audit_trail ? JSON.parse(request.audit_trail) : []
       }
@@ -257,12 +307,8 @@ export class MultiSignatureService {
         startedAt: session.started_at,
         completedAt: session.completed_at,
         expiresAt: session.expires_at,
-        ipAddress: session.ip_address,
-        userAgent: session.user_agent,
         fieldsToComplete: session.fields_to_complete ? JSON.parse(session.fields_to_complete) : [],
-        fieldsCompleted: session.fields_completed ? JSON.parse(session.fields_completed) : [],
-        currentFieldId: session.current_field_id,
-        sessionData: session.session_data ? JSON.parse(session.session_data) : {}
+        fieldsCompleted: session.fields_completed ? JSON.parse(session.fields_completed) : []
       }
     } catch (error) {
       console.error('Error getting signing session:', error)
@@ -287,9 +333,9 @@ export class MultiSignatureService {
       const updateData: any = {
         status,
         ...(status === 'signed' && { signed_at: new Date().toISOString() }),
-        ...(status === 'declined' && { 
+        ...(status === 'declined' && {
           declined_at: new Date().toISOString(),
-          decline_reason: additionalData?.declineReason 
+          decline_reason: additionalData?.declineReason
         }),
         ...(additionalData?.signatureImage && { signature_image: additionalData.signatureImage }),
         ...(additionalData?.ipAddress && { ip_address: additionalData.ipAddress }),
@@ -321,7 +367,7 @@ export class MultiSignatureService {
       const request = await this.getSignatureRequest(requestId)
       if (!request) return false
 
-      const allSignersCompleted = request.signers.every(signer => 
+      const allSignersCompleted = request.signers.every(signer =>
         signer.status === 'signed' || (!request.settings.requireAllSigners && signer.status === 'declined')
       )
 
@@ -329,7 +375,7 @@ export class MultiSignatureService {
         // Update request status to completed
         await supabase
           .from(this.SIGNATURE_REQUESTS_TABLE)
-          .update({ 
+          .update({
             status: 'completed',
             completed_at: new Date().toISOString()
           })
@@ -363,7 +409,7 @@ export class MultiSignatureService {
 
       // Get signers for each request
       const requestsWithSigners = await Promise.all(
-        (requests || []).map(async (request) => {
+        (requests || []).map(async (request: any) => {
           const { data: signers } = await supabase
             .from(this.SIGNERS_TABLE)
             .select('*')
@@ -376,7 +422,7 @@ export class MultiSignatureService {
             title: request.title,
             message: request.message,
             status: request.status,
-            signers: signers?.map(signer => ({
+            signers: signers?.map((signer: any) => ({
               id: signer.id,
               email: signer.email,
               name: signer.name,

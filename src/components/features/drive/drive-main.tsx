@@ -3,13 +3,12 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { DriveService } from '@/lib/drive-service'
-import { DocumentTemplate, DocumentManagementState, DocumentStatus } from '@/types/drive'
+import { DocumentTemplate, DocumentManagementState } from '@/types/drive'
 import { DocumentList } from './document-list'
 import { AddDocumentModal } from './add-document-modal'
 import { DocumentDesignerWrapper } from './document-designer-wrapper'
 import { DocumentStatsImproved } from './document-stats-improved'
-import { Plus, FileText, AlertCircle, Filter } from 'lucide-react'
-import { filterDocumentsByGroup } from '@/utils/document-status'
+import { Plus, AlertCircle, Filter } from 'lucide-react'
 
 export function DriveMain() {
   const { user } = useAuth()
@@ -36,7 +35,23 @@ export function DriveMain() {
     if (statusFilter === 'all') {
       setFilteredDocuments(state.documents)
     } else {
-      const filtered = filterDocumentsByGroup(state.documents, statusFilter)
+      // Create a type-safe filter for drive documents
+      const filtered = state.documents.filter(doc => {
+        const key = statusFilter
+        // Map drive statuses to status groups
+        switch (key) {
+          case 'in_progress':
+            return doc.status === 'draft' || doc.status === 'ready'
+          case 'pending_signatures':
+            return doc.status === 'pending'
+          case 'completed':
+            return doc.status === 'completed'
+          case 'inactive':
+            return doc.status === 'expired' || doc.status === 'cancelled' || doc.status === 'archived'
+          default:
+            return false
+        }
+      })
       setFilteredDocuments(filtered)
     }
   }, [state.documents, statusFilter])
@@ -111,15 +126,11 @@ export function DriveMain() {
 
     if (confirm('Are you sure you want to delete this document? This action cannot be undone.')) {
       try {
-        const success = await DriveService.deleteDocumentTemplate(documentId, user.id)
-        if (success) {
-          setState(prev => ({
-            ...prev,
-            documents: prev.documents.filter(doc => doc.id !== documentId)
-          }))
-        } else {
-          alert('Failed to delete document. Please try again.')
-        }
+        await DriveService.deleteDocumentTemplate(documentId, user.id)
+        setState(prev => ({
+          ...prev,
+          documents: prev.documents.filter(doc => doc.id !== documentId)
+        }))
       } catch (error) {
         console.error('Error deleting document:', error)
         alert('Failed to delete document. Please try again.')

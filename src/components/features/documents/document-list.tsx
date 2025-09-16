@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { File, Clock, CheckCircle, AlertTriangle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Calendar } from 'lucide-react'
+import { File, Clock, CheckCircle, AlertTriangle, MoreHorizontal, Eye, Trash2, Share2, Users, Calendar } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { SigningWorkflowService, type SigningRequestListItem } from '@/lib/signing-workflow-service'
 import { Button } from '@/components/ui/button'
@@ -33,7 +33,6 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
     const [signingRequests, setSigningRequests] = useState<SigningRequestListItem[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
-    const [viewingRequest, setViewingRequest] = useState<SigningRequestListItem | null>(null)
     const { user } = useAuth()
 
     // Helper function to check if all signers have completed signing
@@ -76,7 +75,7 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
         if (onRefresh) {
             loadSigningRequests()
         }
-    }, [onRefresh])
+    }, [onRefresh, loadSigningRequests])
 
     const handleCancel = async (requestId: string) => {
         if (!user?.id || !confirm('Are you sure you want to cancel this signing request?')) return
@@ -132,7 +131,6 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
     const handleView = (request: SigningRequestListItem) => {
         // TODO: Implement signing request details view
         console.log('View signing request details:', request)
-        setViewingRequest(request)
     }
 
     const handleShare = async (request: SigningRequestListItem) => {
@@ -151,7 +149,7 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
             if (response.ok) {
                 alert(result.message || 'Reminder sent successfully!')
                 // Refresh the list
-                fetchSigningRequests()
+                loadSigningRequests()
             } else {
                 alert(result.error || 'Failed to send reminder')
             }

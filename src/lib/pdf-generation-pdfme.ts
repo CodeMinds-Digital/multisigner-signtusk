@@ -27,7 +27,7 @@ export async function generatePDFWithPDFMe(requestId: string): Promise<string | 
 
     // Get all signers (both signed and pending)
     const allSigners = signingRequest.signers || []
-    const signedSigners = allSigners.filter(s => s.status === 'signed' || s.signer_status === 'signed')
+    const signedSigners = allSigners.filter((s: any) => s.status === 'signed' || s.signer_status === 'signed')
 
     if (signedSigners.length === 0) {
       console.error('❌ No signed signers found')

@@ -228,7 +228,11 @@ export class QRPDFService {
    * Generate document hash for verification
    */
   private static async generateDocumentHash(pdfBytes: Uint8Array): Promise<string> {
-    const hashBuffer = await crypto.subtle.digest('SHA-256', pdfBytes)
+    // Create a proper ArrayBuffer from the Uint8Array
+    const buffer = new ArrayBuffer(pdfBytes.length)
+    const view = new Uint8Array(buffer)
+    view.set(pdfBytes)
+    const hashBuffer = await crypto.subtle.digest('SHA-256', buffer)
     const hashArray = Array.from(new Uint8Array(hashBuffer))
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
   }

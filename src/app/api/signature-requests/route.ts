@@ -386,7 +386,7 @@ export async function POST(request: NextRequest) {
           status: 'draft',
           user_id: userId,
           user_email: userEmail,
-          signers: JSON.stringify(signers.map(s => ({ name: s.name, email: s.email }))),
+          signers: JSON.stringify(signers.map((s: any) => ({ name: s.name, email: s.email }))),
           signature_fields: JSON.stringify([]),
           settings: JSON.stringify({ signing_order: signingOrder || 'sequential' }),
           file_url: originalFileUrl, // Copy from original document
@@ -584,7 +584,7 @@ export async function POST(request: NextRequest) {
 
     console.log('🔍 Attempting signer insert (v7 - FINAL)...')
     console.log('🔍 Using correct table: signing_request_signers (FINAL FIX)')
-    console.log('🔍 Supabase admin client URL:', supabaseAdmin.supabaseUrl)
+    console.log('🔍 Supabase admin client configured')
     console.log('🔍 First signer data sample:', JSON.stringify(signerInserts[0], null, 2))
 
     // Test if the signing_request_id exists in signing_requests table

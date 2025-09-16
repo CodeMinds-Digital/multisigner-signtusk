@@ -4,8 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { DriveService } from '@/lib/drive-service'
 import { DocumentTemplate, Schema } from '@/types/drive'
-import { supabase } from '@/lib/supabase'
-import { ArrowLeft, Save, Eye, Download } from 'lucide-react'
+import { ArrowLeft, Save, Eye } from 'lucide-react'
 import { AntdWarningSuppressor } from '@/components/ui/antd-warning-suppressor'
 
 interface DocumentDesignerWrapperProps {
@@ -340,7 +339,7 @@ export function DocumentDesignerWrapper({
         pdfmeSchemas = []
 
         for (let i = 0; i <= maxPage; i++) {
-          pdfmeSchemas[i] = schemasByPage[i] || []
+          (pdfmeSchemas as any)[i] = schemasByPage[i] || []
         }
 
         console.log('Converted schemas by page:', schemasByPage)
@@ -600,7 +599,7 @@ export function DocumentDesignerWrapper({
       // Count and validate each field
       let finalFieldCount = 0
       if (Array.isArray(initialTemplate.schemas)) {
-        initialTemplate.schemas.forEach((pageSchemas, pageIndex) => {
+        initialTemplate.schemas.forEach((pageSchemas: any, pageIndex: number) => {
           console.log(`Final validation - Page ${pageIndex}:`, pageSchemas)
           if (Array.isArray(pageSchemas)) {
             console.log(`  - Page ${pageIndex} has ${pageSchemas.length} fields`)
@@ -637,7 +636,7 @@ export function DocumentDesignerWrapper({
       // Validate signers structure
       if (templateCopy.signers && Array.isArray(templateCopy.signers)) {
         console.log('✅ Template copy has valid signers array with', templateCopy.signers.length, 'signers')
-        templateCopy.signers.forEach((signer, index) => {
+        templateCopy.signers.forEach((signer: any, index: number) => {
           console.log(`✅ Signer ${index}:`, {
             id: signer.id,
             name: signer.name,
@@ -652,7 +651,7 @@ export function DocumentDesignerWrapper({
 
       // Validate each field in the template copy
       if (Array.isArray(templateCopy.schemas)) {
-        templateCopy.schemas.forEach((pageSchemas, pageIndex) => {
+        templateCopy.schemas.forEach((pageSchemas: any, pageIndex: number) => {
           if (Array.isArray(pageSchemas)) {
             console.log(`Template copy page ${pageIndex} has ${pageSchemas.length} fields:`)
             pageSchemas.forEach((field, fieldIndex) => {
@@ -991,14 +990,14 @@ export function DocumentDesignerWrapper({
               })
             }
           } catch (debugError) {
-            console.log('🔍 Could not access Designer internal state (this is normal):', debugError.message)
+            console.log('🔍 Could not access Designer internal state (this is normal):', (debugError as Error).message)
           }
 
           let designerFieldCount = 0
           const designerFields: any[] = []
 
           if (Array.isArray(designerTemplate.schemas)) {
-            designerTemplate.schemas.forEach((pageSchemas, pageIndex) => {
+            designerTemplate.schemas.forEach((pageSchemas: any, pageIndex: number) => {
               if (Array.isArray(pageSchemas)) {
                 console.log(`Designer page ${pageIndex} has ${pageSchemas.length} fields`)
                 pageSchemas.forEach((field, fieldIndex) => {
@@ -1021,7 +1020,7 @@ export function DocumentDesignerWrapper({
           const expectedFields: any[] = []
 
           if (Array.isArray(templateCopy.schemas)) {
-            templateCopy.schemas.forEach((pageSchemas) => {
+            templateCopy.schemas.forEach((pageSchemas: any) => {
               if (Array.isArray(pageSchemas)) {
                 pageSchemas.forEach(field => {
                   expectedFields.push(field)
@@ -1201,7 +1200,7 @@ export function DocumentDesignerWrapper({
         // Check if schemas is an array and what it contains
         if (Array.isArray(currentTemplate.schemas)) {
           console.log('Schemas is array, length:', currentTemplate.schemas.length)
-          currentTemplate.schemas.forEach((pageSchema, pageIndex) => {
+          currentTemplate.schemas.forEach((pageSchema: any, pageIndex: number) => {
             console.log(`Page ${pageIndex} schemas:`, pageSchema)
             if (Array.isArray(pageSchema)) {
               console.log(`Page ${pageIndex} has ${pageSchema.length} fields`)
@@ -1458,10 +1457,10 @@ export function DocumentDesignerWrapper({
 
       // Check if it's a storage error specifically
       if (error && typeof error === 'object' && 'message' in error) {
-        if (error.message.includes('row-level security policy')) {
+        if ((error as Error).message.includes('row-level security policy')) {
           alert('Permission error: Unable to save template. Please check your authentication and try again.')
         } else {
-          alert(`Failed to save document: ${error.message}`)
+          alert(`Failed to save document: ${(error as Error).message}`)
         }
       } else {
         alert('Failed to save document. Please try again.')
@@ -1474,7 +1473,7 @@ export function DocumentDesignerWrapper({
   // Preview document
   const handlePreview = async () => {
     try {
-      const url = await DriveService.getDocumentUrl(document.pdf_url)
+      const url = await DriveService.getDocumentUrl(document.pdf_url || '')
       if (url) {
         window.open(url, '_blank')
       } else {

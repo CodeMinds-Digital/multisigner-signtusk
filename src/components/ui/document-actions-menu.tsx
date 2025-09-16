@@ -1,25 +1,21 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
-import { MoreVertical, Archive, Trash2, Eye, Edit, ArchiveRestore } from 'lucide-react'
+import { MoreVertical, Archive, Trash2, ArchiveRestore } from 'lucide-react'
 import { DocumentTemplate } from '@/types/drive'
 
 interface DocumentActionsMenuProps {
   documentItem: DocumentTemplate
-  onEdit: (document: DocumentTemplate) => void
   onDelete: (documentId: string) => void
   onArchive: (documentId: string) => void
   onUnarchive: (documentId: string) => void
-  onPreview: (document: DocumentTemplate) => void
 }
 
 export function DocumentActionsMenu({
   documentItem,
-  onEdit,
   onDelete,
   onArchive,
-  onUnarchive,
-  onPreview
+  onUnarchive
 }: DocumentActionsMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)

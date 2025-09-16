@@ -9,8 +9,7 @@ export async function GET(
   try {
     // Await params to fix Next.js async API warning
     const resolvedParams = await params
-    const cookieStore = await cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const supabase = createRouteHandlerClient({ cookies })
 
     // Get the full path from the URL
     const templatePath = resolvedParams.path.join('/')

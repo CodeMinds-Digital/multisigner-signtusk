@@ -75,7 +75,7 @@ export function SigningProgressStepper({ progress, status, className }: SigningP
     }
   }
 
-  const getConnectorColor = (currentStepStatus: string, nextStepStatus: string) => {
+  const getConnectorColor = (currentStepStatus: string) => {
     if (currentStepStatus === 'completed') {
       return 'bg-green-300'
     }
@@ -120,8 +120,7 @@ export function SigningProgressStepper({ progress, status, className }: SigningP
           const stepStatus = getStepStatus(step.id)
           const stepColor = getStepColor(stepStatus)
           const isLast = index === steps.length - 1
-          const nextStepStatus = !isLast ? getStepStatus(steps[index + 1].id) : null
-          const connectorColor = !isLast ? getConnectorColor(stepStatus, nextStepStatus || '') : ''
+          const connectorColor = !isLast ? getConnectorColor(stepStatus) : ''
 
           return (
             <div key={step.id} className="relative">

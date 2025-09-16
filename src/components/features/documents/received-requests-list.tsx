@@ -182,11 +182,11 @@ export function ReceivedRequestsList({ onRefresh }: ReceivedRequestsListProps) {
                                         </span>
                                     </TableCell>
                                     <TableCell>
-                                        <span className={`text-sm ${getTimeRemaining(request.expires_at).includes('Expired')
-                                                ? 'text-red-600'
-                                                : 'text-gray-600'
+                                        <span className={`text-sm ${getTimeRemaining(request.expires_at || '').includes('Expired')
+                                            ? 'text-red-600'
+                                            : 'text-gray-600'
                                             }`}>
-                                            {getTimeRemaining(request.expires_at)}
+                                            {getTimeRemaining(request.expires_at || '')}
                                         </span>
                                     </TableCell>
                                     <TableCell>

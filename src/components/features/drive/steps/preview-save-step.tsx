@@ -31,7 +31,7 @@ export function PreviewSaveStep({
   const [viewer, setViewer] = useState<any>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const { file, fileName, signatureType, signers = [], schema = [], pdfTemplate } = data
+  const { fileName, signatureType, signers = [], schema = [] } = data
 
   // Generate dummy data for preview
   const generateDummyData = useCallback(() => {

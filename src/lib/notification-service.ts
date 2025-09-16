@@ -8,6 +8,7 @@ export type NotificationType =
   | 'signature_request_declined'
   | 'signature_request_completed'
   | 'signature_request_expired'
+  | 'signature_request_reminder'
   | 'document_viewed'
   | 'document_signed'
   | 'all_signatures_complete'
@@ -444,7 +445,7 @@ export class NotificationService {
           table: this.NOTIFICATIONS_TABLE,
           filter: `user_id=eq.${userId}`
         },
-        (payload) => {
+        (payload: any) => {
           callback(payload.new as Notification)
         }
       )

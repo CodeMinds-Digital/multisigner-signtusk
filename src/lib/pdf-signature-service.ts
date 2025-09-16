@@ -294,7 +294,7 @@ export class PDFSignatureService {
         return false
       }
 
-      const bucketExists = buckets?.some(bucket => bucket.name === this.SIGNED_DOCUMENTS_BUCKET)
+      const bucketExists = buckets?.some((bucket: any) => bucket.name === this.SIGNED_DOCUMENTS_BUCKET)
 
       if (!bucketExists) {
         // Create the bucket

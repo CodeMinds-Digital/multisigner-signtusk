@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, ChevronRight, ChevronLeft, FileText, Users, Send, Mail } from 'lucide-react'
+import { X, ChevronRight, ChevronLeft, FileText, Users, Send } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { DriveService } from '@/lib/drive-service'
 import { DocumentTemplate } from '@/types/drive'

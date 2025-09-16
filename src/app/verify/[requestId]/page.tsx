@@ -218,15 +218,15 @@ export default function VerifyPage() {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Completed:</label>
-                    <p className="text-gray-900">{verificationData.signing_request.status === 'completed' ? formatDate(verificationData.signing_request.updated_at) : 'Not completed'}</p>
+                    <p className="text-gray-900">{verificationData.signing_request.status === 'completed' ? formatDate((verificationData.signing_request as any).updated_at || verificationData.signing_request.created_at) : 'Not completed'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Category:</label>
-                    <p className="text-gray-900">{verificationData.signing_request.document.category || 'N/A'}</p>
+                    <p className="text-gray-900">{(verificationData.signing_request.document as any).category || 'N/A'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Document Type:</label>
-                    <p className="text-gray-900">{verificationData.signing_request.document.document_type || 'N/A'}</p>
+                    <p className="text-gray-900">{(verificationData.signing_request.document as any).document_type || 'N/A'}</p>
                   </div>
                 </div>
                 <div className="space-y-4">
@@ -244,11 +244,11 @@ export default function VerifyPage() {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Signature Requester:</label>
-                    <p className="text-gray-900">{verificationData.signing_request.document.user_email || 'N/A'}</p>
+                    <p className="text-gray-900">{(verificationData.signing_request.document as any).user_email || 'N/A'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Expires:</label>
-                    <p className="text-gray-900">{verificationData.signing_request.expires_at ? formatDate(verificationData.signing_request.expires_at) : 'No expiry'}</p>
+                    <p className="text-gray-900">{(verificationData.signing_request as any).expires_at ? formatDate((verificationData.signing_request as any).expires_at) : 'No expiry'}</p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-500">Document Hash:</label>

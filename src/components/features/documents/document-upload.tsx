@@ -1,9 +1,8 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { Upload, File, X, CheckCircle, AlertCircle } from 'lucide-react'
+import { Upload, File, X, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/components/providers/secure-auth-provider'
@@ -115,7 +114,7 @@ export function DocumentUpload({ onUploadComplete, onClose }: DocumentUploadProp
         if (!error && data) {
           fileCount = data.length
         }
-      } catch (err) {
+      } catch {
         console.warn('user_files table not available, using default count')
       }
 
@@ -167,7 +166,7 @@ export function DocumentUpload({ onUploadComplete, onClose }: DocumentUploadProp
 
       // Try to save file metadata to database
       try {
-        const { data: insertedFile, error: insertError } = await supabase
+        const { error: insertError } = await supabase
           .from('user_files')
           .insert([
             {
@@ -183,7 +182,7 @@ export function DocumentUpload({ onUploadComplete, onClose }: DocumentUploadProp
         if (insertError) {
           console.warn('Could not save to user_files table:', insertError.message)
         }
-      } catch (err) {
+      } catch {
         console.warn('user_files table not available, file uploaded to storage only')
       }
 

@@ -1,9 +1,8 @@
 import { NextRequest } from 'next/server'
-import { getAuthTokensFromRequest, createAuthResponse, clearAuthCookies } from '@/lib/auth-cookies'
+import { getAuthTokensFromRequest, createAuthResponse } from '@/lib/auth-cookies'
 import { verifyRefreshToken, generateTokenPair } from '@/lib/jwt-utils'
 import { validateRefreshToken, rotateRefreshToken, getSession } from '@/lib/session-store'
 import { AUTH_ERRORS } from '@/lib/auth-config'
-import { supabase } from '@/lib/supabase'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
@@ -22,7 +21,7 @@ export async function POST(request: NextRequest) {
     let payload
     try {
       payload = await verifyRefreshToken(refreshToken)
-    } catch (error) {
+    } catch {
       return new Response(
         JSON.stringify({ error: AUTH_ERRORS.INVALID_TOKEN }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Menu, X, FileText, Shield, Users, Zap } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 
 export function PublicHeader() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)

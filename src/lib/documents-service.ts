@@ -141,7 +141,7 @@ export class DocumentsService {
         .update({
           status,
           updated_at: new Date().toISOString(),
-          ...(status === 'completed' && { completed_at: new Date().toISOString() })
+          ...(status === 'published' && { completed_at: new Date().toISOString() })
         })
         .eq('id', documentId)
         .eq('user_id', userId)
@@ -180,9 +180,9 @@ export class DocumentsService {
 
       const stats = {
         total: data.length,
-        completed: data.filter(doc => doc.status === 'published').length,
-        pending: data.filter(doc => doc.status === 'ready').length,
-        draft: data.filter(doc => doc.status === 'draft').length
+        completed: data.filter((doc: any) => doc.status === 'published').length,
+        pending: data.filter((doc: any) => doc.status === 'ready').length,
+        draft: data.filter((doc: any) => doc.status === 'draft').length
       }
 
       return stats

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useCallback } from 'react'
 import { Check, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -80,26 +80,23 @@ export function DocumentWorkflowLayout({
                     {/* Step Button */}
                     <button
                       onClick={() => handleStepClick(stepIndex)}
-                      className={`relative flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors ${
-                        step.status === 'completed'
+                      className={`relative flex h-10 w-10 items-center justify-center rounded-full border-2 transition-colors ${step.status === 'completed'
                           ? 'border-blue-600 bg-blue-600 hover:bg-blue-700'
                           : step.status === 'current'
-                          ? 'border-blue-600 bg-white'
-                          : 'border-gray-300 bg-white hover:border-gray-400'
-                      } ${
-                        step.status === 'completed' || stepIndex <= currentStepIndex
+                            ? 'border-blue-600 bg-white'
+                            : 'border-gray-300 bg-white hover:border-gray-400'
+                        } ${step.status === 'completed' || stepIndex <= currentStepIndex
                           ? 'cursor-pointer'
                           : 'cursor-not-allowed'
-                      }`}
+                        }`}
                       disabled={step.status === 'pending' && stepIndex > currentStepIndex}
                     >
                       {step.status === 'completed' ? (
                         <Check className="h-5 w-5 text-white" />
                       ) : (
                         <span
-                          className={`text-sm font-medium ${
-                            step.status === 'current' ? 'text-blue-600' : 'text-gray-500'
-                          }`}
+                          className={`text-sm font-medium ${step.status === 'current' ? 'text-blue-600' : 'text-gray-500'
+                            }`}
                         >
                           {stepIndex + 1}
                         </span>
@@ -109,9 +106,8 @@ export function DocumentWorkflowLayout({
                     {/* Step Label */}
                     <div className="absolute top-12 left-1/2 transform -translate-x-1/2 w-32 text-center">
                       <p
-                        className={`text-sm font-medium ${
-                          step.status === 'current' ? 'text-blue-600' : 'text-gray-500'
-                        }`}
+                        className={`text-sm font-medium ${step.status === 'current' ? 'text-blue-600' : 'text-gray-500'
+                          }`}
                       >
                         {step.title}
                       </p>
@@ -133,21 +129,19 @@ export function DocumentWorkflowLayout({
             <div className="flex items-center">
               <div className="flex-shrink-0">
                 <div
-                  className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                    currentStep.status === 'completed'
+                  className={`flex h-8 w-8 items-center justify-center rounded-full ${currentStep.status === 'completed'
                       ? 'bg-blue-600'
                       : currentStep.status === 'current'
-                      ? 'bg-blue-100'
-                      : 'bg-gray-100'
-                  }`}
+                        ? 'bg-blue-100'
+                        : 'bg-gray-100'
+                    }`}
                 >
                   {currentStep.status === 'completed' ? (
                     <Check className="h-4 w-4 text-white" />
                   ) : (
                     <span
-                      className={`text-sm font-medium ${
-                        currentStep.status === 'current' ? 'text-blue-600' : 'text-gray-500'
-                      }`}
+                      className={`text-sm font-medium ${currentStep.status === 'current' ? 'text-blue-600' : 'text-gray-500'
+                        }`}
                     >
                       {currentStepIndex + 1}
                     </span>

@@ -52,15 +52,7 @@ export default function DashboardPage() {
     loadDashboardData()
   }, [loadDashboardData])
 
-  const getActivityText = (status: string) => {
-    switch (status) {
-      case 'pending': return 'sent for signature'
-      case 'completed': return 'completed'
-      case 'expired': return 'expired'
-      case 'draft': return 'created as draft'
-      default: return 'updated'
-    }
-  }
+
 
   const getTimeAgo = (dateString: string) => {
     const date = new Date(dateString)

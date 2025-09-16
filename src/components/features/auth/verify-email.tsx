@@ -43,7 +43,7 @@ export function VerifyEmail() {
                     setMessage('Verification email sent! Please check your inbox.')
                 }
             }
-        } catch (error) {
+        } catch {
             setMessage('Failed to resend verification email.')
         } finally {
             setIsResending(false)

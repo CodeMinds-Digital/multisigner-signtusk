@@ -9,7 +9,7 @@ import { useAuth } from '@/components/providers/secure-auth-provider'
  */
 export function useAuthRefresh(onRefresh: () => void, dependencies: any[] = []) {
   const onRefreshRef = useRef(onRefresh)
-  const { ensureValidSession } = useAuth()
+  const { refreshAuth } = useAuth()
 
   // Update the ref when the callback changes
   useEffect(() => {
@@ -17,26 +17,26 @@ export function useAuthRefresh(onRefresh: () => void, dependencies: any[] = []) 
   }, [onRefresh])
 
   useEffect(() => {
-    const handleTokenRefresh = async (event: CustomEvent) => {
-      console.log('🔄 Component received token refresh notification, ensuring session and reloading data...')
+    const handleTokenRefresh = async (event: Event) => {
+      console.log('🔄 Component received token refresh notification, refreshing auth and reloading data...')
 
-      // Ensure session is valid before calling refresh
-      const isValid = await ensureValidSession()
-      if (isValid) {
-        console.log('✅ Session is valid, calling refresh function...')
+      try {
+        // Refresh auth before calling refresh
+        await refreshAuth()
+        console.log('✅ Auth refreshed successfully, calling refresh function...')
         onRefreshRef.current()
-      } else {
-        console.warn('❌ Session is not valid, skipping refresh')
+      } catch (error) {
+        console.warn('❌ Auth refresh failed, skipping refresh:', error)
       }
     }
 
     // Listen for token refresh events
-    window.addEventListener('auth-token-refreshed', handleTokenRefresh as EventListener)
+    window.addEventListener('auth-token-refreshed', handleTokenRefresh)
 
     return () => {
-      window.removeEventListener('auth-token-refreshed', handleTokenRefresh as EventListener)
+      window.removeEventListener('auth-token-refreshed', handleTokenRefresh)
     }
-  }, [...dependencies, ensureValidSession])
+  }, [...dependencies, refreshAuth])
 }
 
 /**
@@ -73,17 +73,18 @@ export function useValidatedDataLoader<T>(
   dataLoader: () => Promise<T>,
   dependencies: any[] = []
 ): () => Promise<T> {
-  const { ensureValidSession } = useAuth()
+  const { refreshAuth } = useAuth()
 
   return async (): Promise<T> => {
-    console.log('🔄 Validating session before loading data...')
+    console.log('🔄 Refreshing auth before loading data...')
 
-    const isValid = await ensureValidSession()
-    if (!isValid) {
+    try {
+      await refreshAuth()
+      console.log('✅ Auth refreshed successfully, loading data...')
+      return await dataLoader()
+    } catch (error) {
+      console.error('❌ Auth refresh failed:', error)
       throw new Error('Session is not valid')
     }
-
-    console.log('✅ Session is valid, loading data...')
-    return await dataLoader()
   }
 }

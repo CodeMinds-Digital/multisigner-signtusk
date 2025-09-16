@@ -95,9 +95,9 @@ export class SignatureRecipientService {
                 .order('signing_order', { ascending: true })
 
               if (allSigners) {
-                const currentSignerIndex = allSigners.findIndex(s => s.order_index === signer.order_index)
+                const currentSignerIndex = allSigners.findIndex((s: any) => s.order_index === signer.order_index)
                 const previousSigners = allSigners.slice(0, currentSignerIndex)
-                const allPreviousSigned = previousSigners.every(s => s.status === 'signed')
+                const allPreviousSigned = previousSigners.every((s: any) => s.status === 'signed')
                 canSign = signer.status === 'pending' && allPreviousSigned && request.status !== 'cancelled'
               }
             }
@@ -123,7 +123,7 @@ export class SignatureRecipientService {
             signature_type: request.signature_type,
             status: request.status,
             requester_id: request.requester_id,
-            requester_email,
+            requester_email: requesterEmail,
             expires_at: request.expires_at,
             created_at: request.created_at,
             updated_at: request.updated_at,

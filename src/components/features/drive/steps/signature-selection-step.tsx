@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { User, Users, Plus, X, Mail, CheckCircle } from 'lucide-react'
+import { Users, Plus, X, Mail } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -31,15 +31,9 @@ export function SignatureSelectionStep({
   const [newSigner, setNewSigner] = useState({ name: '', email: '', role: '' })
   const [errors, setErrors] = useState<{ [key: string]: string }>({})
 
-  const { signatureType = 'single', signers = [] } = data
+  const { signers = [] } = data
 
-  const handleSignatureTypeChange = useCallback((type: 'single' | 'multi') => {
-    onDataChange?.({
-      ...data,
-      signatureType: type,
-      signers: type === 'single' ? [] : signers
-    })
-  }, [data, signers, onDataChange])
+  // Note: signatureType and handleSignatureTypeChange are currently unused but may be needed for future functionality
 
   const validateEmail = (email: string): boolean => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/

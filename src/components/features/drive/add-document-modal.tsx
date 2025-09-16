@@ -144,7 +144,7 @@ export function AddDocumentModal({ onClose, onDocumentCreated }: AddDocumentModa
       }
 
       // Get preview URL
-      const url = await DriveService.getDocumentUrl(document.pdf_url)
+      const url = await DriveService.getDocumentUrl(document.pdf_url || '')
 
       setUploadedDocument(document)
       setPreviewUrl(url)

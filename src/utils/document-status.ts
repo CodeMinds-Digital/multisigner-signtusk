@@ -2,13 +2,9 @@ import {
   FileText,
   CheckCircle,
   Clock,
-  AlertTriangle,
   XCircle,
   Edit3,
-  Send,
-  Users,
-  Calendar,
-  Archive
+  Calendar
 } from 'lucide-react'
 import { DocumentStatus } from '@/types/documents'
 
@@ -151,7 +147,7 @@ export function getStatusGroup(status: DocumentStatus): StatusGroupConfig | unde
   return STATUS_GROUPS.find(group => group.statuses.includes(status))
 }
 
-export function getDocumentCounts(documents: { status: DocumentStatus }[]) {
+export function getDocumentCounts(documents: { status: DocumentStatus }[]): { total: number } & Record<string, number> {
   const total = documents.length
 
   const counts = STATUS_GROUPS.reduce((acc, group) => {

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
   Settings, Eye, EyeOff, Copy, Download, Upload, RefreshCw,
-  CheckCircle, AlertTriangle, XCircle, Plus, Edit, Trash2,
+  CheckCircle, AlertTriangle, XCircle, Edit, Trash2,
   Database, Mail, Shield, Key, Globe, Server, HelpCircle
 } from 'lucide-react'
 import {
@@ -21,7 +21,7 @@ import {
 } from '@/lib/admin-env-service'
 import { getAdminSession } from '@/lib/admin-auth'
 import { EnvironmentSetupGuide } from './environment-setup-guide'
-import { refreshSupabaseClient, detectAndFixConfigurationMismatch } from '@/lib/dynamic-supabase'
+import { refreshSupabaseClient } from '@/lib/dynamic-supabase'
 import { resetEnvironmentVariablesToDefaults, fixConfigurationMismatch } from '@/lib/admin-env-service'
 
 export function EnvironmentManagement() {
@@ -132,7 +132,7 @@ export function EnvironmentManagement() {
               return
             }
           }
-        } catch (error) {
+        } catch {
           alert('Invalid URL format')
           return
         }

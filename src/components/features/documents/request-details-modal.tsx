@@ -1,13 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Calendar, Clock, Users, FileText, Mail, Phone, ExternalLink } from 'lucide-react'
+import { X, Calendar, FileText, Mail, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { SigningProgressStepper } from './signing-progress-stepper'
 import { PDFSigningScreen } from './pdf-signing-screen'
 import { cn } from '@/lib/utils'
-import { DriveService } from '@/lib/drive-service'
 
 interface RequestDetailsModalProps {
   request: {
@@ -62,79 +61,7 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
     })
   }
 
-  const handleOpenDocument = async () => {
-    try {
-      if (!request.document_url) {
-        alert('Document URL not available')
-        return
-      }
 
-      console.log('🔗 Opening document with URL:', request.document_url)
-
-      let documentUrl = request.document_url
-
-      // If it's already a full URL, use it directly
-      if (documentUrl.startsWith('http')) {
-        console.log('✅ Using direct URL:', documentUrl)
-        window.open(documentUrl, '_blank')
-        return
-      }
-
-      // For storage paths, try multiple buckets (documents, files, uploads)
-      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://gzxfsojbbfipzvjxucci.supabase.co'
-      const buckets = ['documents', 'files', 'uploads']
-
-      // Try each bucket until we find the file
-      for (const bucket of buckets) {
-        const publicUrl = `${supabaseUrl}/storage/v1/object/public/${bucket}/${documentUrl}`
-        console.log(`🔗 Trying ${bucket} bucket:`, publicUrl)
-
-        try {
-          const response = await fetch(publicUrl, { method: 'HEAD' })
-          if (response.ok) {
-            console.log(`✅ Found document in ${bucket} bucket, opening document`)
-            window.open(publicUrl, '_blank')
-            return
-          }
-        } catch (fetchError) {
-          console.log(`❌ Document not found in ${bucket} bucket:`, fetchError)
-        }
-      }
-
-      console.log('❌ Document not found in any public bucket')
-
-      // If public URL fails, try the API approach as fallback
-      try {
-        console.log('🔄 Trying API fallback...')
-        const response = await fetch('/api/drive/document-url', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ pdfUrl: documentUrl })
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.success && data.data?.url) {
-            console.log('✅ API resolved URL:', data.data.url)
-            window.open(data.data.url, '_blank')
-            return
-          }
-        }
-      } catch (apiError) {
-        console.log('❌ API fallback failed:', apiError)
-      }
-
-      // If all approaches fail, show helpful error
-      alert('Document is not currently accessible. This may be because:\n\n• The document is still being processed\n• Storage permissions need to be configured\n• The document was not properly uploaded\n\nPlease contact support if this issue persists.')
-
-    } catch (error) {
-      console.error('❌ Error opening document:', error)
-      alert(`Error opening document: ${error instanceof Error ? error.message : 'Unknown error'}`)
-    }
-  }
 
   const getSignerStatusColor = (status: string) => {
     switch (status.toLowerCase()) {

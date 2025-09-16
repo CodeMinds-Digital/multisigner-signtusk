@@ -11,7 +11,7 @@ interface DocumentStatsImprovedProps {
 }
 
 export function DocumentStatsImproved({ documents, onFilterChange, activeFilter = 'all' }: DocumentStatsImprovedProps) {
-  const counts = getDocumentCounts(documents)
+  const counts = getDocumentCounts(documents as any)
 
   const handleFilterClick = (filter: string) => {
     if (onFilterChange) {
@@ -88,8 +88,8 @@ export function DocumentStatsImproved({ documents, onFilterChange, activeFilter 
         {/* Total Documents Card */}
         <div
           className={`bg-white rounded-2xl border-2 p-6 cursor-pointer transition-all duration-300 hover:shadow-xl hover:-translate-y-2 ${activeFilter === 'all'
-              ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg'
-              : 'border-gray-200 hover:border-blue-300'
+            ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 shadow-lg'
+            : 'border-gray-200 hover:border-blue-300'
             }`}
           onClick={() => handleFilterClick('all')}
         >
@@ -114,7 +114,7 @@ export function DocumentStatsImproved({ documents, onFilterChange, activeFilter 
 
         {/* Status Group Cards */}
         {STATUS_GROUPS.map((group) => {
-          const count = counts[group.label.toLowerCase().replace(/\s+/g, '_')] || 0
+          const count = (counts as any)[group.label.toLowerCase().replace(/\s+/g, '_')] || 0
           const Icon = group.icon
           const filterKey = group.label.toLowerCase().replace(/\s+/g, '_')
           const isActive = activeFilter === filterKey
@@ -182,7 +182,7 @@ export function DocumentStatsImproved({ documents, onFilterChange, activeFilter 
             <h3 className="text-lg font-semibold text-gray-900">Workflow Progress</h3>
             <div className="text-sm text-gray-500">
               {STATUS_GROUPS.reduce((acc, group) => {
-                const count = counts[group.label.toLowerCase().replace(/\s+/g, '_')] || 0
+                const count = (counts as any)[group.label.toLowerCase().replace(/\s+/g, '_')] || 0
                 return acc + count
               }, 0)} / {counts.total} categorized
             </div>
@@ -190,7 +190,7 @@ export function DocumentStatsImproved({ documents, onFilterChange, activeFilter 
           <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
             <div className="flex h-full">
               {STATUS_GROUPS.map((group, index) => {
-                const count = counts[group.label.toLowerCase().replace(/\s+/g, '_')] || 0
+                const count = (counts as any)[group.label.toLowerCase().replace(/\s+/g, '_')] || 0
                 const percentage = counts.total > 0 ? (count / counts.total) * 100 : 0
                 const colors = getColorClasses(group.label, false)
 

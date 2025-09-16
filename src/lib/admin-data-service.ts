@@ -80,8 +80,8 @@ export async function getRealSystemStats(): Promise<RealSystemStats> {
 
       if (!error && docs) {
         totalDocuments = docs.length
-        completedDocuments = docs.filter(d => d.status === 'completed').length
-        pendingDocuments = docs.filter(d => d.status === 'pending').length
+        completedDocuments = docs.filter((d: { status: string }) => d.status === 'completed').length
+        pendingDocuments = docs.filter((d: { status: string }) => d.status === 'pending').length
       } else {
         // Fallback to local storage aggregation
         const allUserData = Object.keys(localStorage).filter(key => key.startsWith('signtusk_documents_'))
@@ -159,7 +159,7 @@ export async function getRealUsers(): Promise<RealUserRecord[]> {
     const { data: authUsers, error } = await supabase.auth.admin.listUsers()
 
     if (!error && authUsers?.users) {
-      return authUsers.users.map((user, index) => ({
+      return authUsers.users.map((user: any, index: number) => ({
         id: user.id,
         email: user.email || 'unknown@example.com',
         plan: index === 0 ? 'pro' : 'free', // First user is pro, others free
@@ -176,7 +176,7 @@ export async function getRealUsers(): Promise<RealUserRecord[]> {
 
   // Fallback: return current user info if available
   const currentUser = supabase.auth.getUser()
-  return currentUser.then(({ data: { user } }) => {
+  return currentUser.then(({ data: { user } }: { data: { user: any } }) => {
     if (user) {
       return [{
         id: user.id,
@@ -204,7 +204,7 @@ export async function getRealDocuments(): Promise<RealDocumentRecord[]> {
       .limit(50)
 
     if (!error && docs) {
-      return docs.map(doc => ({
+      return docs.map((doc: any) => ({
         id: doc.id,
         title: doc.title,
         status: doc.status,

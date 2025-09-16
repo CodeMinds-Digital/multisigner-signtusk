@@ -25,7 +25,7 @@ export default function SignInboxPage() {
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Sign Inbox</h1>
-          <p className="text-gray-600">Manage signature requests you've sent and received</p>
+          <p className="text-gray-600">Manage signature requests you&apos;ve sent and received</p>
         </div>
         <Button
           onClick={() => setIsRequestModalOpen(true)}

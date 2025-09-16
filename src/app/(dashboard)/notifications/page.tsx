@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { Bell, Check, CheckCheck, Trash2, Filter } from 'lucide-react'
+import { Bell, CheckCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useRouter } from 'next/navigation'
@@ -40,10 +40,10 @@ export default function NotificationsPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ notification_id: notification.id })
         })
-        
+
         if (response.ok) {
           // Update local state
-          setNotifications(prev => 
+          setNotifications(prev =>
             prev.map(n => n.id === notification.id ? { ...n, is_read: true } : n)
           )
         }
@@ -66,7 +66,7 @@ export default function NotificationsPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ mark_all: true })
       })
-      
+
       if (response.ok) {
         setNotifications(prev => prev.map(n => ({ ...n, is_read: true })))
       }
@@ -80,16 +80,16 @@ export default function NotificationsPage() {
     const date = new Date(dateString)
     const now = new Date()
     const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60))
-    
+
     if (diffInMinutes < 1) return 'Just now'
     if (diffInMinutes < 60) return `${diffInMinutes} minutes ago`
-    
+
     const diffInHours = Math.floor(diffInMinutes / 60)
     if (diffInHours < 24) return `${diffInHours} hours ago`
-    
+
     const diffInDays = Math.floor(diffInHours / 24)
     if (diffInDays < 7) return `${diffInDays} days ago`
-    
+
     return date.toLocaleDateString()
   }
 
@@ -145,7 +145,7 @@ export default function NotificationsPage() {
   }
 
   // Filter notifications
-  const filteredNotifications = filter === 'unread' 
+  const filteredNotifications = filter === 'unread'
     ? notifications.filter(n => !n.is_read)
     : notifications
 
@@ -165,7 +165,7 @@ export default function NotificationsPage() {
             <Badge variant="destructive">{unreadCount} unread</Badge>
           )}
         </div>
-        
+
         {unreadCount > 0 && (
           <Button onClick={handleMarkAllRead} variant="outline" size="sm">
             <CheckCheck className="h-4 w-4 mr-2" />
@@ -196,7 +196,7 @@ export default function NotificationsPage() {
                   {filter === 'unread' ? 'No unread notifications' : 'No notifications yet'}
                 </h3>
                 <p className="text-muted-foreground">
-                  {filter === 'unread' 
+                  {filter === 'unread'
                     ? 'All caught up! You have no unread notifications.'
                     : 'When you receive notifications, they will appear here.'
                   }
@@ -206,11 +206,10 @@ export default function NotificationsPage() {
           ) : (
             <div className="space-y-3">
               {filteredNotifications.map((notification) => (
-                <Card 
+                <Card
                   key={notification.id}
-                  className={`cursor-pointer transition-all hover:shadow-md ${
-                    !notification.is_read ? 'border-l-4 border-l-blue-500 bg-blue-50/50' : ''
-                  }`}
+                  className={`cursor-pointer transition-all hover:shadow-md ${!notification.is_read ? 'border-l-4 border-l-blue-500 bg-blue-50/50' : ''
+                    }`}
                   onClick={() => handleNotificationClick(notification)}
                 >
                   <CardContent className="p-4">
@@ -220,7 +219,7 @@ export default function NotificationsPage() {
                           {getNotificationIcon(notification.type)}
                         </div>
                       </div>
-                      
+
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">
                           <h3 className={`font-medium ${!notification.is_read ? 'text-foreground' : 'text-muted-foreground'}`}>
@@ -235,16 +234,16 @@ export default function NotificationsPage() {
                             )}
                           </div>
                         </div>
-                        
+
                         <p className="text-sm text-muted-foreground mb-2">
                           {notification.message}
                         </p>
-                        
+
                         <div className="flex items-center justify-between">
                           <span className="text-xs text-muted-foreground">
                             {formatRelativeTime(notification.created_at)}
                           </span>
-                          
+
                           {notification.action_url && (
                             <span className="text-xs text-blue-600 hover:text-blue-800">
                               Click to view →

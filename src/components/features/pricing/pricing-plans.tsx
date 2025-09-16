@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Check, Send, Rocket, Building2 } from "lucide-react"
 
@@ -71,13 +71,12 @@ export function PricingPlans() {
 
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {plans.map((plan) => (
-            <Card 
-              key={plan.name} 
-              className={`relative ${
-                plan.isPopular 
-                  ? 'border-2 border-blue-500 shadow-lg' 
+            <Card
+              key={plan.name}
+              className={`relative ${plan.isPopular
+                  ? 'border-2 border-blue-500 shadow-lg'
                   : 'border border-gray-200 shadow'
-              }`}
+                }`}
             >
               {plan.isPopular && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
@@ -86,7 +85,7 @@ export function PricingPlans() {
                   </span>
                 </div>
               )}
-              
+
               <CardHeader className="text-center">
                 {plan.icon}
                 <CardTitle className="text-2xl">{plan.name}</CardTitle>
@@ -106,12 +105,11 @@ export function PricingPlans() {
                   ))}
                 </ul>
 
-                <Button 
-                  className={`w-full ${
-                    plan.isPopular
+                <Button
+                  className={`w-full ${plan.isPopular
                       ? 'bg-blue-500 text-white hover:bg-blue-600'
                       : 'bg-blue-500 text-white hover:bg-blue-600'
-                  }`}
+                    }`}
                 >
                   {plan.buttonText}
                 </Button>

@@ -2,6 +2,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 // Global Supabase client instance
 let supabaseClient: SupabaseClient | null = null
+let currentConfig: { url: string; anonKey: string } | null = null
 
 // Expected project ID from process.env (for reference, not strict validation)
 const PROCESS_ENV_PROJECT_ID = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -101,8 +102,9 @@ export function getSupabaseClient(): SupabaseClient {
 
   // Always check if we need to recreate the client
   const needsRecreation = !supabaseClient ||
-    supabaseClient.supabaseUrl !== url ||
-    supabaseClient.supabaseKey !== anonKey
+    !currentConfig ||
+    currentConfig.url !== url ||
+    currentConfig.anonKey !== anonKey
 
   if (needsRecreation) {
     console.log('🔄 Creating new Supabase client with configuration:', {
@@ -110,7 +112,7 @@ export function getSupabaseClient(): SupabaseClient {
       keyLength: anonKey.length,
       keyPrefix: anonKey.substring(0, 10) + '...',
       reason: !supabaseClient ? 'No existing client' : 'Configuration changed',
-      previousUrl: supabaseClient?.supabaseUrl,
+      previousUrl: currentConfig?.url,
       newUrl: url
     })
 
@@ -126,9 +128,12 @@ export function getSupabaseClient(): SupabaseClient {
         },
       })
 
+      // Store the current configuration
+      currentConfig = { url, anonKey }
+
       console.log('✅ Supabase client created successfully:', {
-        url: supabaseClient.supabaseUrl,
-        keyLength: supabaseClient.supabaseKey.length
+        url,
+        keyLength: anonKey.length
       })
 
       // Trigger a custom event to notify components of client change
@@ -144,9 +149,13 @@ export function getSupabaseClient(): SupabaseClient {
     }
   } else {
     console.log('♻️ Reusing existing Supabase client:', {
-      url: supabaseClient.supabaseUrl,
-      keyLength: supabaseClient.supabaseKey.length
+      url: currentConfig?.url,
+      keyLength: currentConfig?.anonKey.length
     })
+  }
+
+  if (!supabaseClient) {
+    throw new Error('Failed to create Supabase client')
   }
 
   return supabaseClient
@@ -187,9 +196,7 @@ export async function testSupabaseConfiguration(): Promise<{ success: boolean; m
         message: `Connection failed: ${error.message}`,
         details: {
           error: error.message,
-          code: error.code,
-          hint: error.hint,
-          details: error.details
+          code: error.code
         }
       }
     }
@@ -199,7 +206,7 @@ export async function testSupabaseConfiguration(): Promise<{ success: boolean; m
       success: true,
       message: 'Supabase connection successful',
       details: {
-        url: client.supabaseUrl,
+        url: currentConfig?.url || 'unknown',
         connected: true,
         timestamp: new Date().toISOString(),
         auth: 'available',
@@ -228,9 +235,9 @@ export function getSupabaseInfo() {
     url: url || 'Not configured',
     anonKey: anonKey || 'Not configured',
     isConfigured: !!(url && anonKey),
-    client: supabaseClient ? {
-      url: supabaseClient.supabaseUrl,
-      key: supabaseClient.supabaseKey
+    client: supabaseClient && currentConfig ? {
+      url: currentConfig.url,
+      key: currentConfig.anonKey
     } : null
   }
 }

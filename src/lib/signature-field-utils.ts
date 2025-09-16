@@ -1,4 +1,12 @@
-import { Signer } from '@/types/document-management'
+// Define Signer interface locally
+interface Signer {
+  id: string
+  name: string
+  email: string
+  order?: number
+  role?: string
+  is_required?: boolean
+}
 
 /**
  * Utility functions for managing signature fields and signers

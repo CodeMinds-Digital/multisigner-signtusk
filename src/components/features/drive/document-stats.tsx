@@ -1,7 +1,7 @@
 'use client'
 
-import { FileText, TrendingUp, BarChart3 } from 'lucide-react'
-import { DocumentTemplate } from '@/types/document-management'
+import { FileText, TrendingUp } from 'lucide-react'
+import { DocumentTemplate } from '@/types/drive'
 import { STATUS_GROUPS, getDocumentCounts } from '@/utils/document-status'
 
 interface DocumentStatsProps {
@@ -11,7 +11,7 @@ interface DocumentStatsProps {
 }
 
 export function DocumentStats({ documents, onFilterChange, activeFilter = 'all' }: DocumentStatsProps) {
-  const counts = getDocumentCounts(documents)
+  const counts = getDocumentCounts(documents as any)
 
   const handleFilterClick = (filter: string) => {
     if (onFilterChange) {
@@ -62,7 +62,7 @@ export function DocumentStats({ documents, onFilterChange, activeFilter = 'all' 
 
         {/* Status Group Cards */}
         {STATUS_GROUPS.map((group) => {
-          const count = counts[group.label.toLowerCase().replace(/\s+/g, '_')] || 0
+          const count = (counts as any)[group.label.toLowerCase().replace(/\s+/g, '_')] || 0
           const Icon = group.icon
           const filterKey = group.label.toLowerCase().replace(/\s+/g, '_')
           const isActive = activeFilter === filterKey
@@ -104,7 +104,7 @@ export function DocumentStats({ documents, onFilterChange, activeFilter = 'all' 
 }
 
 export function DocumentStatsCompact({ documents }: { documents: DocumentTemplate[] }) {
-  const counts = getDocumentCounts(documents)
+  const counts = getDocumentCounts(documents as any)
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -120,7 +120,8 @@ export function DocumentStatsCompact({ documents }: { documents: DocumentTemplat
         </div>
 
         {STATUS_GROUPS.slice(0, 4).map((group) => {
-          const count = counts[group.label.toLowerCase().replace(/\s+/g, '_')] || 0
+          const key = group.label.toLowerCase().replace(/\s+/g, '_')
+          const count = (counts as Record<string, number>)[key] || 0
           const Icon = group.icon
 
           return (

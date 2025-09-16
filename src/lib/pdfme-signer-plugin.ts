@@ -1,4 +1,9 @@
-import { Signer } from '@/components/features/document-management/signer-management'
+// Define Signer interface locally
+interface Signer {
+  id: string
+  name: string
+  email: string
+}
 
 /**
  * Custom PDFme plugin to add signer assignment functionality

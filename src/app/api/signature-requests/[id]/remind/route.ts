@@ -193,7 +193,7 @@ export async function POST(
 
     console.log(`📧 Found ${combinedRequest.signers?.length || 0} total signers`)
     console.log(`📧 Found ${pendingSigners.length} pending signers:`,
-      pendingSigners.map(s => ({ email: s.email, status: s.status })))
+      pendingSigners.map((s: any) => ({ email: s.email, status: s.status })))
 
     if (pendingSigners.length === 0) {
       return new Response(

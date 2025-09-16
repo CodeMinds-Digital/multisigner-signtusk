@@ -136,8 +136,6 @@ export class DriveService {
           title: updates.name,
           status: updates.status,
           description: updates.description,
-          completion_percentage: updates.completion_percentage,
-          metadata: updates.metadata,
           updated_at: new Date().toISOString()
         })
         .eq('id', documentId)
@@ -152,16 +150,20 @@ export class DriveService {
       return {
         id: document.id,
         name: document.title,
+        type: document.type || 'document',
         status: document.status,
+        schemas: document.schemas || [],
         created_at: document.created_at,
         updated_at: document.updated_at,
-        file_name: document.file_name,
-        file_url: document.file_url,
         user_id: document.user_id,
-        metadata: document.metadata || {},
         description: document.description,
-        document_type: document.document_type,
-        completion_percentage: document.completion_percentage
+        pdf_url: document.pdf_url,
+        template_url: document.template_url,
+        signature_type: document.signature_type,
+        category: document.category,
+        is_public: document.is_public,
+        is_system_template: document.is_system_template,
+        usage_count: document.usage_count
       }
 
     } catch (error) {
@@ -457,20 +459,20 @@ export class DriveService {
       }
 
       // Ensure schemas is always an array
-      let schemas = []
+      let documentSchemas = []
       if (Array.isArray(document.schemas)) {
-        schemas = document.schemas
+        documentSchemas = document.schemas
       } else if (document.schemas && typeof document.schemas === 'string') {
         try {
           const parsed = JSON.parse(document.schemas)
-          schemas = Array.isArray(parsed) ? parsed : []
+          documentSchemas = Array.isArray(parsed) ? parsed : []
         } catch (e) {
           console.warn('Failed to parse schemas as JSON:', document.schemas)
-          schemas = []
+          documentSchemas = []
         }
       } else if (document.schemas && typeof document.schemas === 'object') {
         // If it's an object but not an array, wrap it in an array
-        schemas = [document.schemas]
+        documentSchemas = [document.schemas]
       }
 
       console.log('🔍 DriveService - Document schemas transformation:', {
@@ -478,8 +480,8 @@ export class DriveService {
         originalSchemas: document.schemas,
         originalType: typeof document.schemas,
         isArray: Array.isArray(document.schemas),
-        transformedSchemas: schemas,
-        transformedLength: schemas.length
+        transformedSchemas: documentSchemas,
+        transformedLength: documentSchemas.length
       })
 
       return {
@@ -490,8 +492,7 @@ export class DriveService {
         status: document.status,
         pdf_url: document.file_url || document.pdf_url,
         template_url: document.template_url,
-        schemas: schemas, // Use the safely transformed schemas
-        signers: Array.isArray(document.signers) ? document.signers : [],
+        schemas: documentSchemas, // Use the safely transformed schemas
         created_at: document.created_at,
         updated_at: document.updated_at,
         user_id: document.user_id,
@@ -500,8 +501,7 @@ export class DriveService {
         category: document.category,
         is_public: document.is_public || false,
         is_system_template: document.is_system_template || false,
-        usage_count: document.usage_count || 0,
-        completion_percentage: document.completion_percentage || 0
+        usage_count: document.usage_count || 0
       }
 
     } catch (error) {
@@ -698,14 +698,18 @@ export class DriveService {
           {
             id: 'sig-1',
             type: 'signature',
-            x: 100,
-            y: 200,
-            width: 200,
-            height: 50,
             name: 'Employee Signature',
+            position: {
+              x: 100,
+              y: 200,
+              width: 200,
+              height: 50,
+              page: 1
+            },
             properties: {
               signerId: 'signer_1'
-            }
+            },
+            created_at: new Date().toISOString()
           }
         ],
         created_at: new Date(Date.now() - 86400000).toISOString(),
@@ -725,26 +729,34 @@ export class DriveService {
           {
             id: 'sig-1',
             type: 'signature',
-            x: 100,
-            y: 200,
-            width: 200,
-            height: 50,
             name: 'Partner 1 Signature',
+            position: {
+              x: 100,
+              y: 200,
+              width: 200,
+              height: 50,
+              page: 1
+            },
             properties: {
               signerId: 'signer_1'
-            }
+            },
+            created_at: new Date().toISOString()
           },
           {
             id: 'sig-2',
             type: 'signature',
-            x: 100,
-            y: 300,
-            width: 200,
-            height: 50,
             name: 'Partner 2 Signature',
+            position: {
+              x: 100,
+              y: 300,
+              width: 200,
+              height: 50,
+              page: 1
+            },
             properties: {
               signerId: 'signer_2'
-            }
+            },
+            created_at: new Date().toISOString()
           }
         ],
         created_at: new Date(Date.now() - 172800000).toISOString(),
@@ -764,14 +776,18 @@ export class DriveService {
           {
             id: 'sig-1',
             type: 'signature',
-            x: 100,
-            y: 250,
-            width: 200,
-            height: 50,
             name: 'Signatory',
+            position: {
+              x: 100,
+              y: 250,
+              width: 200,
+              height: 50,
+              page: 1
+            },
             properties: {
               signerId: 'signer_1'
-            }
+            },
+            created_at: new Date().toISOString()
           }
         ],
         created_at: new Date(Date.now() - 259200000).toISOString(),
@@ -835,7 +851,7 @@ export class DriveService {
 
     } catch (error) {
       console.error('Error getting document stats:', error)
-      return { total: 0, completed: 0, incomplete: 0, pending: 0 }
+      return { total: 0, completed: 0, draft: 0, pending: 0, expired: 0, cancelled: 0 }
     }
   }
 

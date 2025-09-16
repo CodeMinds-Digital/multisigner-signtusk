@@ -4,7 +4,6 @@ import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { User, LogOut, Pen } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
-import { Button } from '@/components/ui/button'
 import { NotificationBell } from '@/components/ui/notification-bell'
 
 interface HeaderProps {

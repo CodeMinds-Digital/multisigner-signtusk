@@ -358,9 +358,7 @@ export async function testEmailConfiguration(): Promise<{ success: boolean; erro
     if (process.env.NODE_ENV === 'development') {
       console.log('📧 Development mode: Simulating test email instead of sending')
       return {
-        success: true,
-        message: 'Email configuration test passed (simulated in development mode)',
-        note: 'In development, emails are simulated. For production, verify a domain at resend.com/domains'
+        success: true
       }
     }
 

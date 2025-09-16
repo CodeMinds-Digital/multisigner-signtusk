@@ -33,7 +33,7 @@ export function DocumentList({ documents, onEdit, onDelete, onArchive, onUnarchi
       console.log('🔍 Drive PDF Preview - Document:', document)
       console.log('🔍 Drive PDF Preview - pdf_url:', document.pdf_url)
 
-      const url = await DriveService.getDocumentUrl(document.pdf_url)
+      const url = await DriveService.getDocumentUrl(document.pdf_url || '')
       console.log('🔍 Drive PDF Preview - Got URL:', url)
 
       if (url) {
@@ -223,11 +223,9 @@ export function DocumentList({ documents, onEdit, onDelete, onArchive, onUnarchi
               {/* Three-dots Menu */}
               <DocumentActionsMenu
                 documentItem={document}
-                onEdit={onEdit}
                 onDelete={onDelete}
                 onArchive={onArchive || (() => { })}
                 onUnarchive={onUnarchive || (() => { })}
-                onPreview={handlePreview}
               />
             </div>
           </div>

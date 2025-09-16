@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge'
 import {
     Share2,
     Copy,
-    Mail,
     Users,
     Clock,
     CheckCircle,

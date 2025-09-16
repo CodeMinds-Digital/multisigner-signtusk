@@ -115,7 +115,7 @@ export class PDFGenerationService {
       const documentSchema: DocumentSchema = {
         fields: schemas.map((field: any) => {
           const signerId = field.properties?._originalConfig?.signerId
-          const signerEmail = signerId ? signerMapping[signerId] : null
+          const signerEmail = signerId ? signerMapping[signerId] : undefined
 
           return {
             id: field.id,

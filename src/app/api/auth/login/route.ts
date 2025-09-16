@@ -4,7 +4,6 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { generateTokenPair, generateSessionId } from '@/lib/jwt-utils'
 import { storeSession } from '@/lib/session-store'
 import { createAuthResponse } from '@/lib/auth-cookies'
-import { AUTH_ERRORS } from '@/lib/auth-config'
 
 export async function POST(request: NextRequest) {
   console.log('🚀 Login endpoint called - v2')
@@ -117,7 +116,7 @@ export async function POST(request: NextRequest) {
       user.email!,
       tokens.refreshToken,
       request.headers.get('user-agent') || undefined,
-      request.ip || request.headers.get('x-forwarded-for') || undefined
+      request.headers.get('x-forwarded-for') || undefined
     )
     console.log('✅ Session stored successfully')
 
