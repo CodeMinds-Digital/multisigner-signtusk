@@ -14,6 +14,7 @@ const nextConfig = {
     serverActions: {
       allowedOrigins: ['localhost:3000', 'localhost:3001'],
     },
+    esmExternals: 'loose',
   },
   webpack: (config, { buildId, dev, isServer, defaultLoaders, webpack }) => {
     // Ensure proper path resolution for aliases
@@ -35,6 +36,14 @@ const nextConfig = {
       config.externals = config.externals || []
       config.externals.push({
         '@codeminds-digital/pdfme-complete': '@codeminds-digital/pdfme-complete',
+        '@react-email/render': '@react-email/render',
+        '@hugocxl/react-to-image': '@hugocxl/react-to-image',
+        '@react-pdf-viewer/core': '@react-pdf-viewer/core',
+        '@react-pdf-viewer/default-layout': '@react-pdf-viewer/default-layout',
+        '@simplepdf/react-embed-pdf': '@simplepdf/react-embed-pdf',
+        'resend': 'resend',
+        'pdf-lib': 'pdf-lib',
+        'pdfjs-dist': 'pdfjs-dist',
       })
     }
 
