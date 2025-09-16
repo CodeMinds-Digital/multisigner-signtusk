@@ -1,6 +1,17 @@
-import { Resend } from 'resend'
+// Dynamic import to handle optional dependencies
+let resend: any = null
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+async function getResendClient() {
+  if (!resend && process.env.RESEND_API_KEY) {
+    try {
+      const { Resend } = await import('resend')
+      resend = new Resend(process.env.RESEND_API_KEY)
+    } catch (error) {
+      console.warn('Resend package not available:', error)
+    }
+  }
+  return resend
+}
 
 export interface SignatureRequestEmail {
   to: string
@@ -39,12 +50,18 @@ export async function sendSignatureRequestEmail(emailData: SignatureRequestEmail
       return simulateEmailSend(emailData)
     }
 
+    const resendClient = await getResendClient()
+    if (!resendClient) {
+      console.warn('Resend client not available, simulating email send')
+      return simulateEmailSend(emailData)
+    }
+
     // Domain is verified and account is in production mode - can send to any email
 
     // Use verified domain for all environments
     const fromEmail = 'SignTusk <noreply@notifications.signtusk.com>'
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await resendClient.emails.send({
       from: fromEmail,
       to: [emailData.to],
       subject: `Signature Request: ${emailData.documentTitle}`,
@@ -128,12 +145,18 @@ export async function sendReminderEmail(emailData: ReminderEmail): Promise<Email
       return simulateEmailSend(emailData)
     }
 
+    const resendClient = await getResendClient()
+    if (!resendClient) {
+      console.warn('Resend client not available, simulating email send')
+      return simulateEmailSend(emailData)
+    }
+
     // Domain is verified and account is in production mode - can send to any email
 
     // Use verified domain for all environments
     const fromEmail = 'SignTusk <noreply@notifications.signtusk.com>'
 
-    const { data, error } = await resend.emails.send({
+    const { data, error } = await resendClient.emails.send({
       from: fromEmail,
       to: [emailData.to],
       subject: `Reminder: ${emailData.documentTitle} - Signature Required`,
@@ -364,7 +387,12 @@ export async function testEmailConfiguration(): Promise<{ success: boolean; erro
 
     const fromEmail = 'SignTusk <noreply@notifications.signtusk.com>' // Verified domain
 
-    const testResult = await resend.emails.send({
+    const resendClient = await getResendClient()
+    if (!resendClient) {
+      throw new Error('Resend client not available')
+    }
+
+    const testResult = await resendClient.emails.send({
       from: fromEmail,
       to: ['ramalai13@gmail.com'], // Use verified email for testing
       subject: 'SignTusk Email Configuration Test',

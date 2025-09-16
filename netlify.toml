@@ -1,9 +1,9 @@
 [build]
   publish = ".next"
-  command = "npm ci && npm run build"
+  command = "./build.sh"
 
 [build.environment]
-  NODE_VERSION = "18"
+  NODE_VERSION = "20"
   NPM_FLAGS = "--production=false"
   NPM_CONFIG_LEGACY_PEER_DEPS = "true"
 

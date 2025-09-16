@@ -5,8 +5,20 @@
  */
 
 import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
-import QRCode from 'qrcode'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+
+// Dynamic import for QRCode to prevent SSR issues
+let QRCode: any = null
+async function getQRCode() {
+  if (!QRCode) {
+    try {
+      QRCode = (await import('qrcode')).default
+    } catch (error) {
+      console.warn('QRCode package not available:', error)
+    }
+  }
+  return QRCode
+}
 
 export interface QRCodeOptions {
   size?: number
@@ -213,7 +225,12 @@ export class QRPDFService {
    * Generate QR code as data URL
    */
   private static async generateQRCode(data: string, options: QRCodeOptions): Promise<string> {
-    return await QRCode.toDataURL(data, {
+    const QRCodeLib = await getQRCode()
+    if (!QRCodeLib) {
+      throw new Error('QRCode library not available')
+    }
+
+    return await QRCodeLib.toDataURL(data, {
       width: options.size || 80,
       margin: 2,
       color: {
