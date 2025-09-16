@@ -1,4 +1,3 @@
-import { logAdminActivity } from './admin-auth'
 import { updateSupabaseConfiguration, testSupabaseConfiguration, refreshSupabaseClient, clearAdminEnvironmentOverrides, detectAndFixConfigurationMismatch } from './dynamic-supabase'
 
 export interface EnvironmentVariable {
@@ -250,12 +249,7 @@ export async function updateEnvironmentVariable(
       }
     }
 
-    // Log the action
-    await logAdminActivity(
-      adminUserId,
-      'update_env_var',
-      `Updated environment variable: ${key}`
-    )
+
 
     return { success: true }
 
@@ -280,12 +274,7 @@ export async function deleteEnvironmentVariable(
     localStorage.removeItem(`admin_env_${key}`)
     localStorage.removeItem(`admin_env_${key}_updated`)
 
-    // Log the action
-    await logAdminActivity(
-      adminUserId,
-      'delete_env_var',
-      `Deleted environment variable: ${key}`
-    )
+
 
     return { success: true }
 
@@ -449,12 +438,7 @@ export async function resetEnvironmentVariablesToDefaults(
     // Refresh Supabase client if Supabase variables were reset
     refreshSupabaseClient()
 
-    // Log the action
-    await logAdminActivity(
-      adminUserId,
-      'reset_env_vars',
-      `Reset ${resetCount} environment variables to defaults`
-    )
+
 
     return { success: true, resetCount }
 
@@ -471,11 +455,7 @@ export async function fixConfigurationMismatch(
     const result = detectAndFixConfigurationMismatch()
 
     if (result.fixed) {
-      await logAdminActivity(
-        adminUserId,
-        'fix_config_mismatch',
-        result.message
-      )
+      // Configuration mismatch was fixed
     }
 
     return { success: true, message: result.message }
@@ -510,11 +490,7 @@ export async function switchSupabaseProject(
 
     const projectId = new URL(newUrl).hostname.split('.')[0]
 
-    await logAdminActivity(
-      adminUserId,
-      'switch_supabase_project',
-      `Switched to Supabase project: ${projectId}`
-    )
+
 
     return {
       success: true,

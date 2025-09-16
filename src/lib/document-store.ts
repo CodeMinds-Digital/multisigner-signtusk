@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+// Note: Admin operations moved to API routes for security
 
 // Mock data for development when database tables don't exist
 function getMockDocuments(): Document[] {
@@ -69,34 +69,7 @@ function getMockDocuments(): Document[] {
   ]
 }
 
-function getMockActivity(): Activity[] {
-  return [
-    {
-      id: '1',
-      user_id: 'mock-user',
-      action: 'Document signed',
-      type: 'sign',
-      time: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
-      created_at: new Date(Date.now() - 3600000).toISOString(),
-    },
-    {
-      id: '2',
-      user_id: 'mock-user',
-      action: 'Document uploaded',
-      type: 'upload',
-      time: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-      created_at: new Date(Date.now() - 7200000).toISOString(),
-    },
-    {
-      id: '3',
-      user_id: 'mock-user',
-      action: 'Signature requested',
-      type: 'share',
-      time: new Date(Date.now() - 10800000).toISOString(), // 3 hours ago
-      created_at: new Date(Date.now() - 10800000).toISOString(),
-    }
-  ]
-}
+
 
 export interface Document {
   id: string
@@ -119,7 +92,7 @@ export interface Document {
   updated_at: string
   completed_at?: string
   expires_at?: string
-  last_activity_at?: string
+
   // Legacy fields for backward compatibility
   name?: string
   document_type?: string
@@ -128,14 +101,7 @@ export interface Document {
   public_url?: string
 }
 
-export interface Activity {
-  id: string
-  action: string
-  type: 'upload' | 'sign' | 'share' | 'complete'
-  user_id: string
-  time: string
-  created_at: string
-}
+
 
 export interface DashboardStats {
   total: number
@@ -145,144 +111,95 @@ export interface DashboardStats {
   expired: number
 }
 
-// Get documents for a user
+// Get documents for a user (client-side function that calls API)
 export async function getDocuments(userId: string): Promise<Document[]> {
-  // In development mode, always use mock data to avoid database setup issues
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Development mode: Using mock documents data')
-    return getMockDocuments()
-  }
-
   try {
-    const { data, error } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
+    const response = await fetch('/api/documents', {
+      method: 'GET',
+      credentials: 'include', // Include cookies for authentication
+    })
 
-    if (error) {
-      console.error('Error fetching documents:', error)
-      return getMockDocuments() // Fallback to mock data
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    return data || []
+    const result = await response.json()
+
+    if (result.success) {
+      return result.data || []
+    } else {
+      throw new Error(result.error || 'Failed to fetch documents')
+    }
   } catch (error) {
-    console.error('Database connection error:', error)
+    console.warn('Failed to fetch documents from API, using mock data:', error)
     return getMockDocuments() // Fallback to mock data
   }
 }
 
-// Get documents by status
+// Get documents by status (client-side function that calls API)
 export async function getDocumentsByStatus(userId: string, status: string): Promise<Document[]> {
   try {
-    const { data, error } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('user_id', userId)
-      .eq('status', status)
-      .order('created_at', { ascending: false })
+    const response = await fetch(`/api/documents?status=${encodeURIComponent(status)}`, {
+      method: 'GET',
+      credentials: 'include', // Include cookies for authentication
+    })
 
-    if (error) {
-      console.error(`Error fetching ${status} documents:`, error)
-      return []
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    return data || []
+    const result = await response.json()
+
+    if (result.success) {
+      return (result.data || []).filter((doc: Document) => doc.status === status)
+    } else {
+      throw new Error(result.error || 'Failed to fetch documents')
+    }
   } catch (error) {
-    console.error('Database connection error:', error)
+    console.warn(`Failed to fetch ${status} documents from API:`, error)
     return []
   }
 }
 
-// Get dashboard statistics
+// Get dashboard statistics (client-side function that calls API)
 export async function getDashboardStats(userId: string): Promise<DashboardStats> {
-  // In development mode, always use mock data to avoid database setup issues
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Development mode: Using mock dashboard stats')
-    return {
-      total: 3,
-      pending: 1,
-      completed: 1,
-      draft: 1,
-      expired: 0
-    }
-  }
-
   try {
-    const [totalResult, pendingResult, completedResult, draftResult, expiredResult] = await Promise.all([
-      supabase
-        .from('documents')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId),
-      supabase
-        .from('documents')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('status', 'pending'),
-      supabase
-        .from('documents')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('status', 'completed'),
-      supabase
-        .from('documents')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('status', 'draft'),
-      supabase
-        .from('documents')
-        .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId)
-        .eq('status', 'expired')
-    ])
+    const response = await fetch('/api/dashboard/stats', {
+      method: 'GET',
+      credentials: 'include', // Include cookies for authentication
+    })
 
-    return {
-      total: totalResult.count || 0,
-      pending: pendingResult.count || 0,
-      completed: completedResult.count || 0,
-      draft: draftResult.count || 0,
-      expired: expiredResult.count || 0
-    }
-  } catch {
-    console.warn('Database tables not found. Using mock stats for development.')
-    // Return mock stats based on our mock documents
-    return {
-      total: 3,
-      pending: 1,
-      completed: 1,
-      draft: 1,
-      expired: 0
-    }
-  }
-}
-
-// Get recent activity
-export async function getRecentActivity(userId: string): Promise<Activity[]> {
-  // In development mode, always use mock data to avoid database setup issues
-  if (process.env.NODE_ENV === 'development') {
-    console.log('Development mode: Using mock activity data')
-    return getMockActivity()
-  }
-
-  try {
-    const { data, error } = await supabase
-      .from('activity_logs')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(10)
-
-    if (error) {
-      console.error('Error fetching recent activity:', error)
-      return getMockActivity() // Fallback to mock data
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    return data || []
+    const result = await response.json()
+
+    if (result.success) {
+      return {
+        total: result.data.totalDocuments,
+        pending: result.data.pendingSignatures,
+        completed: result.data.completedDocuments,
+        draft: 0, // API doesn't return draft count yet
+        expired: result.data.expiredDocuments
+      }
+    } else {
+      throw new Error(result.error || 'Failed to fetch dashboard stats')
+    }
   } catch (error) {
-    console.error('Database connection error:', error)
-    return getMockActivity() // Fallback to mock data
+    console.warn('Failed to fetch dashboard stats from API, using mock data:', error)
+    // Return mock stats as fallback
+    return {
+      total: 3,
+      pending: 1,
+      completed: 1,
+      draft: 1,
+      expired: 0
+    }
   }
 }
+
+
 
 // Upload document
 export async function uploadDocument(
@@ -323,200 +240,93 @@ export async function uploadDocument(
   }
 
   try {
-    // Generate unique identifiers
-    const uniqueDocId = `${Date.now()}-${Math.random().toString(36).substring(2, 10)}`
-    const uniqueFileName = `${userId}-${Date.now()}-${uniqueDocId}`
+    // Create form data for API request
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('documentType', documentType)
 
-    // Upload file to storage
-    const { data: fileDetails, error: uploadError } = await supabase.storage
-      .from('files')
-      .upload(`public/${uniqueFileName}`, file, {
-        cacheControl: '3600',
-        upsert: false
-      })
+    const response = await fetch('/api/documents/upload', {
+      method: 'POST',
+      credentials: 'include', // Include cookies for authentication
+      body: formData
+    })
 
-    if (uploadError) throw uploadError
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
 
-    // Get public URL
-    const { data: publicUrlData } = supabase.storage
-      .from('files')
-      .getPublicUrl(fileDetails.path)
+    const result = await response.json()
 
-    const publicUrl = publicUrlData.publicUrl
-
-    // Save document metadata
-    const { data: document, error: insertError } = await supabase
-      .from('documents')
-      .insert([{
-        title: file.name,
-        file_name: file.name,
-        file_url: publicUrl,
-        status: 'draft',
-        user_id: userId,
-        user_email: '', // Will be filled by trigger
-        signers: [],
-        signature_fields: [],
-        settings: { document_type: documentType }
-      }])
-      .select()
-      .single()
-
-    if (insertError) throw insertError
-
-    // Log activity
-    await logActivity(userId, 'upload', `Uploaded ${file.name}`, document.id)
-
-    return { success: true, document }
+    if (result.success) {
+      return { success: true, document: result.data }
+    } else {
+      throw new Error(result.error || 'Upload failed')
+    }
   } catch (error) {
     console.error('Error uploading document:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Upload failed' }
   }
 }
 
-// Update document status
+// Update document status (client-side function that calls API)
 export async function updateDocumentStatus(
   documentId: string,
   status: Document['status'],
   userId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { error } = await supabase
-      .from('documents')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', documentId)
-      .eq('user_id', userId)
+    const response = await fetch(`/api/documents/${documentId}/status`, {
+      method: 'PATCH',
+      credentials: 'include', // Include cookies for authentication
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ status })
+    })
 
-    if (error) throw error
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
+    }
 
-    return { success: true }
+    const result = await response.json()
+
+    if (result.success) {
+      return { success: true }
+    } else {
+      throw new Error(result.error || 'Update failed')
+    }
   } catch (error) {
     console.error('Error updating document status:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Update failed' }
   }
 }
 
-// Delete document
+// Delete document (client-side function that calls API)
 export async function deleteDocument(
   documentId: string,
   userId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    // Get document details first
-    const { data: document, error: fetchError } = await supabase
-      .from('documents')
-      .select('file_url')
-      .eq('id', documentId)
-      .eq('user_id', userId)
-      .single()
+    const response = await fetch(`/api/documents/${documentId}`, {
+      method: 'DELETE',
+      credentials: 'include', // Include cookies for authentication
+    })
 
-    if (fetchError) throw fetchError
-
-    // Extract file path from public URL
-    const urlParts = document.file_url.split('/')
-    const filePath = `public/${urlParts[urlParts.length - 1]}`
-
-    // Delete from storage
-    const { error: storageError } = await supabase.storage
-      .from('files')
-      .remove([filePath])
-
-    if (storageError) {
-      console.warn('Error deleting file from storage:', storageError)
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`)
     }
 
-    // Delete from database
-    const { error: deleteError } = await supabase
-      .from('documents')
-      .delete()
-      .eq('id', documentId)
-      .eq('user_id', userId)
+    const result = await response.json()
 
-    if (deleteError) throw deleteError
-
-    // Log activity
-    await logActivity(userId, 'delete', `Deleted document from storage`)
-
-    return { success: true }
+    if (result.success) {
+      return { success: true }
+    } else {
+      throw new Error(result.error || 'Delete failed')
+    }
   } catch (error) {
     console.error('Error deleting document:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Delete failed' }
   }
 }
 
-// Enhanced activity logging function
-export async function logActivity(
-  userId: string,
-  type: string,
-  action: string,
-  documentId?: string,
-  metadata?: Record<string, string | number | boolean>
-) {
-  try {
-    await supabase
-      .from('recent_activity')
-      .insert({
-        user_id: userId,
-        type,
-        action,
-        document_id: documentId,
-        metadata,
-        time: new Date().toISOString(),
-        created_at: new Date().toISOString()
-      })
-  } catch (error) {
-    console.error('Failed to log activity:', error)
-  }
-}
 
-// Get activity with enhanced filtering
-export async function getActivityByType(userId: string, type?: string): Promise<Activity[]> {
-  try {
-    let query = supabase
-      .from('recent_activity')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false })
-      .limit(50)
-
-    if (type) {
-      query = query.eq('type', type)
-    }
-
-    const { data, error } = await query
-
-    if (error) throw error
-    return data || []
-  } catch (error) {
-    console.error('Error fetching activity:', error)
-    return []
-  }
-}
-
-// Get activity statistics
-export async function getActivityStats(userId: string): Promise<{
-  totalActivities: number
-  activitiesByType: Record<string, number>
-  recentActivity: Activity[]
-}> {
-  try {
-    const activities = await getRecentActivity(userId)
-
-    const activitiesByType = activities.reduce((acc, activity) => {
-      acc[activity.type] = (acc[activity.type] || 0) + 1
-      return acc
-    }, {} as Record<string, number>)
-
-    return {
-      totalActivities: activities.length,
-      activitiesByType,
-      recentActivity: activities.slice(0, 10)
-    }
-  } catch (error) {
-    console.error('Error fetching activity stats:', error)
-    return {
-      totalActivities: 0,
-      activitiesByType: {},
-      recentActivity: []
-    }
-  }
-}

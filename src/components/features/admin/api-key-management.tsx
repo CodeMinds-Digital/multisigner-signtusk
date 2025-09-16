@@ -5,11 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
-import { 
-  Key, Plus, Edit, Trash2, Eye, EyeOff, Copy, CheckCircle, AlertTriangle, 
+import {
+  Key, Plus, Edit, Trash2, Eye, EyeOff, Copy, CheckCircle, AlertTriangle,
   Clock, Activity, RefreshCw, Settings
 } from 'lucide-react'
-import { getAdminSession, logAdminActivity } from '@/lib/admin-auth'
+import { getAdminSession } from '@/lib/admin-auth'
 
 interface APIKey {
   id: string
@@ -110,7 +110,7 @@ export function APIKeyManagement() {
       setNewKey({ name: '', service: '', key: '', description: '' })
       setShowAddForm(false)
 
-      await logAdminActivity(adminSession.user.id, 'create_api_key', `Created API key: ${apiKey.name}`)
+
     } catch (error) {
       console.error('Failed to add API key:', error)
     }
@@ -123,9 +123,9 @@ export function APIKeyManagement() {
     if (confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
       const keyToDelete = apiKeys.find(k => k.id === keyId)
       setApiKeys(apiKeys.filter(k => k.id !== keyId))
-      
+
       if (keyToDelete) {
-        await logAdminActivity(adminSession.user.id, 'delete_api_key', `Deleted API key: ${keyToDelete.name}`)
+        // API key deleted
       }
     }
   }
@@ -137,7 +137,7 @@ export function APIKeyManagement() {
     setApiKeys(apiKeys.map(key => {
       if (key.id === keyId) {
         const newStatus = key.status === 'active' ? 'inactive' : 'active'
-        logAdminActivity(adminSession.user.id, 'toggle_api_key', `${newStatus === 'active' ? 'Activated' : 'Deactivated'} API key: ${key.name}`)
+
         return { ...key, status: newStatus }
       }
       return key
@@ -285,7 +285,7 @@ export function APIKeyManagement() {
                       <h3 className="text-lg font-medium text-gray-900">{apiKey.name}</h3>
                       {getStatusBadge(apiKey.status)}
                     </div>
-                    
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm text-gray-600">
                       <div>
                         <span className="font-medium">Service:</span> {apiKey.service}
@@ -300,11 +300,11 @@ export function APIKeyManagement() {
                         <span className="font-medium">Last Used:</span> {apiKey.last_used === 'Never' ? 'Never' : new Date(apiKey.last_used).toLocaleDateString()}
                       </div>
                     </div>
-                    
+
                     {apiKey.description && (
                       <p className="text-sm text-gray-600 mt-2">{apiKey.description}</p>
                     )}
-                    
+
                     <div className="flex items-center space-x-2 mt-3">
                       <div className="flex-1 font-mono text-sm bg-gray-50 p-2 rounded border">
                         {visibleKeys.has(apiKey.id) ? apiKey.key : maskKey(apiKey.key)}
@@ -325,7 +325,7 @@ export function APIKeyManagement() {
                       </Button>
                     </div>
                   </div>
-                  
+
                   <div className="flex space-x-2 ml-4">
                     <Button
                       variant="outline"
@@ -345,7 +345,7 @@ export function APIKeyManagement() {
                 </div>
               </div>
             ))}
-            
+
             {apiKeys.length === 0 && (
               <div className="text-center py-8 text-gray-500">
                 <Key className="w-12 h-12 text-gray-300 mx-auto mb-4" />

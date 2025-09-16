@@ -6,13 +6,13 @@ import { SignatureRequest } from '@/components/features/signature/signature-requ
 export default function RequestSignaturePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  
+
   const documentId = searchParams.get('documentId')
   const documentTitle = searchParams.get('title') || 'Document'
 
   const handleRequestSent = (requestId: string) => {
-    // Redirect to documents page with success message
-    router.push(`/documents?success=signature-request&requestId=${requestId}`)
+    // Redirect to sign inbox page with success message
+    router.push(`/sign-inbox?success=signature-request&requestId=${requestId}`)
   }
 
   return (
@@ -22,7 +22,7 @@ export default function RequestSignaturePage() {
         <p className="text-gray-600">Send your document for digital signature</p>
       </div>
 
-      <SignatureRequest 
+      <SignatureRequest
         documentId={documentId || undefined}
         documentTitle={documentTitle}
         onRequestSent={handleRequestSent}

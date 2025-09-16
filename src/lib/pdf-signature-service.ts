@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import { PDFDocument, rgb, StandardFonts } from 'pdf-lib'
+import { PDFDocument, rgb, StandardFonts } from '@codeminds-digital/pdfme-complete'
 
 export interface SignatureData {
   signature: string // Base64 signature image
@@ -99,7 +99,7 @@ export class PDFSignatureService {
         // Ensure signature fits within page bounds
         const signatureWidth = 150
         const signatureHeight = 75
-        
+
         if (x + signatureWidth > pageWidth) {
           x = pageWidth - signatureWidth - 20
         }
@@ -147,11 +147,11 @@ export class PDFSignatureService {
     const base64Data = base64.replace(/^data:image\/[a-z]+;base64,/, '')
     const binaryString = atob(base64Data)
     const bytes = new Uint8Array(binaryString.length)
-    
+
     for (let i = 0; i < binaryString.length; i++) {
       bytes[i] = binaryString.charCodeAt(i)
     }
-    
+
     return bytes.buffer
   }
 
@@ -288,13 +288,13 @@ export class PDFSignatureService {
     try {
       // Check if bucket exists
       const { data: buckets, error: listError } = await supabase.storage.listBuckets()
-      
+
       if (listError) {
         console.error('Error listing buckets:', listError)
         return false
       }
 
-      const bucketExists = buckets?.some(bucket => bucket.name === this.SIGNED_DOCUMENTS_BUCKET)
+      const bucketExists = buckets?.some((bucket: any) => bucket.name === this.SIGNED_DOCUMENTS_BUCKET)
 
       if (!bucketExists) {
         // Create the bucket

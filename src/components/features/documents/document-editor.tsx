@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Designer, generate, text, image, barcodes, dateTime } from 'pdfme-complete'
+import { Designer, generate, text, image, barcodes, dateTime } from '@codeminds-digital/pdfme-complete'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -14,7 +14,7 @@ import {
   Check,
   ArrowLeft
 } from 'lucide-react'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { supabase } from '@/lib/supabase'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 import { LoadingOverlay } from '@/components/ui/loading'
@@ -80,7 +80,7 @@ const convertToBase64 = async (url: string) => {
 
 
 
-export default function DocumentEditor({
+function DocumentEditor({
   fileUrl,
   fileName,
   onClose
@@ -336,7 +336,7 @@ export default function DocumentEditor({
 
   if (showConfirmDialog) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="fixed inset-0 flex items-center justify-center z-50">
         <Card className="w-full max-w-md mx-4">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -473,3 +473,6 @@ export default function DocumentEditor({
     </ErrorBoundary>
   )
 }
+
+export { DocumentEditor }
+export default DocumentEditor

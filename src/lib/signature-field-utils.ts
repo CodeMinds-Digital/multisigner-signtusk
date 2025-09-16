@@ -1,4 +1,12 @@
-import { Signer } from '@/types/document-management'
+// Define Signer interface locally
+interface Signer {
+  id: string
+  name: string
+  email: string
+  order?: number
+  role?: string
+  is_required?: boolean
+}
 
 /**
  * Utility functions for managing signature fields and signers
@@ -140,6 +148,78 @@ export function determineSignatureType(schemas: any[]): 'single' | 'multi' {
 }
 
 /**
+ * Count total signature fields in schemas
+ */
+export function countSignatureFields(schemas: any[]): number {
+  const signatureFields = extractSignatureFields(schemas)
+  return signatureFields.length
+}
+
+/**
+ * Analyze document template and determine signature type from schemas
+ * This is the main function to use for determining signature type from PDFme template data
+ */
+export function analyzeDocumentSignatureType(templateData: any): {
+  signatureType: 'single' | 'multi'
+  signatureFieldsCount: number
+  uniqueSignersCount: number
+  analysis: string
+} {
+  console.log('🔍 Analyzing document signature type from template data:', templateData)
+
+  let schemas: any[] = []
+
+  // Extract schemas from different possible structures
+  if (templateData?.schemas) {
+    schemas = Array.isArray(templateData.schemas) ? templateData.schemas : []
+  } else if (templateData?.template_data?.schemas) {
+    schemas = Array.isArray(templateData.template_data.schemas) ? templateData.template_data.schemas : []
+  } else if (Array.isArray(templateData)) {
+    schemas = templateData
+  }
+
+  const signatureFields = extractSignatureFields(schemas)
+  const signatureFieldsCount = signatureFields.length
+
+  // Count unique signers based on field assignments
+  const uniqueSignerIds = new Set<string>()
+  signatureFields.forEach(field => {
+    const signerId = field.properties?._originalConfig?.signerId ||
+      field.properties?.signerId ||
+      field.signerId ||
+      field.assignedTo?.signerIds?.[0] ||
+      'signer_1' // default
+    uniqueSignerIds.add(signerId)
+  })
+
+  const uniqueSignersCount = uniqueSignerIds.size
+  const signatureType = signatureFieldsCount > 1 ? 'multi' : 'single'
+
+  let analysis = ''
+  if (signatureFieldsCount === 0) {
+    analysis = 'No signature fields found'
+  } else if (signatureFieldsCount === 1) {
+    analysis = 'Single signature field detected'
+  } else {
+    analysis = `${signatureFieldsCount} signature fields detected (${uniqueSignersCount} unique signers)`
+  }
+
+  console.log('🔍 Signature analysis result:', {
+    signatureType,
+    signatureFieldsCount,
+    uniqueSignersCount,
+    analysis
+  })
+
+  return {
+    signatureType,
+    signatureFieldsCount,
+    uniqueSignersCount,
+    analysis
+  }
+}
+
+/**
  * Sync signers with signature fields
  * This ensures that the number of signers matches the number of signature fields
  */
@@ -203,6 +283,116 @@ export function validateSignerFieldMapping(
     excessSigners: Math.max(0, signers.length - signatureFields.length),
     signatureFieldsCount: signatureFields.length,
     signersCount: signers.length
+  }
+}
+
+/**
+ * Validate document completion status based on schemas and signers
+ * For template creation: only validates schemas and signature fields
+ * For signature requests: validates signers and email requirements
+ */
+export function validateDocumentCompletion(
+  schemas: any[],
+  signers: Signer[],
+  isTemplateMode: boolean = true
+): {
+  status: 'draft' | 'ready'
+  completion_percentage: number
+  isValid: boolean
+  issues: string[]
+  signatureFieldsCount: number
+  validSignersCount: number
+} {
+  const issues: string[] = []
+
+  // Check if schemas exist
+  if (!schemas || !Array.isArray(schemas) || schemas.length === 0) {
+    return {
+      status: 'draft',
+      completion_percentage: 0,
+      isValid: false,
+      issues: ['No schemas defined'],
+      signatureFieldsCount: 0,
+      validSignersCount: 0
+    }
+  }
+
+  // Extract signature fields
+  const signatureFields = extractSignatureFields(schemas)
+
+  if (signatureFields.length === 0) {
+    return {
+      status: 'draft',
+      completion_percentage: 0,
+      isValid: false,
+      issues: ['No signature fields defined'],
+      signatureFieldsCount: 0,
+      validSignersCount: 0
+    }
+  }
+
+  // For template mode: only validate schemas and signature fields
+  if (isTemplateMode) {
+    // Template is ready if it has schemas and signature fields
+    const completion = 100 // Templates with signature fields are complete
+
+    return {
+      status: 'ready',
+      completion_percentage: completion,
+      isValid: true,
+      issues: [],
+      signatureFieldsCount: signatureFields.length,
+      validSignersCount: signatureFields.length // Count signature fields as potential signers
+    }
+  }
+
+  // For signature request mode: validate signers and emails
+  const validSigners = signers.filter(signer =>
+    signer.name && signer.name.trim() !== '' &&
+    signer.email && signer.email.trim() !== ''
+  )
+
+  // Validate signer-field mapping
+  const validation = validateSignerFieldMapping(validSigners, schemas)
+
+  if (validation.missingSigners > 0) {
+    issues.push(`${validation.missingSigners} signature field(s) missing signer assignment`)
+  }
+
+  if (validation.excessSigners > 0) {
+    issues.push(`${validation.excessSigners} excess signer(s) without signature fields`)
+  }
+
+  // Check if all signers have required information
+  const invalidSigners = signers.filter(signer =>
+    !signer.name || signer.name.trim() === '' ||
+    !signer.email || signer.email.trim() === ''
+  )
+
+  if (invalidSigners.length > 0) {
+    issues.push(`${invalidSigners.length} signer(s) missing name or email`)
+  }
+
+  // Calculate completion percentage for signature request mode
+  let completion = 0
+  if (schemas.length > 0) completion += 40 // Has schemas
+  if (signatureFields.length > 0) completion += 30 // Has signature fields
+  if (validSigners.length > 0) completion += 20 // Has valid signers
+  if (validation.isValid && issues.length === 0) completion += 10 // Perfect mapping
+
+  // Determine status (only 'draft' and 'ready' allowed by database constraint)
+  let status: 'draft' | 'ready' = 'draft'
+  if (completion >= 100 && issues.length === 0) {
+    status = 'ready'
+  }
+
+  return {
+    status,
+    completion_percentage: completion,
+    isValid: validation.isValid && issues.length === 0,
+    issues,
+    signatureFieldsCount: signatureFields.length,
+    validSignersCount: validSigners.length
   }
 }
 

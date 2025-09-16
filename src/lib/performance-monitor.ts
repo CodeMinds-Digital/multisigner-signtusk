@@ -21,13 +21,13 @@ export class PerformanceMonitor {
   /**
    * Start timing an operation
    */
-  static startTiming(operationName: string): () => void {
+  static startTiming(operationName: string): (metadata?: any) => void {
     const startTime = performance.now()
-    
+
     return (metadata?: any) => {
       const endTime = performance.now()
       const duration = endTime - startTime
-      
+
       this.recordMetric({
         name: operationName,
         duration,
@@ -42,7 +42,7 @@ export class PerformanceMonitor {
    */
   static recordMetric(metric: PerformanceMetric): void {
     this.metrics.push(metric)
-    
+
     // Keep only the most recent metrics
     if (this.metrics.length > this.MAX_METRICS) {
       this.metrics = this.metrics.slice(-this.MAX_METRICS)
@@ -63,13 +63,13 @@ export class PerformanceMonitor {
     metadata?: any
   ): Promise<T> {
     const endTiming = this.startTiming(operationName)
-    
+
     try {
       const result = await operation()
       endTiming({ ...metadata, success: true })
       return result
     } catch (error) {
-      endTiming({ ...metadata, success: false, error: error.message })
+      endTiming({ ...metadata, success: false, error: error instanceof Error ? error.message : String(error) })
       throw error
     }
   }
@@ -83,13 +83,13 @@ export class PerformanceMonitor {
     metadata?: any
   ): T {
     const endTiming = this.startTiming(operationName)
-    
+
     try {
       const result = operation()
       endTiming({ ...metadata, success: true })
       return result
     } catch (error) {
-      endTiming({ ...metadata, success: false, error: error.message })
+      endTiming({ ...metadata, success: false, error: error instanceof Error ? error.message : String(error) })
       throw error
     }
   }
@@ -116,18 +116,18 @@ export class PerformanceMonitor {
       .sort((a, b) => b.duration - a.duration)
       .slice(0, 10)
 
-    const errorCount = this.metrics.filter(metric => 
+    const errorCount = this.metrics.filter(metric =>
       metric.metadata?.success === false
     ).length
     const errorRate = (errorCount / this.metrics.length) * 100
 
-    const cacheOperations = this.metrics.filter(metric => 
+    const cacheOperations = this.metrics.filter(metric =>
       metric.name.includes('cache') || metric.metadata?.cached
     )
-    const cacheHits = cacheOperations.filter(metric => 
+    const cacheHits = cacheOperations.filter(metric =>
       metric.metadata?.cached === true
     ).length
-    const cacheHitRate = cacheOperations.length > 0 ? 
+    const cacheHitRate = cacheOperations.length > 0 ?
       (cacheHits / cacheOperations.length) * 100 : 0
 
     return {
@@ -172,9 +172,10 @@ export class PerformanceMonitor {
     // First Input Delay (FID)
     new PerformanceObserver((entryList) => {
       for (const entry of entryList.getEntries()) {
+        const eventEntry = entry as any // Cast to access processingStart property
         this.recordMetric({
           name: 'FID',
-          duration: entry.processingStart - entry.startTime,
+          duration: eventEntry.processingStart ? eventEntry.processingStart - entry.startTime : entry.duration || 0,
           timestamp: Date.now(),
           metadata: { type: 'core-web-vital' }
         })
@@ -185,11 +186,12 @@ export class PerformanceMonitor {
     let clsValue = 0
     new PerformanceObserver((entryList) => {
       for (const entry of entryList.getEntries()) {
-        if (!entry.hadRecentInput) {
-          clsValue += entry.value
+        const layoutEntry = entry as any // Cast to access layout shift properties
+        if (!layoutEntry.hadRecentInput) {
+          clsValue += layoutEntry.value || 0
         }
       }
-      
+
       this.recordMetric({
         name: 'CLS',
         duration: clsValue,
@@ -205,6 +207,7 @@ export class PerformanceMonitor {
   static monitorResourceLoading(): void {
     new PerformanceObserver((entryList) => {
       for (const entry of entryList.getEntries()) {
+        const resourceEntry = entry as any // Cast to access resource timing properties
         this.recordMetric({
           name: 'Resource Load',
           duration: entry.duration,
@@ -212,8 +215,8 @@ export class PerformanceMonitor {
           metadata: {
             type: 'resource',
             name: entry.name,
-            size: entry.transferSize,
-            cached: entry.transferSize === 0
+            size: resourceEntry.transferSize || 0,
+            cached: (resourceEntry.transferSize || 0) === 0
           }
         })
       }
@@ -226,14 +229,15 @@ export class PerformanceMonitor {
   static monitorNavigation(): void {
     new PerformanceObserver((entryList) => {
       for (const entry of entryList.getEntries()) {
+        const navEntry = entry as any // Cast to access navigation timing properties
         this.recordMetric({
           name: 'Navigation',
           duration: entry.duration,
           timestamp: Date.now(),
           metadata: {
             type: 'navigation',
-            domContentLoaded: entry.domContentLoadedEventEnd - entry.domContentLoadedEventStart,
-            loadComplete: entry.loadEventEnd - entry.loadEventStart
+            domContentLoaded: (navEntry.domContentLoadedEventEnd || 0) - (navEntry.domContentLoadedEventStart || 0),
+            loadComplete: (navEntry.loadEventEnd || 0) - (navEntry.loadEventStart || 0)
           }
         })
       }
@@ -248,7 +252,7 @@ export class PerformanceMonitor {
       this.monitorCoreWebVitals()
       this.monitorResourceLoading()
       this.monitorNavigation()
-      
+
       console.log('Performance monitoring initialized')
     }
   }
@@ -258,20 +262,20 @@ export class PerformanceMonitor {
    */
   static logSummary(): void {
     const report = this.getReport()
-    
+
     console.group('Performance Summary')
     console.log(`Average Load Time: ${report.averageLoadTime.toFixed(2)}ms`)
     console.log(`Total Operations: ${report.totalOperations}`)
     console.log(`Error Rate: ${report.errorRate.toFixed(2)}%`)
     console.log(`Cache Hit Rate: ${report.cacheHitRate.toFixed(2)}%`)
-    
+
     if (report.slowestOperations.length > 0) {
       console.log('Slowest Operations:')
       report.slowestOperations.forEach((op, index) => {
         console.log(`  ${index + 1}. ${op.name}: ${op.duration.toFixed(2)}ms`)
       })
     }
-    
+
     console.groupEnd()
   }
 

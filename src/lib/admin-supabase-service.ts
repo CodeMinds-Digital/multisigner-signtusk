@@ -1,5 +1,4 @@
 import { getSupabaseClient } from './dynamic-supabase'
-import { logAdminActivity } from './admin-auth'
 
 export interface SupabaseConfig {
   url: string
@@ -278,7 +277,7 @@ export async function createAdminTables(adminUserId: string): Promise<{ success:
       }
     }
 
-    await logAdminActivity(adminUserId, 'create_admin_tables', 'Attempted to create admin tables')
+
 
     return {
       success: true,
@@ -366,7 +365,7 @@ export async function updateSupabaseConfig(
       localStorage.setItem('admin_env_NEXT_PUBLIC_SUPABASE_ANON_KEY_updated', new Date().toISOString())
     }
 
-    await logAdminActivity(adminUserId, 'update_supabase_config', 'Updated Supabase configuration')
+
 
     return {
       success: true,

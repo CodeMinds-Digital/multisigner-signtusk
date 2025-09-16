@@ -1,9 +1,9 @@
 'use client'
 
-import { DocumentStats, DocumentStatsCompact } from '@/components/features/document-management/document-stats'
-import { DocumentTemplate } from '@/types/document-management'
+import { DocumentStats, DocumentStatsCompact } from '@/components/features/drive/document-stats'
+import { DocumentTemplate } from '@/types/drive'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { DOCUMENT_STATUS_CONFIG, STATUS_GROUPS } from '@/utils/document-status'
+import { DOCUMENT_STATUS_CONFIG, STATUS_GROUPS, getStatusConfig } from '@/utils/document-status'
 
 // Sample data for demonstration
 const sampleDocuments: DocumentTemplate[] = [
@@ -161,7 +161,7 @@ export default function DocumentStatusDemoPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {STATUS_GROUPS.map((group) => {
                   const Icon = group.icon
-                  const count = sampleDocuments.filter(doc => group.statuses.includes(doc.status)).length
+                  const count = sampleDocuments.filter(doc => group.statuses.includes(doc.status as any)).length
                   return (
                     <div key={group.label} className={`p-4 rounded-lg border-2 ${group.bgColor} border-gray-200`}>
                       <div className="flex items-center justify-between mb-2">
@@ -204,7 +204,7 @@ export default function DocumentStatusDemoPage() {
             <CardContent>
               <div className="space-y-3">
                 {sampleDocuments.map((doc) => {
-                  const config = DOCUMENT_STATUS_CONFIG[doc.status]
+                  const config = getStatusConfig(doc.status as any)
                   const Icon = config.icon
                   return (
                     <div key={doc.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg">

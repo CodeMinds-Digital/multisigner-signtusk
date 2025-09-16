@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useRef, useCallback } from 'react'
-import { Upload, File, X, CheckCircle, AlertCircle } from 'lucide-react'
+import { Upload, File, X, CheckCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { supabase } from '@/lib/supabase'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { LoadingOverlay, ProgressBar } from '@/components/ui/loading'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
 
@@ -115,7 +114,7 @@ export function DocumentUpload({ onUploadComplete, onClose }: DocumentUploadProp
         if (!error && data) {
           fileCount = data.length
         }
-      } catch (err) {
+      } catch {
         console.warn('user_files table not available, using default count')
       }
 
@@ -167,7 +166,7 @@ export function DocumentUpload({ onUploadComplete, onClose }: DocumentUploadProp
 
       // Try to save file metadata to database
       try {
-        const { data: insertedFile, error: insertError } = await supabase
+        const { error: insertError } = await supabase
           .from('user_files')
           .insert([
             {
@@ -183,26 +182,11 @@ export function DocumentUpload({ onUploadComplete, onClose }: DocumentUploadProp
         if (insertError) {
           console.warn('Could not save to user_files table:', insertError.message)
         }
-      } catch (err) {
+      } catch {
         console.warn('user_files table not available, file uploaded to storage only')
       }
 
-      // Try to log activity
-      try {
-        const { data: recentActivity, error: activityError } = await supabase
-          .from('recent_activity')
-          .insert([{
-            action: `You uploaded ${selectedDocument.name}`,
-            type: 'upload',
-            user_id: user.id
-          }])
 
-        if (activityError) {
-          console.warn('Could not log activity:', activityError.message)
-        }
-      } catch (err) {
-        console.warn('recent_activity table not available, skipping activity log')
-      }
 
       setUploadProgress(100)
       setSuccess(true)

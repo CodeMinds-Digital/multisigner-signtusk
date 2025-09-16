@@ -9,7 +9,6 @@ import { Badge } from '@/components/ui/badge'
 import {
     Share2,
     Copy,
-    Mail,
     Users,
     Clock,
     CheckCircle,
@@ -17,7 +16,7 @@ import {
     Plus,
     Send
 } from 'lucide-react'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { supabase } from '@/lib/supabase'
 
 interface DocumentSharingProps {
@@ -158,7 +157,7 @@ export default function DocumentSharing({
     }
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="fixed inset-0 flex items-center justify-center z-50">
             <Card className="w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
                 <CardHeader>
                     <div className="flex items-center justify-between">

@@ -107,8 +107,8 @@ export class DatabaseInitialization {
       'document_templates',
       'document_types',
       'document_categories',
-      'signature_requests',
-      'signature_request_signers',
+      'signing_requests',
+      'signing_request_signers',
       'notifications',
       'notification_preferences'
     ]

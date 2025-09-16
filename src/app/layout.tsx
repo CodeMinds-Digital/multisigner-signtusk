@@ -1,17 +1,18 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/components/providers/auth-provider";
-import { AuthErrorHandler } from "@/components/auth-error-handler";
-
-// Import auth recovery utilities to make them globally available
-import "@/utils/auth-recovery";
+import { SecureAuthProvider } from "@/components/providers/secure-auth-provider";
+import { ConsoleFilterProvider } from "@/components/providers/console-filter-provider";
+import { ToastProvider } from "@/components/ui/toast";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "SignTusk - Digital Document Signing Platform",
   description: "Secure digital document signing and management platform",
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({
@@ -21,11 +22,16 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={inter.className}>
-        <AuthErrorHandler />
-        <AuthProvider>
-          {children}
-        </AuthProvider>
+      <body className={inter.className} suppressHydrationWarning={true}>
+        <div id="root">
+          <ConsoleFilterProvider>
+            <SecureAuthProvider>
+              <ToastProvider>
+                {children}
+              </ToastProvider>
+            </SecureAuthProvider>
+          </ConsoleFilterProvider>
+        </div>
       </body>
     </html>
   );

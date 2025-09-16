@@ -4,14 +4,13 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
-  Users, FileText, Mail, Settings, Database, Activity, Search, Download, RefreshCw, Eye, Trash2,
-  Shield, LogOut, DollarSign, Key, AlertTriangle, CheckCircle, Clock, TrendingUp, UserCheck, CreditCard,
-  Plus, Edit, MoreHorizontal, Server
+  Users, FileText, Mail, Settings, Database, Activity, Download, RefreshCw, Eye, EyeOff,
+  Shield, LogOut, DollarSign, Key, AlertTriangle, TrendingUp, UserCheck, CreditCard,
+  Edit, Server
 } from 'lucide-react'
-import { getAdminSession, adminLogout, hasAdminPermission, logAdminActivity, getAdminActivityLogs } from '@/lib/admin-auth'
+import { getAdminSession, adminLogout } from '@/lib/admin-auth'
 import { getRealSystemStats, getRealUsers, getRealDocuments, getRealAPIKeys, RealSystemStats, RealUserRecord, RealDocumentRecord, RealAPIKeyRecord } from '@/lib/admin-data-service'
 import { EnvironmentManagement } from './environment-management'
 import { SupabaseManagement } from './supabase-management'
@@ -19,9 +18,8 @@ import { ConfigurationDiagnostics } from './configuration-diagnostics'
 
 export function ComprehensiveAdminDashboard() {
   const router = useRouter()
-  const [adminSession, setAdminSession] = useState<any>(null)
+  const [adminSession, setAdminSession] = useState<{ userId: string; email: string } | null>(null)
   const [activeTab, setActiveTab] = useState('overview')
-  const [loading, setLoading] = useState(false)
 
   // Check admin authentication
   useEffect(() => {
@@ -30,7 +28,7 @@ export function ComprehensiveAdminDashboard() {
       router.push('/admin/login')
       return
     }
-    setAdminSession(session)
+    setAdminSession(session as any)
   }, [router])
 
   const handleLogout = async () => {
@@ -48,7 +46,7 @@ export function ComprehensiveAdminDashboard() {
     { id: 'environment', label: 'Environment', icon: Settings },
     { id: 'diagnostics', label: 'Diagnostics', icon: AlertTriangle },
     { id: 'system', label: 'System Health', icon: Server },
-    { id: 'logs', label: 'Activity Logs', icon: Activity }
+
   ]
 
   if (!adminSession) {
@@ -80,8 +78,8 @@ export function ComprehensiveAdminDashboard() {
 
             <div className="flex items-center space-x-4">
               <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{adminSession.user.name}</p>
-                <p className="text-xs text-gray-500 capitalize">{adminSession.user.role.replace('_', ' ')}</p>
+                <p className="text-sm font-medium text-gray-900">{(adminSession as any).user?.name || adminSession.email}</p>
+                <p className="text-xs text-gray-500 capitalize">{(adminSession as any).user?.role?.replace('_', ' ') || 'Admin'}</p>
               </div>
               <Button variant="outline" onClick={handleLogout}>
                 <LogOut className="w-4 h-4 mr-2" />
@@ -143,8 +141,7 @@ export function ComprehensiveAdminDashboard() {
           {/* System Health Tab */}
           {activeTab === 'system' && <SystemHealthTab />}
 
-          {/* Activity Logs Tab */}
-          {activeTab === 'logs' && <ActivityLogsTab />}
+
         </div>
       </div>
     </div>
@@ -774,16 +771,4 @@ function SystemHealthTab() {
   )
 }
 
-function ActivityLogsTab() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Activity Logs</CardTitle>
-        <CardDescription>View admin actions and system events</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-gray-600">Activity logs interface coming soon...</p>
-      </CardContent>
-    </Card>
-  )
-}
+

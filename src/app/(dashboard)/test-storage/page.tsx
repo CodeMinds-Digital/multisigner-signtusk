@@ -13,7 +13,7 @@ export default function TestStoragePage() {
   const runTests = async () => {
     setIsRunning(true)
     setTestResults(null)
-    
+
     try {
       const results = await runStorageTests()
       setTestResults(results)
@@ -26,14 +26,14 @@ export default function TestStoragePage() {
 
   const createBuckets = async () => {
     setIsRunning(true)
-    
+
     try {
       const result = await createDefaultBuckets()
       console.log('Bucket creation result:', result)
-      
+
       // Run tests again after creating buckets
       const testResult = await testStorageConnection()
-      setTestResults(prev => ({
+      setTestResults((prev: any) => ({
         ...prev,
         bucketCreation: result,
         storage: testResult
@@ -53,9 +53,8 @@ export default function TestStoragePage() {
     const colorClass = isSuccess ? 'text-green-600' : 'text-red-600'
 
     return (
-      <div className={`flex items-start space-x-3 p-4 rounded-lg border ${
-        isSuccess ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-      }`}>
+      <div className={`flex items-start space-x-3 p-4 rounded-lg border ${isSuccess ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+        }`}>
         <Icon className={`w-5 h-5 mt-0.5 ${colorClass}`} />
         <div className="flex-1">
           <h4 className={`font-medium ${colorClass}`}>{title}</h4>
@@ -102,7 +101,7 @@ export default function TestStoragePage() {
                 'Run All Tests'
               )}
             </Button>
-            
+
             <Button variant="outline" onClick={createBuckets} disabled={isRunning}>
               {isRunning ? (
                 <>
@@ -118,11 +117,11 @@ export default function TestStoragePage() {
           {testResults && (
             <div className="space-y-4 mt-6">
               <h3 className="text-lg font-medium text-gray-900">Test Results</h3>
-              
+
               {testResults.database && renderTestResult(testResults.database, 'Database Connection')}
               {testResults.storage && renderTestResult(testResults.storage, 'Storage Connection')}
               {testResults.bucketCreation && renderTestResult(testResults.bucketCreation, 'Bucket Creation')}
-              
+
               {testResults.error && (
                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                   <div className="flex items-center">
@@ -179,7 +178,7 @@ export default function TestStoragePage() {
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <p className="text-blue-800 text-sm">
-                <strong>Note:</strong> The application will work without database tables by using storage-only mode. 
+                <strong>Note:</strong> The application will work without database tables by using storage-only mode.
                 Files will be uploaded to storage and can be accessed directly via URLs.
               </p>
             </div>

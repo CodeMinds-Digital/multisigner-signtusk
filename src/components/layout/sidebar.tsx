@@ -3,45 +3,20 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
-  FileText,
-  Pen,
   BarChart2,
-  LogOut,
-  File,
-  Clock,
-  CheckCircle,
-  AlertTriangle,
-  SquareActivity,
-  SquarePen,
-  Send,
+  Inbox,
   CreditCard,
   PenTool,
-  Workflow
+  Workflow,
+  Settings,
+  QrCode
 } from 'lucide-react'
-import { useAuth } from '@/components/providers/auth-provider'
 
-interface SidebarProps {
-  waitingCount?: number
-  completedCount?: number
-  draftsCount?: number
-  pendingCount?: number
-}
-
-export function Sidebar({
-  waitingCount = 0,
-  completedCount = 0,
-  draftsCount = 0,
-  pendingCount = 0
-}: SidebarProps) {
+export function Sidebar() {
   const pathname = usePathname()
-  const { signOut } = useAuth()
 
   // Function to determine if a link is active
   const isActive = (path: string) => pathname === path
-
-  const handleLogout = async () => {
-    await signOut()
-  }
 
   return (
     <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
@@ -63,34 +38,25 @@ export function Sidebar({
           </li>
           <li>
             <Link
-              href="/documents"
-              className={`flex items-center px-3 py-2 rounded-md ${isActive('/documents') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
+              href="/sign-inbox"
+              className={`flex items-center px-3 py-2 rounded-md ${isActive('/sign-inbox') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
                 }`}
             >
-              <FileText className="w-5 h-5 mr-3" />
-              Documents
+              <Inbox className="w-5 h-5 mr-3" />
+              Sign Inbox
             </Link>
           </li>
           <li>
             <Link
-              href="/document-management"
-              className={`flex items-center px-3 py-2 rounded-md ${isActive('/document-management') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
+              href="/drive"
+              className={`flex items-center px-3 py-2 rounded-md ${isActive('/drive') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
                 }`}
             >
               <Workflow className="w-5 h-5 mr-3" />
-              Document Management
+              Drive
             </Link>
           </li>
-          <li>
-            <Link
-              href="/activity"
-              className={`flex items-center px-3 py-2 rounded-md ${isActive('/activity') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
-                }`}
-            >
-              <SquareActivity className="w-5 h-5 mr-3" />
-              Activities
-            </Link>
-          </li>
+
           <li>
             <Link
               href="/signatures"
@@ -99,6 +65,16 @@ export function Sidebar({
             >
               <PenTool className="w-5 h-5 mr-3" />
               Signatures
+            </Link>
+          </li>
+          <li>
+            <Link
+              href="/verify"
+              className={`flex items-center px-3 py-2 rounded-md ${isActive('/verify') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
+                }`}
+            >
+              <QrCode className="w-5 h-5 mr-3" />
+              Verify
             </Link>
           </li>
           <li>
@@ -113,61 +89,22 @@ export function Sidebar({
           </li>
         </ul>
 
+
+
+        {/* Settings */}
         <div className="mt-8">
           <h3 className="px-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Status
+            Settings
           </h3>
           <ul className="mt-2 space-y-1">
             <li>
               <Link
-                href="/pending"
-                className={`flex items-center px-3 py-2 rounded-md ${isActive('/pending') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
+                href="/settings"
+                className={`flex items-center px-3 py-2 rounded-md ${isActive('/settings') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
                   }`}
               >
-                <Clock className="w-5 h-5 mr-3 text-yellow-500" />
-                Pending
-                <span className="ml-auto bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full text-xs font-medium">
-                  {pendingCount}
-                </span>
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/completed"
-                className={`flex items-center px-3 py-2 rounded-md ${isActive('/completed') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-              >
-                <CheckCircle className="w-5 h-5 mr-3 text-green-500" />
-                Completed
-                <span className="ml-auto bg-green-100 text-green-800 px-2 py-0.5 rounded-full text-xs font-medium">
-                  {completedCount}
-                </span>
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/drafts"
-                className={`flex items-center px-3 py-2 rounded-md ${isActive('/drafts') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-              >
-                <File className="w-5 h-5 mr-3 text-blue-500" />
-                Drafts
-                <span className="ml-auto bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full text-xs font-medium">
-                  {draftsCount}
-                </span>
-              </Link>
-            </li>
-            <li>
-              <Link
-                href="/expired"
-                className={`flex items-center px-3 py-2 rounded-md ${isActive('/expired') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-              >
-                <AlertTriangle className="w-5 h-5 mr-3 text-red-500" />
-                Expired
-                <span className="ml-auto bg-red-100 text-red-800 px-2 py-0.5 rounded-full text-xs font-medium">
-                  {waitingCount}
-                </span>
+                <Settings className="w-5 h-5 mr-3" />
+                Document Settings
               </Link>
             </li>
           </ul>
@@ -204,15 +141,7 @@ export function Sidebar({
         </div>
       </nav>
 
-      <div className="p-4 border-t border-gray-200">
-        <button
-          onClick={handleLogout}
-          className="flex items-center text-gray-700 hover:text-gray-900 mt-4"
-        >
-          <LogOut className="w-5 h-5 mr-3" />
-          Logout
-        </button>
-      </div>
+
     </div>
   )
 }

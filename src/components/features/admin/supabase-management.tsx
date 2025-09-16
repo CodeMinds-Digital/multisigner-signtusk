@@ -6,9 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
-  Database, RefreshCw, CheckCircle, AlertTriangle, XCircle,
+  RefreshCw, CheckCircle, AlertTriangle, XCircle,
   ExternalLink, Copy, Settings, BarChart3, Table,
-  Server, Globe, Key, Eye, EyeOff
+  Server, Globe, Eye, EyeOff
 } from 'lucide-react'
 import {
   getSupabaseConfig,

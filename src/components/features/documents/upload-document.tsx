@@ -2,7 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { X, ChevronDown, File, User, Upload } from 'lucide-react'
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { uploadDocument, type Document as DocumentType } from '@/lib/document-store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -73,7 +73,7 @@ export function UploadDocument({ isOpen, onClose, onSuccess }: UploadDocumentPro
     if (!isOpen) return null
 
     return (
-        <div className="fixed inset-0 backdrop-blur-sm bg-black/30 flex items-center justify-center z-50">
+        <div className="fixed inset-0 flex items-center justify-center z-50">
             <Card className="w-full max-w-lg mx-4">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
                     <div>

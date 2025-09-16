@@ -49,7 +49,7 @@ export class CategoriesService {
 
       // Get template counts for each category
       const categoriesWithCounts = await Promise.all(
-        (data || []).map(async (category) => {
+        (data || []).map(async (category: any) => {
           const { count } = await supabase
             .from('document_templates')
             .select('*', { count: 'exact', head: true })

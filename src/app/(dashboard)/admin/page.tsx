@@ -1,6 +1,6 @@
 'use client'
 
-import { useAuth } from '@/components/providers/auth-provider'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { ComprehensiveAdminDashboard } from '@/components/features/admin/comprehensive-admin-dashboard'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Shield } from 'lucide-react'
@@ -35,7 +35,7 @@ export default function AdminPage() {
             <Shield className="w-12 h-12 text-red-400 mx-auto mb-4" />
             <CardTitle>Access Denied</CardTitle>
             <CardDescription>
-              You don't have permission to access the admin panel
+              You don&apos;t have permission to access the admin panel
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">

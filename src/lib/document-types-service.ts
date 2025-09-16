@@ -49,7 +49,7 @@ export class DocumentTypesService {
 
       // Get template counts for each document type
       const typesWithCounts = await Promise.all(
-        (data || []).map(async (type) => {
+        (data || []).map(async (type: any) => {
           const { count } = await supabase
             .from('document_templates')
             .select('*', { count: 'exact', head: true })

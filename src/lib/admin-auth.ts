@@ -19,7 +19,7 @@ export interface AdminSession {
 
 // Admin authentication storage keys
 const ADMIN_SESSION_KEY = 'signtusk_admin_session'
-const ADMIN_ACTIVITY_KEY = 'signtusk_admin_activity'
+
 
 // Predefined admin users (in production, this would be in a secure database)
 const ADMIN_USERS: Record<string, { password: string; user: Omit<AdminUser, 'id' | 'last_login'> }> = {
@@ -62,7 +62,7 @@ const ADMIN_USERS: Record<string, { password: string; user: Omit<AdminUser, 'id'
 export async function adminLogin(email: string, password: string): Promise<{ success: boolean; session?: AdminSession; error?: string }> {
   try {
     const adminData = ADMIN_USERS[email.toLowerCase()]
-    
+
     if (!adminData) {
       return { success: false, error: 'Invalid credentials' }
     }
@@ -89,9 +89,8 @@ export async function adminLogin(email: string, password: string): Promise<{ suc
 
     // Store session
     localStorage.setItem(ADMIN_SESSION_KEY, JSON.stringify(session))
-    
-    // Log admin activity
-    await logAdminActivity(session.user.id, 'login', `Admin ${session.user.email} logged in`)
+
+
 
     return { success: true, session }
 
@@ -107,7 +106,7 @@ export function getAdminSession(): AdminSession | null {
     if (!stored) return null
 
     const session: AdminSession = JSON.parse(stored)
-    
+
     // Check if session is expired
     if (new Date(session.expires_at) < new Date()) {
       localStorage.removeItem(ADMIN_SESSION_KEY)
@@ -124,10 +123,6 @@ export function getAdminSession(): AdminSession | null {
 
 // Admin logout
 export async function adminLogout(): Promise<void> {
-  const session = getAdminSession()
-  if (session) {
-    await logAdminActivity(session.user.id, 'logout', `Admin ${session.user.email} logged out`)
-  }
   localStorage.removeItem(ADMIN_SESSION_KEY)
 }
 
@@ -141,74 +136,14 @@ export function hasAdminPermission(permission: string, userRole?: string): boole
   const permissions: Record<string, string[]> = {
     'super_admin': ['*'], // All permissions
     'support': ['view_users', 'view_documents', 'manage_api_keys', 'view_reports'],
-    'auditor': ['view_users', 'view_documents', 'view_reports', 'view_logs']
+    'auditor': ['view_users', 'view_documents', 'view_reports']
   }
 
   const userPermissions = permissions[role] || []
   return userPermissions.includes('*') || userPermissions.includes(permission)
 }
 
-// Log admin activity
-export async function logAdminActivity(adminId: string, action: string, details: string): Promise<void> {
-  try {
-    const activity = {
-      id: `activity_${Date.now()}_${Math.random().toString(36).substring(2)}`,
-      admin_id: adminId,
-      action,
-      details,
-      timestamp: new Date().toISOString(),
-      ip_address: 'localhost', // In production, get real IP
-      user_agent: navigator.userAgent
-    }
 
-    // Try to store in database first
-    const { error } = await supabase
-      .from('admin_activity_logs')
-      .insert([activity])
-
-    if (error) {
-      // Fallback to local storage
-      const stored = localStorage.getItem(ADMIN_ACTIVITY_KEY)
-      const activities = stored ? JSON.parse(stored) : []
-      activities.unshift(activity)
-      
-      // Keep only last 1000 activities in local storage
-      if (activities.length > 1000) {
-        activities.splice(1000)
-      }
-      
-      localStorage.setItem(ADMIN_ACTIVITY_KEY, JSON.stringify(activities))
-    }
-
-  } catch (error) {
-    console.error('Failed to log admin activity:', error)
-  }
-}
-
-// Get admin activity logs
-export async function getAdminActivityLogs(limit: number = 100): Promise<any[]> {
-  try {
-    // Try database first
-    const { data, error } = await supabase
-      .from('admin_activity_logs')
-      .select('*')
-      .order('timestamp', { ascending: false })
-      .limit(limit)
-
-    if (!error && data) {
-      return data
-    }
-
-    // Fallback to local storage
-    const stored = localStorage.getItem(ADMIN_ACTIVITY_KEY)
-    const activities = stored ? JSON.parse(stored) : []
-    return activities.slice(0, limit)
-
-  } catch (error) {
-    console.error('Failed to get admin activity logs:', error)
-    return []
-  }
-}
 
 // Validate admin session middleware
 export function requireAdminAuth(): AdminSession | null {
@@ -242,8 +177,7 @@ export async function updateAdminUser(userId: string, updates: Partial<AdminUser
     }
 
     // In production, this would update the database
-    await logAdminActivity(session.user.id, 'update_admin_user', `Updated admin user ${userId}`)
-    
+
     return { success: true }
 
   } catch (error: any) {
@@ -264,8 +198,7 @@ export async function createAdminUser(userData: Omit<AdminUser, 'id' | 'created_
     }
 
     // In production, this would create in database
-    await logAdminActivity(session.user.id, 'create_admin_user', `Created admin user ${userData.email}`)
-    
+
     return { success: true }
 
   } catch (error: any) {

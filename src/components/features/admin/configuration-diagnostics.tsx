@@ -59,8 +59,8 @@ export function ConfigurationDiagnostics() {
       // Get active Supabase client info
       const client = getSupabaseClient()
       const activeClient = {
-        url: client.supabaseUrl,
-        keyLength: client.supabaseKey?.length || 0
+        url: (client as any).supabaseUrl || 'Protected',
+        keyLength: (client as any).supabaseKey?.length || 0
       }
 
       // Test connection with multiple methods
@@ -69,21 +69,19 @@ export function ConfigurationDiagnostics() {
 
       try {
         // Test 1: Auth session (basic connectivity)
-        const { data: authData, error: authError } = await client.auth.getSession()
+        const { error: authError } = await client.auth.getSession()
         const authResponseTime = Date.now() - startTime
 
         if (!authError) {
           connectionTest = {
             success: true,
-            message: 'Auth connection successful',
-            responseTime: authResponseTime
-          }
+            message: `Auth connection successful (${authResponseTime}ms)`,
+          } as any
         } else {
           connectionTest = {
             success: false,
-            message: `Auth error: ${authError.message}`,
-            responseTime: authResponseTime
-          }
+            message: `Auth error: ${authError.message} (${authResponseTime}ms)`,
+          } as any
         }
 
         // Test 2: Database operation (actual database connectivity)
@@ -95,7 +93,7 @@ export function ConfigurationDiagnostics() {
 
           // Test 1: Try to query a system table
           try {
-            const { data: systemData, error: systemError } = await client
+            const { error: systemError } = await client
               .from('information_schema.tables')
               .select('table_name')
               .limit(1)
@@ -115,7 +113,7 @@ export function ConfigurationDiagnostics() {
 
           // Test 2: Try to query auth.users (if accessible)
           try {
-            const { data: authData, error: authError } = await client
+            const { error: authError } = await client
               .from('auth.users')
               .select('id')
               .limit(1)
@@ -136,7 +134,7 @@ export function ConfigurationDiagnostics() {
           // Test 3: Try to use the proxy directly
           try {
             const { supabase: proxyClient } = await import('@/lib/supabase')
-            const { data: proxyData, error: proxyError } = await proxyClient.auth.getSession()
+            const { error: proxyError } = await proxyClient.auth.getSession()
 
             tests.push({
               name: 'Proxy client test',
@@ -158,16 +156,14 @@ export function ConfigurationDiagnostics() {
           if (successfulTests > 0) {
             databaseTest = {
               success: true,
-              message: `Database connectivity verified (${successfulTests}/${totalTests} tests passed)`,
-              responseTime: dbResponseTime
-            }
+              message: `Database connectivity verified (${successfulTests}/${totalTests} tests passed) (${dbResponseTime}ms)`,
+            } as any
           } else {
             const errors = tests.map(t => `${t.name}: ${t.error}`).join('; ')
             databaseTest = {
               success: false,
-              message: `All database tests failed: ${errors}`,
-              responseTime: dbResponseTime
-            }
+              message: `All database tests failed: ${errors} (${dbResponseTime}ms)`,
+            } as any
           }
         } catch (dbErr: any) {
           databaseTest = {
@@ -240,8 +236,7 @@ export function ConfigurationDiagnostics() {
       const { supabase: proxyClient } = await import('@/lib/supabase')
 
       // Try to create a test table (this will fail if permissions are wrong, but that's expected)
-      const testTableName = `admin_test_${Date.now()}`
-      const { data, error } = await proxyClient.rpc('version')
+      const { error } = await proxyClient.rpc('version')
 
       if (!error) {
         console.log('✅ Database write test successful - can execute functions')

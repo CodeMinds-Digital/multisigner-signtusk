@@ -1,0 +1,19 @@
+{
+  "name": "signtusk-email-test",
+  "version": "1.0.0",
+  "description": "Test Resend email configuration for SignTusk",
+  "main": "test-email.js",
+  "type": "module",
+  "scripts": {
+    "test": "node test-email.js",
+    "test-signature": "node test-signature-email.js",
+    "test-reminder": "node test-reminder-email.js"
+  },
+  "dependencies": {
+    "resend": "^3.2.0",
+    "dotenv": "^16.4.5"
+  },
+  "keywords": ["email", "resend", "signtusk", "test"],
+  "author": "SignTusk Team",
+  "license": "MIT"
+}

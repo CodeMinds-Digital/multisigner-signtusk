@@ -1,19 +1,15 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Clock, CheckCircle, AlertTriangle, RefreshCw, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useAuth } from '@/components/providers/auth-provider'
-import { getDashboardStats, getDocuments, getRecentActivity, type Document as DocumentType } from '@/lib/document-store'
+import { useAuth } from '@/components/providers/secure-auth-provider'
+import { getDashboardStats, getDocuments, type Document as DocumentType } from '@/lib/document-store'
 import { UploadDocument } from '@/components/features/documents/upload-document'
 import { getStatusConfig } from '@/utils/document-status'
 
-interface DashboardActivity {
-  id: number
-  action: string
-  time: string
-}
+
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -23,12 +19,11 @@ export default function DashboardPage() {
     completedDocuments: 0,
     expiredDocuments: 0
   })
-  const [recentActivity, setRecentActivity] = useState<DashboardActivity[]>([])
   const [recentDocuments, setRecentDocuments] = useState<DocumentType[]>([])
   const [loading, setLoading] = useState(true)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     if (!user) return
 
     setLoading(true)
@@ -46,35 +41,18 @@ export default function DashboardPage() {
       const documents = await getDocuments(user.id)
       setRecentDocuments(documents.slice(0, 5))
 
-      // Get recent activity
-      const activity = await getRecentActivity(user.id)
-      const formattedActivity = activity.slice(0, 5).map((act, index) => ({
-        id: index + 1,
-        action: act.action,
-        time: getTimeAgo(act.time || act.created_at)
-      }))
-      setRecentActivity(formattedActivity)
-
     } catch (error) {
       console.error('Failed to load dashboard data:', error)
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
 
   useEffect(() => {
     loadDashboardData()
-  }, [user])
+  }, [loadDashboardData])
 
-  const getActivityText = (status: string) => {
-    switch (status) {
-      case 'pending': return 'sent for signature'
-      case 'completed': return 'completed'
-      case 'expired': return 'expired'
-      case 'draft': return 'created as draft'
-      default: return 'updated'
-    }
-  }
+
 
   const getTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
@@ -195,6 +173,19 @@ export default function DashboardPage() {
                     <div className="flex-shrink-0">
                       {(() => {
                         const config = getStatusConfig(doc.status as any)
+                        // Defensive check for undefined config or missing icon
+                        if (!config || !config.icon) {
+                          console.warn('Invalid document status or missing config:', doc.status, config)
+                          // Fallback to a default config
+                          const Icon = FileText
+                          return (
+                            <span className="px-2 py-1 text-xs font-medium rounded-full inline-flex items-center bg-gray-50 text-gray-800">
+                              <Icon className="w-3 h-3 text-gray-600 mr-1" />
+                              {doc.status || 'Unknown'}
+                            </span>
+                          )
+                        }
+
                         const Icon = config.icon
                         return (
                           <span className={`px-2 py-1 text-xs font-medium rounded-full inline-flex items-center ${config.bgColor} ${config.textColor}`}>
@@ -215,38 +206,7 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Recent Activity</CardTitle>
-            <CardDescription>
-              Your latest document activities
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="text-center py-8 text-gray-500">
-                Loading activity...
-              </div>
-            ) : recentActivity.length > 0 ? (
-              <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-start space-x-3">
-                    <div className="w-2 h-2 bg-blue-500 rounded-full mt-2"></div>
-                    <div className="flex-1">
-                      <p className="text-sm text-gray-900">{activity.action}</p>
-                      <p className="text-xs text-gray-500">{activity.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-500">
-                No recent activity to display
-              </div>
-            )}
-          </CardContent>
-        </Card>
+
       </div>
 
       {/* Upload Document Modal */}

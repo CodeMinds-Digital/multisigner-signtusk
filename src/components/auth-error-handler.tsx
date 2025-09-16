@@ -12,10 +12,10 @@ export function AuthErrorHandler() {
     // Listen for unhandled promise rejections that might be auth-related
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       const error = event.reason
-      
+
       if (error && typeof error === 'object' && 'message' in error) {
         const message = error.message as string
-        
+
         // Check for refresh token errors
         if (
           message.includes('refresh_token_not_found') ||
@@ -25,12 +25,18 @@ export function AuthErrorHandler() {
         ) {
           console.warn('🚨 Detected auth error on startup:', message)
           console.log('🧹 Automatically clearing auth storage...')
-          
+
           clearSupabaseAuthStorage()
-          
+
           // Prevent the error from being logged to console
           event.preventDefault()
-          
+
+          // Redirect to login if not already there
+          if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+            console.log('🔄 Redirecting to login due to auth error...')
+            window.location.href = '/login'
+          }
+
           // Show user-friendly message
           console.log('✅ Auth storage cleared. Please refresh the page if you continue to see issues.')
         }

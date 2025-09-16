@@ -32,6 +32,18 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- User sessions table (for refresh token management)
+CREATE TABLE IF NOT EXISTS public.user_sessions (
+    session_id TEXT PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+    email TEXT NOT NULL,
+    refresh_token_hash TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    last_used_at TIMESTAMPTZ DEFAULT NOW(),
+    user_agent TEXT,
+    ip_address TEXT
+);
+
 -- Documents table (core document management)
 CREATE TABLE IF NOT EXISTS public.documents (
     id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
@@ -937,7 +949,7 @@ DO $$
 DECLARE
     table_count INTEGER;
     expected_tables TEXT[] := ARRAY[
-        'user_profiles', 'documents', 'document_signatures', 'document_templates',
+        'user_profiles', 'user_sessions', 'documents', 'document_signatures', 'document_templates',
         'admin_users', 'admin_activity_logs', 'system_config', 'api_keys',
         'email_logs', 'system_metrics', 'subscription_plans', 'user_subscriptions',
         'payment_history'

@@ -1,16 +1,12 @@
-import { 
-  FileText, 
-  CheckCircle, 
-  Clock, 
-  AlertTriangle, 
-  XCircle, 
+import {
+  FileText,
+  CheckCircle,
+  Clock,
+  XCircle,
   Edit3,
-  Send,
-  Users,
-  Calendar,
-  Archive
+  Calendar
 } from 'lucide-react'
-import { DocumentStatus } from '@/types/document-management'
+import { DocumentStatus } from '@/types/documents'
 
 export interface StatusConfig {
   label: string
@@ -33,16 +29,6 @@ export const DOCUMENT_STATUS_CONFIG: Record<DocumentStatus, StatusConfig> = {
     borderColor: 'border-blue-200',
     textColor: 'text-blue-800',
     badgeVariant: 'outline'
-  },
-  ready: {
-    label: 'Ready to Sign',
-    description: 'Document is ready for signatures',
-    icon: Send,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-    borderColor: 'border-green-200',
-    textColor: 'text-green-800',
-    badgeVariant: 'default'
   },
   pending: {
     label: 'Pending Signatures',
@@ -107,54 +93,63 @@ export const STATUS_GROUPS: StatusGroupConfig[] = [
     priority: 1
   },
   {
-    label: 'Ready to Send',
-    description: 'Documents ready for signatures',
-    icon: Send,
-    color: 'text-green-600',
-    bgColor: 'bg-green-50',
-    statuses: ['ready'],
-    priority: 2
-  },
-  {
-    label: 'Awaiting Signatures',
+    label: 'Pending Signatures',
     description: 'Documents waiting for signatures',
-    icon: Users,
+    icon: Clock,
     color: 'text-amber-600',
     bgColor: 'bg-amber-50',
     statuses: ['pending'],
-    priority: 3
+    priority: 2
   },
   {
     label: 'Completed',
-    description: 'Fully signed documents',
+    description: 'Completed documents',
     icon: CheckCircle,
-    color: 'text-emerald-600',
-    bgColor: 'bg-emerald-50',
+    color: 'text-green-600',
+    bgColor: 'bg-green-50',
     statuses: ['completed'],
-    priority: 4
+    priority: 3
   },
   {
-    label: 'Archived',
+    label: 'Inactive',
     description: 'Expired or cancelled documents',
-    icon: Archive,
+    icon: XCircle,
     color: 'text-gray-600',
     bgColor: 'bg-gray-50',
     statuses: ['expired', 'cancelled'],
-    priority: 5
+    priority: 4
   }
 ]
 
 export function getStatusConfig(status: DocumentStatus): StatusConfig {
-  return DOCUMENT_STATUS_CONFIG[status]
+  // Return the config if it exists, otherwise return a default config
+  const config = DOCUMENT_STATUS_CONFIG[status]
+
+  if (!config) {
+    console.warn('Unknown document status:', status)
+    // Return a default config for unknown statuses
+    return {
+      label: status || 'Unknown',
+      description: 'Unknown document status',
+      icon: FileText,
+      color: 'text-gray-600',
+      bgColor: 'bg-gray-50',
+      borderColor: 'border-gray-200',
+      textColor: 'text-gray-800',
+      badgeVariant: 'outline'
+    }
+  }
+
+  return config
 }
 
 export function getStatusGroup(status: DocumentStatus): StatusGroupConfig | undefined {
   return STATUS_GROUPS.find(group => group.statuses.includes(status))
 }
 
-export function getDocumentCounts(documents: { status: DocumentStatus }[]) {
+export function getDocumentCounts(documents: { status: DocumentStatus }[]): { total: number } & Record<string, number> {
   const total = documents.length
-  
+
   const counts = STATUS_GROUPS.reduce((acc, group) => {
     const count = documents.filter(doc => group.statuses.includes(doc.status)).length
     acc[group.label.toLowerCase().replace(/\s+/g, '_')] = count
@@ -168,7 +163,7 @@ export function getDocumentCounts(documents: { status: DocumentStatus }[]) {
 }
 
 export function filterDocumentsByStatus(
-  documents: { status: DocumentStatus }[], 
+  documents: { status: DocumentStatus }[],
   statusFilter: DocumentStatus | 'all'
 ) {
   if (statusFilter === 'all') return documents
@@ -176,7 +171,7 @@ export function filterDocumentsByStatus(
 }
 
 export function filterDocumentsByGroup(
-  documents: { status: DocumentStatus }[], 
+  documents: { status: DocumentStatus }[],
   groupLabel: string
 ) {
   if (groupLabel === 'all') return documents
