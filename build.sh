@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# Exit on any error
+set -e
+
 # Netlify build script for SignTusk
 echo "🚀 Starting SignTusk build process..."
 
@@ -22,10 +25,16 @@ echo "✅ .npmrc created successfully"
 
 # Install dependencies
 echo "📦 Installing dependencies..."
-npm ci
+if ! npm ci; then
+  echo "❌ Failed to install dependencies"
+  exit 1
+fi
 
 # Build the application
 echo "🔨 Building application..."
-npm run build
+if ! npm run build; then
+  echo "❌ Build failed"
+  exit 1
+fi
 
 echo "🎉 Build completed successfully!"
