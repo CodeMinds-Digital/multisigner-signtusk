@@ -3,6 +3,10 @@
 # Netlify build script for SignTusk
 echo "🚀 Starting SignTusk build process..."
 
+# Check Node.js version
+echo "📋 Node.js version: $(node --version)"
+echo "📋 NPM version: $(npm --version)"
+
 # Check if NPM_TOKEN is set
 if [ -z "$NPM_TOKEN" ]; then
   echo "❌ NPM_TOKEN environment variable is not set"
@@ -19,6 +23,11 @@ cat > .npmrc << EOF
 EOF
 
 echo "✅ .npmrc created successfully"
+
+# Clean any existing build artifacts
+echo "🧹 Cleaning previous build artifacts..."
+rm -rf .next
+rm -rf node_modules/.cache
 
 # Install dependencies
 echo "📦 Installing dependencies..."
