@@ -21,6 +21,8 @@ const nextConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@': require('path').resolve(__dirname, 'src'),
+      // Mock problematic packages to prevent Html imports
+      '@react-email/render': require('path').resolve(__dirname, 'src/lib/react-email-mock.ts'),
     }
 
     // Handle potential Html import issues
@@ -34,16 +36,36 @@ const nextConfig = {
     // Exclude problematic packages from server-side bundle
     if (isServer) {
       config.externals = config.externals || []
-      config.externals.push({
-        '@codeminds-digital/pdfme-complete': '@codeminds-digital/pdfme-complete',
-        '@react-email/render': '@react-email/render',
-        '@hugocxl/react-to-image': '@hugocxl/react-to-image',
-        '@react-pdf-viewer/core': '@react-pdf-viewer/core',
-        '@react-pdf-viewer/default-layout': '@react-pdf-viewer/default-layout',
-        '@simplepdf/react-embed-pdf': '@simplepdf/react-embed-pdf',
-        'resend': 'resend',
-        'pdf-lib': 'pdf-lib',
-        'pdfjs-dist': 'pdfjs-dist',
+
+      // More aggressive externals for Netlify compatibility
+      const problematicPackages = [
+        '@codeminds-digital/pdfme-complete',
+        '@react-email/render',
+        '@hugocxl/react-to-image',
+        '@react-pdf-viewer/core',
+        '@react-pdf-viewer/default-layout',
+        '@simplepdf/react-embed-pdf',
+        'resend',
+        'pdf-lib',
+        'pdfjs-dist',
+        'html-to-image',
+        'canvas',
+        'jsdom',
+        'qrcode',
+        'qr-code-styling',
+        'qrcode.react',
+        'jsqr',
+      ]
+
+      // Add as both object and function externals
+      config.externals.push(...problematicPackages.map(pkg => ({ [pkg]: pkg })))
+
+      // Add function-based externals for more aggressive exclusion
+      config.externals.push((context, request, callback) => {
+        if (problematicPackages.some(pkg => request.includes(pkg))) {
+          return callback(null, `commonjs ${request}`)
+        }
+        callback()
       })
     }
 
