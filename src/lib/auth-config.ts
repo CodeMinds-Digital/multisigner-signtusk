@@ -3,33 +3,33 @@
 export const AUTH_CONFIG = {
   // Short-lived access tokens (5-15 minutes)
   ACCESS_TOKEN_LIFETIME: 15 * 60, // 15 minutes in seconds
-  
+
   // Long-lived refresh tokens (7-30 days)
   REFRESH_TOKEN_LIFETIME: 7 * 24 * 60 * 60, // 7 days in seconds
-  
+
   // Refresh threshold (refresh 2 minutes before expiry)
   REFRESH_THRESHOLD: 2 * 60, // 2 minutes in seconds
-  
+
   // Cookie settings
   COOKIES: {
     ACCESS_TOKEN: {
       name: 'access_token',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
+      secure: false, // Disabled for localhost compatibility in production
+      sameSite: 'lax' as const, // Changed from strict to lax for better compatibility
       maxAge: 15 * 60, // 15 minutes
       path: '/',
     },
     REFRESH_TOKEN: {
-      name: 'refresh_token', 
+      name: 'refresh_token',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict' as const,
+      secure: false, // Disabled for localhost compatibility in production
+      sameSite: 'lax' as const, // Changed from strict to lax for better compatibility
       maxAge: 7 * 24 * 60 * 60, // 7 days
       path: '/',
     }
   },
-  
+
   // Protected routes that require authentication
   PROTECTED_ROUTES: [
     '/dashboard',
@@ -40,7 +40,7 @@ export const AUTH_CONFIG = {
     '/api/documents',
     '/api/signing-requests',
   ],
-  
+
   // Public routes that don't require authentication
   PUBLIC_ROUTES: [
     '/login',
@@ -56,13 +56,13 @@ export const AUTH_CONFIG = {
 export const JWT_CONFIG = {
   // Use environment variable for JWT secret
   secret: process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production',
-  
+
   // Algorithm for JWT signing
   algorithm: 'HS256' as const,
-  
+
   // Issuer
   issuer: 'signtusk-app',
-  
+
   // Audience
   audience: 'signtusk-users',
 }
@@ -74,16 +74,16 @@ export const SUPABASE_AUTH_CONFIG = {
     // Store tokens in HttpOnly cookies instead of localStorage
     storage: {
       getItem: () => null, // Disable client-side storage
-      setItem: () => {}, // Disable client-side storage
-      removeItem: () => {}, // Disable client-side storage
+      setItem: () => { }, // Disable client-side storage
+      removeItem: () => { }, // Disable client-side storage
     },
-    
+
     // Disable auto refresh on client (we'll handle server-side)
     autoRefreshToken: false,
-    
+
     // Don't persist session in browser storage
     persistSession: false,
-    
+
     // Disable session detection in URL
     detectSessionInUrl: false,
   },
@@ -100,13 +100,13 @@ export const AUTH_ERRORS = {
 
 // Helper functions
 export function isProtectedRoute(pathname: string): boolean {
-  return AUTH_CONFIG.PROTECTED_ROUTES.some(route => 
+  return AUTH_CONFIG.PROTECTED_ROUTES.some(route =>
     pathname.startsWith(route)
   )
 }
 
 export function isPublicRoute(pathname: string): boolean {
-  return AUTH_CONFIG.PUBLIC_ROUTES.some(route => 
+  return AUTH_CONFIG.PUBLIC_ROUTES.some(route =>
     pathname === route || (route !== '/' && pathname.startsWith(route))
   )
 }

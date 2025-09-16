@@ -17,26 +17,26 @@ export function setAuthCookies(
   tokens: AuthTokens
 ): NextResponse {
   const { accessToken, refreshToken, expiresAt } = tokens
-  
+
   // Calculate actual expiry times
   const accessTokenExpiry = new Date(Date.now() + AUTH_CONFIG.ACCESS_TOKEN_LIFETIME * 1000)
   const refreshTokenExpiry = new Date(Date.now() + AUTH_CONFIG.REFRESH_TOKEN_LIFETIME * 1000)
-  
+
   // Set access token cookie
   const accessCookie = serialize(AUTH_CONFIG.COOKIES.ACCESS_TOKEN.name, accessToken, {
     ...AUTH_CONFIG.COOKIES.ACCESS_TOKEN,
     expires: accessTokenExpiry,
   })
-  
+
   // Set refresh token cookie  
   const refreshCookie = serialize(AUTH_CONFIG.COOKIES.REFRESH_TOKEN.name, refreshToken, {
     ...AUTH_CONFIG.COOKIES.REFRESH_TOKEN,
     expires: refreshTokenExpiry,
   })
-  
+
   // Set both cookies
   response.headers.set('Set-Cookie', [accessCookie, refreshCookie].join(', '))
-  
+
   return response
 }
 
@@ -49,15 +49,15 @@ export function clearAuthCookies(response: NextResponse): NextResponse {
     maxAge: 0,
     expires: new Date(0),
   })
-  
+
   const refreshCookie = serialize(AUTH_CONFIG.COOKIES.REFRESH_TOKEN.name, '', {
     ...AUTH_CONFIG.COOKIES.REFRESH_TOKEN,
     maxAge: 0,
     expires: new Date(0),
   })
-  
+
   response.headers.set('Set-Cookie', [accessCookie, refreshCookie].join(', '))
-  
+
   return response
 }
 
@@ -69,7 +69,7 @@ export function getAuthTokensFromRequest(request: NextRequest): {
   refreshToken: string | null
 } {
   const cookies = request.cookies
-  
+
   return {
     accessToken: cookies.get(AUTH_CONFIG.COOKIES.ACCESS_TOKEN.name)?.value || null,
     refreshToken: cookies.get(AUTH_CONFIG.COOKIES.REFRESH_TOKEN.name)?.value || null,
@@ -84,7 +84,7 @@ export function getAuthTokensFromCookies(cookieString: string): {
   refreshToken: string | null
 } {
   const cookies = parse(cookieString || '')
-  
+
   return {
     accessToken: cookies[AUTH_CONFIG.COOKIES.ACCESS_TOKEN.name] || null,
     refreshToken: cookies[AUTH_CONFIG.COOKIES.REFRESH_TOKEN.name] || null,
@@ -105,22 +105,22 @@ export function createAuthResponse(
       'Content-Type': 'application/json',
     },
   })
-  
+
   // Set cookies using Response headers
   const { accessToken, refreshToken } = tokens
-  
+
   const accessCookie = serialize(AUTH_CONFIG.COOKIES.ACCESS_TOKEN.name, accessToken, {
     ...AUTH_CONFIG.COOKIES.ACCESS_TOKEN,
     expires: new Date(Date.now() + AUTH_CONFIG.ACCESS_TOKEN_LIFETIME * 1000),
   })
-  
+
   const refreshCookie = serialize(AUTH_CONFIG.COOKIES.REFRESH_TOKEN.name, refreshToken, {
     ...AUTH_CONFIG.COOKIES.REFRESH_TOKEN,
     expires: new Date(Date.now() + AUTH_CONFIG.REFRESH_TOKEN_LIFETIME * 1000),
   })
-  
+
   response.headers.set('Set-Cookie', [accessCookie, refreshCookie].join(', '))
-  
+
   return response
 }
 
@@ -129,7 +129,7 @@ export function createAuthResponse(
  */
 export function validateCookieConfig(): boolean {
   const isProduction = process.env.NODE_ENV === 'production'
-  
+
   if (isProduction) {
     // In production, ensure secure settings
     return (
@@ -137,10 +137,10 @@ export function validateCookieConfig(): boolean {
       AUTH_CONFIG.COOKIES.REFRESH_TOKEN.secure &&
       AUTH_CONFIG.COOKIES.ACCESS_TOKEN.httpOnly &&
       AUTH_CONFIG.COOKIES.REFRESH_TOKEN.httpOnly &&
-      AUTH_CONFIG.COOKIES.ACCESS_TOKEN.sameSite === 'strict' &&
-      AUTH_CONFIG.COOKIES.REFRESH_TOKEN.sameSite === 'strict'
+      AUTH_CONFIG.COOKIES.ACCESS_TOKEN.sameSite === 'lax' &&
+      AUTH_CONFIG.COOKIES.REFRESH_TOKEN.sameSite === 'lax'
     )
   }
-  
+
   return true // Allow non-secure in development
 }
