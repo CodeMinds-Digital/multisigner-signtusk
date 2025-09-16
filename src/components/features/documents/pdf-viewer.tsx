@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { text, image, barcodes, dateTime, Designer } from '@codeminds-digital/pdfme-complete'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -150,6 +149,9 @@ export default function PDFViewer({
           designerRef.current.destroy?.()
           containerRef.current.innerHTML = ''
         }
+
+        // Dynamic import to avoid SSR issues
+        const { Designer, text, image, barcodes, dateTime } = await import('@codeminds-digital/pdfme-complete')
 
         // Create designer with proper error handling
         const designerConfig: DesignerConfig = {

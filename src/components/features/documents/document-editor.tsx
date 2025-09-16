@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Designer, generate, text, image, barcodes, dateTime } from '@codeminds-digital/pdfme-complete'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -185,6 +184,9 @@ function DocumentEditor({
         containerRef.current.innerHTML = ''
       }
 
+      // Dynamic import to avoid SSR issues
+      const { Designer, text, image, barcodes, dateTime } = await import('@codeminds-digital/pdfme-complete')
+
       const inputs = {
         signature: signatureImage || '',
         name: userInputName || '',
@@ -237,6 +239,9 @@ function DocumentEditor({
     try {
       setIsProcessing(true)
       if (!pdfTemplate) throw new Error('Template not ready')
+
+      // Dynamic import to avoid SSR issues
+      const { generate, text, image, barcodes, dateTime } = await import('@codeminds-digital/pdfme-complete')
 
       const inputs = {
         signature: signatureImage || '',
