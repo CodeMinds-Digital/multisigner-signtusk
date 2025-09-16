@@ -22,6 +22,14 @@ const nextConfig = {
       '@': require('path').resolve(__dirname, 'src'),
     }
 
+    // Handle potential Html import issues
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+    }
+
     return config
   },
 }

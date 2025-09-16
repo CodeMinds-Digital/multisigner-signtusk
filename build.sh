@@ -30,16 +30,7 @@ EOF
 
 echo "✅ .npmrc created successfully"
 
-# Debug: Check if the file exists
-echo "🔍 Checking if storage-test.ts exists..."
-if [ -f "src/lib/storage-test.ts" ]; then
-  echo "✅ storage-test.ts found"
-else
-  echo "❌ storage-test.ts not found"
-  ls -la src/lib/ | grep storage || echo "No storage files found"
-fi
-
-# Debug: Check tsconfig.json
+# Debug: Check tsconfig.json paths
 echo "🔍 Checking tsconfig.json paths..."
 grep -A 5 '"paths"' tsconfig.json || echo "No paths found in tsconfig.json"
 
