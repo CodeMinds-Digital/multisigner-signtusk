@@ -58,8 +58,9 @@ If the Next.js plugin fails, use the static export approach:
 ## 🐛 **Troubleshooting**
 
 ### Error: "Html should not be imported outside of pages/_document"
-- ✅ **Fixed**: No Html imports found in codebase
-- ✅ **Cause**: Was due to conflicting document status types
+- ✅ **Fixed**: Removed unused `@react-email/render` dependency
+- ✅ **Root Cause**: The `@react-email/render` package was causing conflicts during static generation
+- ✅ **Solution**: Removed the dependency since it wasn't being used in the codebase
 
 ### Error: "Your publish directory does not contain expected Next.js build output"
 - ✅ **Solution**: Removed `output: 'standalone'` from Next.js config
