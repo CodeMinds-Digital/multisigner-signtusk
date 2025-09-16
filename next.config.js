@@ -35,7 +35,6 @@ const nextConfig = {
       config.externals = config.externals || []
       config.externals.push({
         '@codeminds-digital/pdfme-complete': '@codeminds-digital/pdfme-complete',
-        'resend': 'resend',
       })
     }
 
