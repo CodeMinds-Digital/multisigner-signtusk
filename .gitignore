@@ -283,3 +283,4 @@ $RECYCLE.BIN/
 .directory
 .Trash-*
 .nfs*
+package-lock.json
