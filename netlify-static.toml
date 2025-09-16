@@ -1,5 +1,9 @@
+# Alternative Netlify configuration for static export
+# Use this if the Next.js plugin fails
+
 [build]
-  command = "./build.sh"
+  command = "./build-static.sh"
+  publish = "out"
 
 [build.environment]
   NODE_VERSION = "20"
@@ -7,9 +11,11 @@
   NPM_CONFIG_LEGACY_PEER_DEPS = "true"
   NEXT_TELEMETRY_DISABLED = "1"
 
-# Next.js plugin for proper deployment
-[[plugins]]
-  package = "@netlify/plugin-nextjs"
+# Redirect all routes to index.html for SPA behavior
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
 
 # Security headers
 [[headers]]

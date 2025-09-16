@@ -10,8 +10,8 @@ const nextConfig: NextConfig = {
     },
   },
 
-  // Ensure proper static generation
-  output: 'standalone',
+  // Remove standalone output for Netlify compatibility
+  // output: 'standalone',
 
   // Fix cross-origin dev warnings
   allowedDevOrigins: ['http://192.168.1.2:3001', 'http://192.168.1.2:3000', 'http://192.168.1.2:3002', 'http://192.168.1.2:3003'],

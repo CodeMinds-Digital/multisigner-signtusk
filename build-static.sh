@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Netlify build script for SignTusk
-echo "🚀 Starting SignTusk build process..."
+# Static build script for SignTusk (fallback)
+echo "🚀 Starting SignTusk static build process..."
 
 # Check if NPM_TOKEN is set
 if [ -z "$NPM_TOKEN" ]; then
@@ -15,5 +15,8 @@ cat > .npmrc << EOF
 //npm.pkg.github.com/:_authToken=${NPM_TOKEN}
 EOF
 
-# Install dependencies and build
-npm ci && npm run build
+# Install dependencies
+npm ci
+
+# Build and export static files
+npm run build && npm run export
