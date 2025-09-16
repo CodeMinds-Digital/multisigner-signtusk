@@ -143,7 +143,7 @@ export default function VerifyPage() {
           signingMode = parsedMetadata.signing_mode === 'parallel' ? 'Parallel' : 'Sequential'
         }
       } catch (e) {
-        console.log('Could not parse metadata for signing mode')
+        console.log('Could not parse metadata for signing mode:', e)
       }
     }
 

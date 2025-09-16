@@ -1,6 +1,8 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createClient } = require('@supabase/supabase-js')
 
 // Load environment variables
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 require('dotenv').config({ path: '.env.local' })
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -16,9 +18,9 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 async function createMissingProfile() {
   const userId = '9779f658-d646-449b-ba55-c036ce58831b'
   const email = 'ramalai13@gmail.com'
-  
+
   console.log('🔍 Checking if profile exists for user:', userId)
-  
+
   // Check if profile already exists
   const { data: existingProfile, error: checkError } = await supabase
     .from('user_profiles')

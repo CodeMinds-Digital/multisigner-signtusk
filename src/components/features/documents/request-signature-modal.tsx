@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { X, ChevronRight, ChevronLeft, FileText, Users, Send } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { DriveService } from '@/lib/drive-service'
@@ -38,12 +38,34 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
     const [isSending, setIsSending] = useState(false)
     const { user } = useAuth()
 
+    const fetchReadyDocuments = useCallback(async () => {
+        if (!user) return
+
+        setLoading(true)
+        setError('')
+
+        try {
+            const allDocuments = await DriveService.getDocumentTemplates()
+            const ready = allDocuments.filter(doc => doc.status === 'ready')
+            setReadyDocuments(ready)
+
+            if (ready.length === 0) {
+                setError('No documents are ready for signature. Please prepare documents in Drive first.')
+            }
+        } catch (err) {
+            console.error('Error fetching ready documents:', err)
+            setError('Failed to load documents. Please try again.')
+        } finally {
+            setLoading(false)
+        }
+    }, [user])
+
     // Fetch ready documents when modal opens
     useEffect(() => {
         if (isOpen && user) {
             fetchReadyDocuments()
         }
-    }, [isOpen, user])
+    }, [isOpen, user, fetchReadyDocuments])
 
     // Reset state when modal closes
     useEffect(() => {
@@ -58,27 +80,6 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
         }
     }, [isOpen])
 
-    const fetchReadyDocuments = async () => {
-        if (!user) return
-
-        setLoading(true)
-        setError('')
-
-        try {
-            const allDocuments = await DriveService.getDocumentTemplates(user.id)
-            const ready = allDocuments.filter(doc => doc.status === 'ready')
-            setReadyDocuments(ready)
-
-            if (ready.length === 0) {
-                setError('No documents are ready for signature. Please prepare documents in Drive first.')
-            }
-        } catch (err) {
-            console.error('Error fetching ready documents:', err)
-            setError('Failed to load documents. Please try again.')
-        } finally {
-            setLoading(false)
-        }
-    }
 
     const handleDocumentSelect = (document: DocumentTemplate) => {
         setSelectedDocument(document)

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { File, Clock, CheckCircle, AlertTriangle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Calendar } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { File, Eye } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { SigningWorkflowService, type SigningRequestListItem } from '@/lib/signing-workflow-service'
 import { Button } from '@/components/ui/button'
@@ -9,12 +9,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { LoadingSpinner } from '@/components/ui/loading'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorAlert } from '@/components/ui/alert'
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import {
     Table,
     TableBody,
@@ -24,18 +18,14 @@ import {
     TableRow,
 } from '@/components/ui/table'
 
-interface ReceivedRequestsListProps {
-    onRefresh?: () => void
-}
 
-export function ReceivedRequestsList({ onRefresh }: ReceivedRequestsListProps) {
+export function ReceivedRequestsList() {
     const [receivedRequests, setReceivedRequests] = useState<SigningRequestListItem[]>([])
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
-    const [viewingRequest, setViewingRequest] = useState<SigningRequestListItem | null>(null)
     const { user } = useAuth()
 
-    const loadReceivedRequests = async () => {
+    const loadReceivedRequests = useCallback(async () => {
         if (!user?.id) return
 
         setLoading(true)
@@ -51,11 +41,11 @@ export function ReceivedRequestsList({ onRefresh }: ReceivedRequestsListProps) {
         } finally {
             setLoading(false)
         }
-    }
+    }, [user?.email, user?.id])
 
     useEffect(() => {
         loadReceivedRequests()
-    }, [user])
+    }, [user, loadReceivedRequests])
 
     const getStatusBadge = (status: string) => {
         const statusConfig = {
@@ -103,13 +93,8 @@ export function ReceivedRequestsList({ onRefresh }: ReceivedRequestsListProps) {
     const handleView = (request: SigningRequestListItem) => {
         // TODO: Implement document preview
         console.log('View document:', request)
-        setViewingRequest(request)
     }
 
-    const handleDecline = (request: SigningRequestListItem) => {
-        // TODO: Implement decline flow
-        console.log('Decline signing request:', request)
-    }
 
     if (loading) {
         return (

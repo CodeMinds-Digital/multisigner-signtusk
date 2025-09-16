@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { User, LogOut, Pen } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
@@ -66,10 +67,12 @@ export function Header({ userName, userSignature }: HeaderProps) {
               }}
             >
               {userSignature ? (
-                <img
+                <Image
                   src={userSignature}
                   alt="Profile"
-                  className="w-8 h-8 rounded-full object-cover border-2 border-white shadow-sm"
+                  width={32}
+                  height={32}
+                  className="rounded-full object-cover border-2 border-white shadow-sm"
                 />
               ) : (
                 <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-medium border-2 border-white shadow-sm">
@@ -84,10 +87,12 @@ export function Header({ userName, userSignature }: HeaderProps) {
                 <div className="p-4 border-b border-gray-200 bg-gray-50">
                   <div className="flex items-center">
                     {userSignature ? (
-                      <img
+                      <Image
                         src={userSignature}
                         alt="Profile"
-                        className="w-12 h-12 rounded-full object-cover border-2 border-white shadow"
+                        width={48}
+                        height={48}
+                        className="rounded-full object-cover border-2 border-white shadow"
                       />
                     ) : (
                       <div className="w-12 h-12 rounded-full bg-blue-500 text-white flex items-center justify-center text-lg font-medium border-2 border-white shadow">
@@ -103,11 +108,13 @@ export function Header({ userName, userSignature }: HeaderProps) {
                   {userSignature && (
                     <div className="mt-3">
                       <p className="text-xs text-gray-500 font-medium mb-1">Your Signature</p>
-                      <div className="bg-white p-2 rounded-md border border-gray-200">
-                        <img
+                      <div className="relative bg-white p-2 rounded-md border border-gray-200 h-12">
+                        <Image
+                          fill
                           src={userSignature}
                           alt="Signature"
-                          className="h-12 object-contain"
+                          className="object-contain"
+                          sizes="100vw"
                         />
                       </div>
                     </div>

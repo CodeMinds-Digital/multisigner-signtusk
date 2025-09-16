@@ -151,7 +151,7 @@ export class DatabaseInitialization {
 
       // Test if functions exist by trying to call one
       try {
-        const { data, error } = await supabase.rpc('can_delete_document_type', {
+        const { error } = await supabase.rpc('can_delete_document_type', {
           type_name: 'test',
           user_id_param: '00000000-0000-0000-0000-000000000000'
         })
@@ -159,7 +159,7 @@ export class DatabaseInitialization {
         if (!error) {
           console.log('✅ Database functions are available')
         }
-      } catch (error) {
+      } catch {
         console.warn('⚠️ Database functions not found - please run the SQL in database-functions.sql')
       }
 

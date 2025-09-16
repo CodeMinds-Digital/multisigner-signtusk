@@ -4,7 +4,10 @@
  */
 
 import { DocumentTemplate, DocumentUploadData } from '@/types/drive'
-import { generateSignersFromSchemas, analyzeDocumentSignatureType } from './signature-field-utils'
+
+/**
+ * Analyze document schemas to determine signature type
+ */
 
 export class DriveService {
   // Note: Admin operations moved to API routes for security
@@ -17,6 +20,7 @@ export class DriveService {
       throw new Error('Server-side DriveService methods cannot be used on the client side. Use API endpoints instead.')
     }
     // Only import on server side
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { supabaseAdmin } = require('./supabase-admin')
     return supabaseAdmin
   }
@@ -24,7 +28,7 @@ export class DriveService {
   /**
    * Get document templates for a user (client-side function that calls API)
    */
-  static async getDocumentTemplates(userId: string): Promise<DocumentTemplate[]> {
+  static async getDocumentTemplates(): Promise<DocumentTemplate[]> {
     try {
       const response = await fetch('/api/drive/templates', {
         method: 'GET',
@@ -51,7 +55,7 @@ export class DriveService {
   /**
    * Upload document to Supabase storage (client-side function that calls API)
    */
-  static async uploadDocument(file: File, userId: string): Promise<{ data?: { path: string }, error?: any }> {
+  static async uploadDocument(file: File): Promise<{ data?: { path: string }, error?: any }> {
     try {
       const formData = new FormData()
       formData.append('file', file)
@@ -166,9 +170,9 @@ export class DriveService {
         usage_count: document.usage_count
       }
 
-    } catch (error) {
-      console.error('Error updating document template:', error)
-      throw error
+    } catch {
+      console.error('Error updating document template')
+      throw new Error('Update failed')
     }
   }
 
@@ -212,9 +216,9 @@ export class DriveService {
   /**
    * Quick storage access test: upload and delete a tiny file under the user folder in files bucket
    */
-  static async testStorageAccess(userId: string): Promise<{ success: boolean; error?: string }> {
+  static async testStorageAccess(_userId: string): Promise<{ success: boolean; error?: string }> {
     try {
-      const testPath = `test/${userId}/${Date.now()}.json`
+      const testPath = `test/${_userId}/${Date.now()}.json`
       const payload = new Blob([JSON.stringify({ ok: true, t: Date.now() })], { type: 'application/json' })
 
       const upload = await this.supabase.storage
@@ -228,8 +232,8 @@ export class DriveService {
       // Clean up
       await this.supabase.storage.from('files').remove([testPath])
       return { success: true }
-    } catch (e: any) {
-      return { success: false, error: e?.message || 'Unknown storage error' }
+    } catch {
+      return { success: false, error: 'Unknown storage error' }
     }
   }
 
@@ -292,6 +296,30 @@ export class DriveService {
     }
 
     return { status: 'ready', completion_percentage: 100 }
+  }
+
+  /**
+   * Analyze document schemas to determine signature type
+   */
+  private static analyzeDocumentSignatureType({ schemas }: { schemas: any[] }): { signatureType: 'single' | 'multi' } {
+    if (!Array.isArray(schemas) || schemas.length === 0) {
+      return { signatureType: 'single' }
+    }
+
+    // Count signature fields across all pages/schemas
+    let signatureCount = 0
+    schemas.forEach(pageSchemas => {
+      if (Array.isArray(pageSchemas)) {
+        pageSchemas.forEach(field => {
+          if (field.type === 'signature' || field.properties?.type === 'signature') {
+            signatureCount++
+          }
+        })
+      }
+    })
+
+    const signatureType = signatureCount > 1 ? 'multi' : 'single'
+    return { signatureType }
   }
 
   /**
@@ -394,7 +422,7 @@ export class DriveService {
 
       // Validate completion and determine status
       const documentWithSchemas = { ...currentDoc, schemas }
-      const { status, completion_percentage } = this.validateTemplateCompletion(documentWithSchemas)
+      const { status, completion_percentage } = DriveService.validateTemplateCompletion(documentWithSchemas)
 
       console.log('🔍 Status validation result:', {
         documentId,
@@ -426,7 +454,7 @@ export class DriveService {
       }
 
       // Analyze signature fields and determine signature type automatically
-      const signatureAnalysis = analyzeDocumentSignatureType({ schemas: serializedSchemas })
+      const signatureAnalysis = DriveService.analyzeDocumentSignatureType({ schemas: serializedSchemas })
       console.log('🔍 Signature analysis for document update:', signatureAnalysis)
 
       // Always update signature_type based on actual signature fields in schemas
@@ -466,7 +494,7 @@ export class DriveService {
         try {
           const parsed = JSON.parse(document.schemas)
           documentSchemas = Array.isArray(parsed) ? parsed : []
-        } catch (e) {
+        } catch (error) {
           console.warn('Failed to parse schemas as JSON:', document.schemas)
           documentSchemas = []
         }
@@ -516,7 +544,7 @@ export class DriveService {
   static async deleteDocumentTemplate(documentId: string, userId: string): Promise<void> {
     try {
       // Try deleting from documents first
-      let { error } = await this.supabase
+      const { error } = await this.supabase
         .from('documents')
         .delete()
         .eq('id', documentId)
@@ -547,7 +575,7 @@ export class DriveService {
   static async archiveDocumentTemplate(documentId: string, userId: string): Promise<void> {
     try {
       // Try updating in documents first
-      let { error } = await this.supabase
+      const { error } = await this.supabase
         .from('documents')
         .update({
           status: 'archived',
@@ -571,9 +599,9 @@ export class DriveService {
           throw new Error(templateUpdate.error.message)
         }
       }
-    } catch (error) {
-      console.error('Error archiving document template:', error)
-      throw error
+    } catch {
+      console.error('Error archiving document template')
+      throw new Error('Archive failed')
     }
   }
 
@@ -644,16 +672,16 @@ export class DriveService {
           throw new Error(error.message)
         }
       }
-    } catch (error) {
-      console.error('Error unarchiving document template:', error)
-      throw error
+    } catch {
+      console.error('Error unarchiving document template')
+      throw new Error('Unarchive failed')
     }
   }
 
   /**
    * Get a single document template (client-side function that calls API)
    */
-  static async getDocumentTemplate(documentId: string, userId: string): Promise<DocumentTemplate | null> {
+  static async getDocumentTemplate(documentId: string): Promise<DocumentTemplate | null> {
     try {
       const response = await fetch(`/api/drive/templates/${documentId}`, {
         method: 'GET',
@@ -838,7 +866,7 @@ export class DriveService {
     cancelled: number
   }> {
     try {
-      const documents = await this.getDocumentTemplates(userId)
+      const documents = await DriveService.getDocumentTemplates()
 
       return {
         total: documents.length,

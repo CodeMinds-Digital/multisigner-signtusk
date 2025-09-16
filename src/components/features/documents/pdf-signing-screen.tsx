@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { X, FileText, CheckCircle, XCircle, User, MapPin, Clock, Upload, AlertCircle } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { X, FileText, CheckCircle, XCircle, User, MapPin, Clock, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -9,6 +9,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+
+import Image from 'next/image'
+
+
 
 interface PDFSigningScreenProps {
   request: {
@@ -85,31 +89,7 @@ export function PDFSigningScreen({
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
   const [pdfLoading, setPdfLoading] = useState(true)
 
-  useEffect(() => {
-    console.log('🔄 PDF Signing Screen useEffect triggered:', {
-      requestId: request.id,
-      currentUserEmail,
-      documentUrl: request.document_url,
-      reason: 'Component mounted or key dependencies changed'
-    })
-
-    fetchUserProfile()
-    captureCurrentLocation()
-
-    // Set the PDF URL from the request
-    if (request.document_url) {
-      setPdfUrl(request.document_url)
-      setPdfLoading(false)
-      console.log('✅ PDF URL set for signing:', request.document_url)
-    }
-
-    // Track document view when PDF signing screen opens
-    trackDocumentView()
-    // Check sequential signing permissions
-    checkSequentialSigningPermissions()
-  }, [request.id, request.document_url, currentUserEmail]) // Fixed: Added missing dependencies
-
-  const checkSequentialSigningPermissions = async () => {
+  const checkSequentialSigningPermissions = useCallback(async () => {
     try {
       console.log('🔄 Checking sequential signing permissions for:', request.id)
       console.log('🔍 Validation context:', {
@@ -161,14 +141,14 @@ export function PDFSigningScreen({
         // Default to allowing signing if validation fails
         setSequentialValidation({ canSign: true, signingMode: 'parallel' })
       }
-    } catch (error) {
-      console.error('❌ Error checking sequential permissions:', error)
+    } catch (e) {
+      console.error('❌ Error checking sequential permissions:', e)
       // Default to allowing signing if validation fails
       setSequentialValidation({ canSign: true, signingMode: 'parallel' })
     }
-  }
+  }, [request.id, currentUserEmail, request.title])
 
-  const trackDocumentView = async () => {
+  const trackDocumentView = useCallback(async () => {
     try {
       console.log('📊 Tracking document view for signing request:', request.id)
 
@@ -184,10 +164,36 @@ export function PDFSigningScreen({
       } else {
         console.log('❌ Failed to track document view:', response.status)
       }
-    } catch (error) {
-      console.error('❌ Error tracking document view:', error)
+    } catch (e) {
+      console.error('❌ Error tracking document view:', e)
     }
-  }
+  }, [request.id])
+
+  useEffect(() => {
+    console.log('🔄 PDF Signing Screen useEffect triggered:', {
+      requestId: request.id,
+      currentUserEmail,
+      documentUrl: request.document_url,
+      reason: 'Component mounted or key dependencies changed'
+    })
+
+    fetchUserProfile()
+    captureCurrentLocation()
+
+    // Set the PDF URL from the request
+    if (request.document_url) {
+      setPdfUrl(request.document_url)
+      setPdfLoading(false)
+      console.log('✅ PDF URL set for signing:', request.document_url)
+    }
+
+    // Track document view when PDF signing screen opens
+    trackDocumentView()
+    // Check sequential signing permissions
+    checkSequentialSigningPermissions()
+  }, [request.id, request.document_url, currentUserEmail, checkSequentialSigningPermissions, trackDocumentView])
+
+
 
   const fetchUserProfile = async () => {
     try {
@@ -236,7 +242,8 @@ export function PDFSigningScreen({
       setCurrentLocation(locationData)
       setIsCapturingLocation(false)
       console.log('✅ Location captured via IP geolocation:', locationData)
-    } catch (error) {
+    } catch (e) {
+      console.error('Location capture error:', e)
       // Fallback: Just set a basic location without IP detection
       const locationData: LocationData = {
         timestamp: new Date().toISOString(),
@@ -628,9 +635,11 @@ export function PDFSigningScreen({
                     }}
                   />
                   {profileForm.signature_image && (
-                    <img
+                    <Image
                       src={profileForm.signature_image}
                       alt="Signature"
+                      width={200}
+                      height={80}
                       className="mt-2 max-h-20 border rounded"
                     />
                   )}

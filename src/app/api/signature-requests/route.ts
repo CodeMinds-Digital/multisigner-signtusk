@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
-import { SigningWorkflowService } from '@/lib/signing-workflow-service'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendBulkSignatureRequests } from '@/lib/email-service'
 import { NotificationService } from '@/lib/notification-service'

@@ -108,7 +108,7 @@ export function AddDocumentModal({ onClose, onDocumentCreated }: AddDocumentModa
     setLoading(true)
     try {
       // Upload PDF to Supabase storage
-      const uploadResult = await DriveService.uploadDocument(selectedFile, user.id)
+      const uploadResult = await DriveService.uploadDocument(selectedFile)
 
       console.log('Upload result:', uploadResult)
 

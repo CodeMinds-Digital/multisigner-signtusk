@@ -94,12 +94,6 @@ export function SignaturePadComponent({
     }
   }
 
-  const getSignatureData = () => {
-    if (signaturePadRef.current && !signaturePadRef.current.isEmpty()) {
-      return signaturePadRef.current.toDataURL('image/png')
-    }
-    return null
-  }
 
   return (
     <Card className="w-fit">
@@ -114,14 +108,14 @@ export function SignaturePadComponent({
           <canvas
             ref={canvasRef}
             className="border border-gray-200 rounded bg-white cursor-crosshair"
-            style={{ 
-              width: `${width}px`, 
+            style={{
+              width: `${width}px`,
               height: `${height}px`,
               cursor: disabled ? 'default' : 'crosshair'
             }}
           />
         </div>
-        
+
         {!disabled && (
           <div className="flex justify-between items-center">
             <Button

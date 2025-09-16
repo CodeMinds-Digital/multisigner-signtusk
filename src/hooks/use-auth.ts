@@ -68,7 +68,7 @@ export function useAuth() {
         if (session?.user) {
           // Fetch user profile data - only allow login if user exists in user_profiles table
           // Force fresh data by bypassing cache
-          const { data: profile, error: profileError } = await supabase
+          const { data: profile } = await supabase
             .from('user_profiles')
             .select('*')
             .eq('email', session.user.email)
@@ -112,7 +112,7 @@ export function useAuth() {
         if (session?.user) {
           // Only allow authenticated users who have completed registration
           // Force fresh data by bypassing cache
-          const { data: profile, error: profileError } = await supabase
+          const { data: profile, error: _profileError } = await supabase
             .from('user_profiles')
             .select('*')
             .eq('email', session.user.email)
@@ -134,7 +134,7 @@ export function useAuth() {
     )
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [clearAuthStorage])
 
   const signIn = async (credentials: LoginCredentials) => {
     try {
@@ -163,7 +163,7 @@ export function useAuth() {
       // Verify user has completed registration
       if (data.user) {
         // Force fresh data by bypassing cache
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile } = await supabase
           .from('user_profiles')
           .select('*')
           .eq('email', data.user.email)

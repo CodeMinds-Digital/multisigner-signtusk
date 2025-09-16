@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     console.log('📋 First schema fields:', schemas[0]?.length || 0)
 
     // Populate schema with signature data
-    const populatedInputs = await populateSchemaWithSignatures(schemas[0], allSigners, requestId)
+    const populatedInputs = await populateSchemaWithSignatures(schemas[0], allSigners)
 
     console.log('🎨 Generating PDF with pdfme-complete...')
 
@@ -221,7 +221,7 @@ export async function POST(request: NextRequest) {
   }
 }
 
-async function populateSchemaWithSignatures(schema: any[], signers: any[], requestId: string) {
+async function populateSchemaWithSignatures(schema: any[], signers: any[]) {
   const inputs: Record<string, any> = {}
 
   console.log(`📋 Processing ${schema.length} fields for ${signers.length} signers`)

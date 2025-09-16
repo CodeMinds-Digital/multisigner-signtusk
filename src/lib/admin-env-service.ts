@@ -148,7 +148,6 @@ export function getEnvironmentVariables(): EnvironmentVariable[] {
 export async function updateEnvironmentVariable(
   key: string,
   value: string,
-  adminUserId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // Validate the key exists in our configuration
@@ -185,7 +184,7 @@ export async function updateEnvironmentVariable(
             console.log(`Project change: ${processProjectId} → ${newProjectId}`)
           }
         }
-      } catch (error) {
+      } catch (_error) {
         return { success: false, error: 'Invalid Supabase URL format' }
       }
     }
@@ -253,15 +252,14 @@ export async function updateEnvironmentVariable(
 
     return { success: true }
 
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch {
+    return { success: false, error: 'An unexpected error occurred' }
   }
 }
 
 // Delete environment variable
 export async function deleteEnvironmentVariable(
   key: string,
-  adminUserId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     // Don't allow deletion of required variables
@@ -278,8 +276,12 @@ export async function deleteEnvironmentVariable(
 
     return { success: true }
 
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (error) {
+    let errorMessage = 'An unexpected error occurred';
+    if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    return { success: false, error: errorMessage }
   }
 }
 
@@ -308,8 +310,8 @@ export async function testEnvironmentVariable(key: string): Promise<{ success: b
         return { success: true, message: 'Environment variable is configured' }
     }
 
-  } catch (error: any) {
-    return { success: false, message: error.message }
+  } catch (_error) {
+    return { success: false, message: 'An unexpected error occurred' }
   }
 }
 
@@ -318,43 +320,12 @@ function isValidUrl(string: string): boolean {
   try {
     new URL(string)
     return true
-  } catch (_) {
+  } catch {
     return false
   }
 }
 
 // Test Supabase connection
-async function testSupabaseConnection(envVars: EnvironmentVariable[]): Promise<{ success: boolean; message: string }> {
-  try {
-    const url = envVars.find(v => v.key === 'NEXT_PUBLIC_SUPABASE_URL')?.value
-    const key = envVars.find(v => v.key === 'NEXT_PUBLIC_SUPABASE_ANON_KEY')?.value
-
-    if (!url || !key) {
-      return { success: false, message: 'Supabase URL or key not configured' }
-    }
-
-    // Simple test: try to create a Supabase client
-    const { createClient } = await import('@supabase/supabase-js')
-    const supabase = createClient(url, key)
-
-    // Test connection with a simple query
-    const { error } = await supabase.from('_test_').select('*').limit(1)
-
-    // If we get a "relation does not exist" error, that's actually good - it means we connected
-    if (error && error.message.includes('relation') && error.message.includes('does not exist')) {
-      return { success: true, message: 'Supabase connection successful' }
-    }
-
-    if (error) {
-      return { success: false, message: `Supabase connection failed: ${error.message}` }
-    }
-
-    return { success: true, message: 'Supabase connection successful' }
-
-  } catch (error: any) {
-    return { success: false, message: `Supabase test failed: ${error.message}` }
-  }
-}
 
 // Test Resend connection
 async function testResendConnection(apiKey: string): Promise<{ success: boolean; message: string }> {
@@ -370,8 +341,8 @@ async function testResendConnection(apiKey: string): Promise<{ success: boolean;
 
     return { success: true, message: 'Resend API key format is valid' }
 
-  } catch (error: any) {
-    return { success: false, message: `Resend test failed: ${error.message}` }
+  } catch {
+    return { success: false, message: 'Resend test failed' }
   }
 }
 
@@ -386,7 +357,7 @@ function testAppUrl(url: string): { success: boolean; message: string } {
 
     return { success: true, message: 'App URL format is valid' }
 
-  } catch (error: any) {
+  } catch {
     return { success: false, message: 'Invalid App URL format' }
   }
 }
@@ -420,7 +391,6 @@ export function generateEnvFileContent(): string {
 
 // Reset environment variables to process.env defaults
 export async function resetEnvironmentVariablesToDefaults(
-  adminUserId: string
 ): Promise<{ success: boolean; error?: string; resetCount?: number }> {
   try {
     let resetCount = 0
@@ -442,14 +412,13 @@ export async function resetEnvironmentVariablesToDefaults(
 
     return { success: true, resetCount }
 
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (_error) {
+    return { success: false, error: 'An unexpected error occurred' }
   }
 }
 
 // Detect and fix configuration mismatches
 export async function fixConfigurationMismatch(
-  adminUserId: string
 ): Promise<{ success: boolean; error?: string; message?: string }> {
   try {
     const result = detectAndFixConfigurationMismatch()
@@ -460,16 +429,15 @@ export async function fixConfigurationMismatch(
 
     return { success: true, message: result.message }
 
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (_error) {
+    return { success: false, error: 'An unexpected error occurred' }
   }
 }
 
 // Switch to a different Supabase project (helper function)
 export async function switchSupabaseProject(
   newUrl: string,
-  newAnonKey: string,
-  adminUserId: string
+  newAnonKey: string
 ): Promise<{ success: boolean; error?: string; message?: string }> {
   try {
     // Validate URL format
@@ -478,12 +446,12 @@ export async function switchSupabaseProject(
     }
 
     // Update both URL and key
-    const urlResult = await updateEnvironmentVariable('NEXT_PUBLIC_SUPABASE_URL', newUrl, adminUserId)
+    const urlResult = await updateEnvironmentVariable('NEXT_PUBLIC_SUPABASE_URL', newUrl)
     if (!urlResult.success) {
       return { success: false, error: urlResult.error }
     }
 
-    const keyResult = await updateEnvironmentVariable('NEXT_PUBLIC_SUPABASE_ANON_KEY', newAnonKey, adminUserId)
+    const keyResult = await updateEnvironmentVariable('NEXT_PUBLIC_SUPABASE_ANON_KEY', newAnonKey)
     if (!keyResult.success) {
       return { success: false, error: keyResult.error }
     }
@@ -497,8 +465,8 @@ export async function switchSupabaseProject(
       message: `Successfully switched to Supabase project: ${projectId}`
     }
 
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (_error) {
+    return { success: false, error: 'An unexpected error occurred' }
   }
 }
 

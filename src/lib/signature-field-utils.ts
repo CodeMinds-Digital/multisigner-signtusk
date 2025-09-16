@@ -120,7 +120,7 @@ export function generateSignersFromSchemas(schemas: any[]): Signer[] {
   const signers: Signer[] = []
   let order = 1
 
-  signerMap.forEach((fields, signerId) => {
+  signerMap.forEach((fields, _signerId) => {
     const firstField = fields[0]
     const signer = {
       id: `signer-${Date.now()}-${order}`,

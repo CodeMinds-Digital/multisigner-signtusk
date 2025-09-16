@@ -40,7 +40,7 @@ export function SignatureSelectionStep({
     return emailRegex.test(email)
   }
 
-  const validateSigner = (signer: { name: string; email: string; role: string }): { [key: string]: string } => {
+  const validateSigner = useCallback((signer: { name: string; email: string; role: string }): { [key: string]: string } => {
     const errors: { [key: string]: string } = {}
 
     if (!signer.name.trim()) {
@@ -60,7 +60,7 @@ export function SignatureSelectionStep({
     }
 
     return errors
-  }
+  }, [signers])
 
   const handleAddSigner = useCallback(() => {
     const validationErrors = validateSigner(newSigner)
@@ -82,7 +82,7 @@ export function SignatureSelectionStep({
       setNewSigner({ name: '', email: '', role: '' })
       setErrors({})
     }
-  }, [newSigner, signers, data, onDataChange])
+  }, [newSigner, signers, data, onDataChange, validateSigner])
 
   const handleRemoveSigner = useCallback((signerId: string) => {
     onDataChange?.({

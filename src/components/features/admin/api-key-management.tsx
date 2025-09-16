@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
-  Key, Plus, Edit, Trash2, Eye, EyeOff, Copy, CheckCircle, AlertTriangle,
-  Clock, Activity, RefreshCw, Settings
+  Key, Plus, Trash2, Eye, EyeOff, Copy, RefreshCw
 } from 'lucide-react'
 import { getAdminSession } from '@/lib/admin-auth'
 
@@ -27,7 +26,6 @@ export function APIKeyManagement() {
   const [apiKeys, setApiKeys] = useState<APIKey[]>([])
   const [loading, setLoading] = useState(false)
   const [showAddForm, setShowAddForm] = useState(false)
-  const [editingKey, setEditingKey] = useState<string | null>(null)
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set())
   const [newKey, setNewKey] = useState({
     name: '',

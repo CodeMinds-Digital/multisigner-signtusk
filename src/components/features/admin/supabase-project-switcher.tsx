@@ -17,12 +17,12 @@ export function SupabaseProjectSwitcher() {
 
   const currentUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
   const currentProjectId = currentUrl ? new URL(currentUrl).hostname.split('.')[0] : 'unknown'
-  
-  const adminUrl = typeof window !== 'undefined' 
-    ? localStorage.getItem('admin_env_NEXT_PUBLIC_SUPABASE_URL') 
+
+  const adminUrl = typeof window !== 'undefined'
+    ? localStorage.getItem('admin_env_NEXT_PUBLIC_SUPABASE_URL')
     : null
-  const activeProjectId = adminUrl 
-    ? new URL(adminUrl).hostname.split('.')[0] 
+  const activeProjectId = adminUrl
+    ? new URL(adminUrl).hostname.split('.')[0]
     : currentProjectId
 
   const handleSwitch = async () => {
@@ -36,7 +36,7 @@ export function SupabaseProjectSwitcher() {
 
     try {
       const newProjectId = new URL(newUrl).hostname.split('.')[0]
-      
+
       const confirmed = confirm(
         `Switch to Supabase project "${newProjectId}"?\n\n` +
         `This will:\n` +
@@ -49,9 +49,9 @@ export function SupabaseProjectSwitcher() {
       if (!confirmed) return
 
       setSwitching(true)
-      
-      const result = await switchSupabaseProject(newUrl, newAnonKey, adminSession.user.id)
-      
+
+      const result = await switchSupabaseProject(newUrl, newAnonKey)
+
       if (result.success) {
         alert(result.message)
         setNewUrl('')
@@ -131,8 +131,8 @@ export function SupabaseProjectSwitcher() {
           </div>
 
           <div className="flex items-center space-x-2">
-            <Button 
-              onClick={handleSwitch} 
+            <Button
+              onClick={handleSwitch}
               disabled={switching || !newUrl || !newAnonKey}
               className="flex items-center space-x-2"
             >
@@ -148,7 +148,7 @@ export function SupabaseProjectSwitcher() {
                 </>
               )}
             </Button>
-            
+
             {newUrl && extractProjectId(newUrl) && (
               <div className="text-sm text-gray-600">
                 → Switching to: <Badge variant="outline">{extractProjectId(newUrl)}</Badge>
@@ -161,8 +161,8 @@ export function SupabaseProjectSwitcher() {
         <div className="border-t pt-4">
           <h4 className="font-semibold mb-2">Quick Actions:</h4>
           <div className="flex space-x-2">
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => {
                 setNewUrl(currentUrl)
@@ -171,8 +171,8 @@ export function SupabaseProjectSwitcher() {
             >
               Reset to Process.env
             </Button>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               size="sm"
               onClick={() => {
                 setNewUrl('')

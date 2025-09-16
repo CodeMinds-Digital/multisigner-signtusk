@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { SignaturePadComponent } from '@/components/features/signature/signature-pad'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -46,7 +47,7 @@ export default function SignaturePage() {
             width={400}
             height={200}
           />
-          
+
           <div className="flex gap-2">
             <Button
               onClick={saveSignature}
@@ -80,10 +81,12 @@ export default function SignaturePage() {
               <div className="space-y-4">
                 {savedSignatures.map((sig, index) => (
                   <div key={index} className="border rounded-lg p-4 bg-gray-50">
-                    <img 
-                      src={sig} 
+                    <Image
+                      src={sig}
                       alt={`Signature ${index + 1}`}
                       className="max-w-full h-16 object-contain"
+                      width={300}
+                      height={64}
                     />
                     <div className="mt-2 flex gap-2">
                       <Button size="sm" variant="outline">

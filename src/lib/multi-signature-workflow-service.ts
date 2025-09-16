@@ -62,8 +62,8 @@ export class MultiSignatureWorkflowService {
         viewedCount,
         nextSignerEmail
       }
-    } catch (error) {
-      console.error('❌ Error checking completion status:', error)
+    } catch {
+      console.error('❌ Error checking completion status')
       return { allCompleted: false, signedCount: 0, totalCount: 0, viewedCount: 0 }
     }
   }
@@ -104,8 +104,8 @@ export class MultiSignatureWorkflowService {
       }
 
       return true
-    } catch (error) {
-      console.error('❌ Error in updateSigningProgress:', error)
+    } catch {
+      console.error('❌ Error in updateSigningProgress')
       return false
     }
   }
@@ -200,8 +200,8 @@ export class MultiSignatureWorkflowService {
       }
 
       return null
-    } catch (error) {
-      console.error('❌ Error generating final PDF:', error)
+    } catch {
+      console.error('❌ Error generating final PDF')
       return null
     }
   }
@@ -227,8 +227,8 @@ export class MultiSignatureWorkflowService {
         return null
       }
 
-    } catch (error) {
-      console.error('❌ Error in PDF generation:', error)
+    } catch {
+      console.error('❌ Error in PDF generation')
       return null
     }
   }
@@ -332,7 +332,7 @@ export class MultiSignatureWorkflowService {
               ? JSON.parse(signingRequest.document.settings)
               : signingRequest.document.settings
             signingMode = settings.signing_order || 'sequential'
-          } catch (e) {
+          } catch {
             console.log('⚠️ Could not parse document settings, using sequential mode (default)')
           }
         }
@@ -348,8 +348,8 @@ export class MultiSignatureWorkflowService {
           nextSignerEmail: status.nextSignerEmail
         }
       }
-    } catch (error) {
-      console.error('❌ Error handling signer completion:', error)
+    } catch {
+      console.error('❌ Error handling signer completion')
       return { success: false, allCompleted: false }
     }
   }
@@ -433,12 +433,12 @@ export class MultiSignatureWorkflowService {
                   : signingRequest.document.settings
                 signingMode = settings.signing_order || 'sequential'
                 console.log('✅ Fallback: Parsed signing mode from document settings:', signingMode)
-              } catch (e2) {
+              } catch {
                 console.log('⚠️ Could not parse document settings either, using sequential mode (default)')
               }
             }
           }
-        } catch (e) {
+        } catch {
           console.log('⚠️ Could not parse signature request metadata, trying document settings fallback')
           // Fallback to document settings
           if (signingRequest?.document?.settings) {
@@ -448,7 +448,7 @@ export class MultiSignatureWorkflowService {
                 : signingRequest.document.settings
               signingMode = settings.signing_order || 'sequential'
               console.log('✅ Fallback: Parsed signing mode from document settings:', signingMode)
-            } catch (e2) {
+            } catch {
               console.log('⚠️ Could not parse document settings either, using sequential mode (default)')
             }
           }
@@ -463,7 +463,7 @@ export class MultiSignatureWorkflowService {
               : signingRequest.document.settings
             signingMode = settings.signing_order || 'sequential'
             console.log('✅ Fallback: Parsed signing mode from document settings:', signingMode)
-          } catch (e) {
+          } catch {
             console.log('⚠️ Could not parse document settings, using sequential mode (default)')
           }
         } else {
@@ -527,8 +527,8 @@ export class MultiSignatureWorkflowService {
         signingMode,
         currentSignerOrder: currentSigner.signing_order
       }
-    } catch (error) {
-      console.error('❌ Error validating sequential signing permission:', error)
+    } catch {
+      console.error('❌ Error validating sequential signing permission')
       return {
         canSign: false,
         error: 'Failed to validate signing permission',
@@ -579,8 +579,8 @@ export class MultiSignatureWorkflowService {
       }
 
       return true
-    } catch (error) {
-      console.error('❌ Error tracking document view:', error)
+    } catch {
+      console.error('❌ Error tracking document view')
       return false
     }
   }

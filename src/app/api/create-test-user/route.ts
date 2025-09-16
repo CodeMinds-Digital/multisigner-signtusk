@@ -18,7 +18,7 @@ export async function POST() {
     const testPassword = 'password123'
 
     // First, try to create the auth user
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    const { error: authError } = await supabase.auth.admin.createUser({
       email: testEmail,
       password: testPassword,
       email_confirm: true
@@ -37,7 +37,7 @@ export async function POST() {
       .single()
 
     if (existingProfile) {
-      return NextResponse.json({ 
+      return NextResponse.json({
         message: 'Test user already exists',
         email: testEmail,
         password: testPassword
@@ -64,7 +64,7 @@ export async function POST() {
       return NextResponse.json({ error: profileError.message }, { status: 400 })
     }
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       message: 'Test user created successfully',
       email: testEmail,
       password: testPassword,
@@ -73,8 +73,8 @@ export async function POST() {
 
   } catch (error) {
     console.error('Error creating test user:', error)
-    return NextResponse.json({ 
-      error: error instanceof Error ? error.message : 'Unknown error' 
+    return NextResponse.json({
+      error: error instanceof Error ? error.message : 'Unknown error'
     }, { status: 500 })
   }
 }

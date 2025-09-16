@@ -58,7 +58,7 @@ export async function middleware(request: NextRequest) {
       }
 
       return response
-    } catch (error) {
+    } catch {
       // Invalid token - redirect to refresh first, then login if refresh fails
       const refreshUrl = new URL('/api/auth/refresh', request.url)
       return NextResponse.redirect(refreshUrl)

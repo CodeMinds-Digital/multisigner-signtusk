@@ -202,10 +202,10 @@ export class QRPDFService {
       console.log('✅ QR code successfully added to all pages')
       return { success: true, pdfBytes: modifiedPdfBytes }
 
-    } catch (error) {
-      console.error('❌ Error adding QR code to PDF:', error)
+    } catch (_error) {
+      console.error('❌ Error adding QR code to PDF:', _error)
       // Return original PDF on error (non-breaking)
-      return { success: false, pdfBytes, error: error instanceof Error ? error.message : 'Unknown error' }
+      return { success: false, pdfBytes, error: _error instanceof Error ? _error.message : 'Unknown error' }
     }
   }
 
@@ -254,8 +254,8 @@ export class QRPDFService {
       }
 
       console.log('✅ QR verification data stored successfully')
-    } catch (error) {
-      console.error('❌ Failed to store QR verification data:', error)
+    } catch (_error) {
+      console.error('❌ Failed to store QR verification data:', _error)
       // Don't throw - this shouldn't break PDF generation
     }
   }
@@ -303,8 +303,8 @@ export class QRPDFService {
         error: 'No QR code detected in PDF. This may not be a SignTusk verified document.'
       }
 
-    } catch (error) {
-      console.error('❌ Error extracting QR from PDF:', error)
+    } catch (_error) {
+      console.error('❌ Error extracting QR from PDF:', _error)
       return {
         success: false,
         error: 'Failed to process PDF file'
@@ -344,21 +344,21 @@ export class QRPDFService {
       }
 
       // Get signers data
-      const { data: signers, error: signersError } = await supabaseAdmin
+      const { data: signers, error: _unusedSignersError } = await supabaseAdmin
         .from('signing_request_signers')
         .select('*')
         .eq('signing_request_id', requestId)
         .order('signing_order')
 
       // Get document data
-      const { data: document, error: documentError } = await supabaseAdmin
+      const { data: document, error: _unusedDocumentError } = await supabaseAdmin
         .from('documents')
         .select('*')
         .eq('id', signingRequest.document_template_id)
         .single()
 
       // Get user data for signature requester using admin client
-      const { data: userData, error: userError } = await supabaseAdmin.auth.admin.getUserById(signingRequest.initiated_by)
+      const { data: userData, error: _unusedUserError } = await supabaseAdmin.auth.admin.getUserById(signingRequest.initiated_by)
 
       // Combine the data
       const combinedData = {
@@ -386,8 +386,8 @@ export class QRPDFService {
         }
       }
 
-    } catch (error) {
-      console.error('❌ Error verifying QR code:', error)
+    } catch (_error) {
+      console.error('❌ Error verifying QR code:', _error)
       return { success: false, error: 'Verification failed' }
     }
   }

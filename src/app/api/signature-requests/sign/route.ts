@@ -96,12 +96,12 @@ export async function POST(request: NextRequest) {
                 : signingRequest.document.settings
               signingMode = settings.signing_order || 'sequential'
               console.log('✅ Fallback: Parsed signing mode from document settings:', signingMode)
-            } catch (e2) {
+            } catch {
               console.log('⚠️ Could not parse document settings, using sequential mode (default)')
             }
           }
         }
-      } catch (e) {
+      } catch {
         console.log('⚠️ Could not parse signature request metadata, trying document settings fallback')
         // Fallback to document settings
         if (signingRequest?.document?.settings) {
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest) {
               : signingRequest.document.settings
             signingMode = settings.signing_order || 'sequential'
             console.log('✅ Fallback: Parsed signing mode from document settings:', signingMode)
-          } catch (e2) {
+          } catch {
             console.log('⚠️ Could not parse document settings, using sequential mode (default)')
           }
         }
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
             : signingRequest.document.settings
           signingMode = settings.signing_order || 'sequential'
           console.log('✅ Fallback: Parsed signing mode from document settings:', signingMode)
-        } catch (e) {
+        } catch {
           console.log('⚠️ Could not parse document settings, using sequential mode (default)')
         }
       }
@@ -261,7 +261,6 @@ export async function POST(request: NextRequest) {
       s.status === 'signed' || s.signer_status === 'signed'
     ).length
     const totalSigners = allSigners.length
-    const allSignersCompleted = signedCount === totalSigners
 
     // Also calculate viewed count (signers who have viewed_at timestamp)
     console.log('✅ Signature saved successfully. Signed:', signedCount, 'Total:', totalSigners)

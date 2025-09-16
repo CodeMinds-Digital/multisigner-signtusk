@@ -133,7 +133,7 @@ Check browser console for detailed debug information.
     if (!adminSession) return
 
     try {
-      const result = await createAdminTables(adminSession.user.id)
+      const result = await createAdminTables()
       alert(result.message)
       if (result.success) {
         loadSupabaseData()

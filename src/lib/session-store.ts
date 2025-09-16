@@ -291,11 +291,11 @@ export async function cleanupExpiredSessions(): Promise<void> {
 /**
  * Get all active sessions for a user
  */
-export async function getUserSessions(userId: string): Promise<SessionData[]> {
+export async function getUserSessions(_userId: string): Promise<SessionData[]> {
   const userSessions: SessionData[] = []
 
-  for (const [sessionId, session] of sessionStore.entries()) {
-    if (session.userId === userId) {
+  for (const [_sessionId, session] of sessionStore.entries()) {
+    if (session.userId === _userId) {
       userSessions.push(session)
     }
   }

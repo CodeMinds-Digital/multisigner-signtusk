@@ -67,7 +67,6 @@ export function DocumentWorkflow({ onComplete }: DocumentWorkflowProps) {
       case 'signers':
         return (
           <SignersStep
-            documentData={documentData}
             onComplete={handleSignersComplete}
           />
         )
@@ -206,7 +205,7 @@ function DocumentConfigurationStep({ documentId, onComplete }: { documentId: str
 }
 
 // Signers Step Component
-function SignersStep({ documentData, onComplete }: { documentData: any, onComplete: (signers: any[]) => void }) {
+function SignersStep({ onComplete }: { onComplete: (signers: any[]) => void }) {
   const [signers, setSigners] = useState([{ name: '', email: '', role: 'Signer' }])
 
   const addSigner = () => {
@@ -292,7 +291,6 @@ function SignersStep({ documentData, onComplete }: { documentData: any, onComple
 // Send Step Component
 function SendStep({ documentData, onComplete }: { documentData: any, onComplete: () => void }) {
   const [isSending, setIsSending] = useState(false)
-  const [emailResults, setEmailResults] = useState<any>(null)
   const { user } = useAuth()
 
   const handleSend = async () => {
@@ -332,7 +330,7 @@ function SendStep({ documentData, onComplete }: { documentData: any, onComplete:
         }
       )
 
-      setEmailResults(emailResult)
+      // emailResult is logged but not used for UI
 
       // Mark as sent if any emails succeeded
       if (emailResult.success) {
@@ -346,10 +344,7 @@ function SendStep({ documentData, onComplete }: { documentData: any, onComplete:
 
     } catch (error) {
       console.error('Failed to send document:', error)
-      setEmailResults({
-        success: false,
-        errors: ['Failed to send signature requests']
-      })
+      // Handle error without setting unused state
     } finally {
       setIsSending(false)
     }

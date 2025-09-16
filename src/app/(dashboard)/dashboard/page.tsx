@@ -29,7 +29,7 @@ export default function DashboardPage() {
     setLoading(true)
     try {
       // Get stats
-      const dashboardStats = await getDashboardStats(user.id)
+      const dashboardStats = await getDashboardStats()
       setStats({
         totalDocuments: dashboardStats.total,
         pendingSignatures: dashboardStats.pending,
@@ -38,7 +38,7 @@ export default function DashboardPage() {
       })
 
       // Get recent documents
-      const documents = await getDocuments(user.id)
+      const documents = await getDocuments()
       setRecentDocuments(documents.slice(0, 5))
 
     } catch (error) {

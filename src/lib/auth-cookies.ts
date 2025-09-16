@@ -16,7 +16,7 @@ export function setAuthCookies(
   response: NextResponse,
   tokens: AuthTokens
 ): NextResponse {
-  const { accessToken, refreshToken, expiresAt } = tokens
+  const { accessToken, refreshToken } = tokens
 
   // Calculate actual expiry times
   const accessTokenExpiry = new Date(Date.now() + AUTH_CONFIG.ACCESS_TOKEN_LIFETIME * 1000)

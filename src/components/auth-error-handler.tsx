@@ -65,8 +65,8 @@ export function AuthErrorHandler() {
             if (value) {
               JSON.parse(value)
             }
-          } catch (parseError) {
-            console.warn(`🚨 Malformed auth storage detected for key: ${key}`)
+          } catch (e) {
+            console.error(`Malformed auth storage detected for key: ${key}:`, e)
             console.log('🧹 Clearing corrupted auth storage...')
             clearSupabaseAuthStorage()
           }

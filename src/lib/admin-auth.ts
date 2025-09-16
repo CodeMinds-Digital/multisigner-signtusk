@@ -1,4 +1,3 @@
-import { supabase } from './supabase'
 
 export interface AdminUser {
   id: string
@@ -94,8 +93,9 @@ export async function adminLogin(email: string, password: string): Promise<{ suc
 
     return { success: true, session }
 
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (e) {
+    console.error('Admin login error:', e)
+    return { success: false, error: 'Invalid credentials' }
   }
 }
 
@@ -115,7 +115,8 @@ export function getAdminSession(): AdminSession | null {
 
     return session
 
-  } catch (error) {
+  } catch (e) {
+    console.error('Admin session parse error:', e)
     localStorage.removeItem(ADMIN_SESSION_KEY)
     return null
   }
@@ -157,7 +158,7 @@ export function requireAdminAuth(): AdminSession | null {
 
 // Get admin users list (for user management)
 export function getAdminUsers(): AdminUser[] {
-  return Object.entries(ADMIN_USERS).map(([email, data], index) => ({
+  return Object.entries(ADMIN_USERS).map(([_unusedEmail, data], index) => ({
     ...data.user,
     id: `admin_${index + 1}`,
     last_login: '2024-01-15T10:30:00Z' // Mock data
@@ -165,7 +166,7 @@ export function getAdminUsers(): AdminUser[] {
 }
 
 // Update admin user
-export async function updateAdminUser(userId: string, updates: Partial<AdminUser>): Promise<{ success: boolean; error?: string }> {
+export async function updateAdminUser(): Promise<{ success: boolean; error?: string }> {
   try {
     const session = getAdminSession()
     if (!session) {
@@ -180,13 +181,14 @@ export async function updateAdminUser(userId: string, updates: Partial<AdminUser
 
     return { success: true }
 
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (e) {
+    console.error('Admin user update error:', e)
+    return { success: false, error: 'Failed to update admin user' }
   }
 }
 
 // Create new admin user
-export async function createAdminUser(userData: Omit<AdminUser, 'id' | 'created_at' | 'last_login'>): Promise<{ success: boolean; error?: string }> {
+export async function createAdminUser(): Promise<{ success: boolean; error?: string }> {
   try {
     const session = getAdminSession()
     if (!session) {
@@ -201,7 +203,8 @@ export async function createAdminUser(userData: Omit<AdminUser, 'id' | 'created_
 
     return { success: true }
 
-  } catch (error: any) {
-    return { success: false, error: error.message }
+  } catch (error) {
+    console.error('Admin user create error:', error)
+    return { success: false, error: 'Failed to create admin user' }
   }
 }

@@ -34,11 +34,14 @@ export async function POST(request: NextRequest) {
     const sessionId = generateSessionId()
 
     // Fetch full user profile from user_profiles table using admin client
-    let { data: profile, error: profileError } = await supabaseAdmin
+    const profileResult = await supabaseAdmin
       .from('user_profiles')
       .select('*')
       .eq('id', user.id)
       .single()
+
+    let profile = profileResult.data
+    const profileError = profileResult.error
 
     // If profile doesn't exist, create it
     if (profileError && profileError.code === 'PGRST116') {

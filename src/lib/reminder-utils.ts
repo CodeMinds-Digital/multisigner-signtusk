@@ -279,7 +279,7 @@ export interface NotificationPreferences {
 /**
  * Get notification preferences for a user (placeholder for future implementation)
  */
-export async function getNotificationPreferences(userId: string): Promise<NotificationPreferences> {
+export async function getNotificationPreferences(): Promise<NotificationPreferences> {
   // TODO: Implement user notification preferences
   // For now, return default email-only configuration
   return {
@@ -296,8 +296,7 @@ export async function getNotificationPreferences(userId: string): Promise<Notifi
 export async function sendMultiChannelReminder(
   signingRequestId: string,
   targets: ReminderTarget[],
-  preferences: NotificationPreferences,
-  metadata: Record<string, any> = {}
+  preferences: NotificationPreferences
 ): Promise<ReminderResult[]> {
   const results: ReminderResult[] = []
 

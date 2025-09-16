@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify access token
-    const payload = await verifyAccessToken(accessToken)
+    await verifyAccessToken(accessToken)
 
     // Get request body
     const { pdfUrl } = await request.json()

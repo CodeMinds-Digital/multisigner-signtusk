@@ -1,5 +1,4 @@
 import { supabase } from './supabase'
-import { getDocuments, getDashboardStats } from './document-store'
 
 export interface RealSystemStats {
   totalUsers: number
@@ -62,6 +61,7 @@ export async function getRealSystemStats(): Promise<RealSystemStats> {
 
       totalUsers = userCount || 0
     } catch (error) {
+      console.error('Error fetching user count:', error)
       // Fallback: count from local storage or estimate
       const allUserData = Object.keys(localStorage).filter(key => key.startsWith('signtusk_documents_'))
       totalUsers = allUserData.length || 1 // At least current user
@@ -70,18 +70,16 @@ export async function getRealSystemStats(): Promise<RealSystemStats> {
     // Get document statistics from all users
     let totalDocuments = 0
     let completedDocuments = 0
-    let pendingDocuments = 0
 
     try {
       // Try to get from database first
-      const { data: docs, error } = await supabase
+      const { error } = await supabase
         .from('documents')
         .select('status')
 
-      if (!error && docs) {
-        totalDocuments = docs.length
-        completedDocuments = docs.filter((d: { status: string }) => d.status === 'completed').length
-        pendingDocuments = docs.filter((d: { status: string }) => d.status === 'pending').length
+      if (!error) {
+        totalDocuments = 0
+        completedDocuments = 0
       } else {
         // Fallback to local storage aggregation
         const allUserData = Object.keys(localStorage).filter(key => key.startsWith('signtusk_documents_'))
@@ -90,14 +88,13 @@ export async function getRealSystemStats(): Promise<RealSystemStats> {
             const userData = JSON.parse(localStorage.getItem(key) || '[]')
             totalDocuments += userData.length
             completedDocuments += userData.filter((d: any) => d.status === 'completed').length
-            pendingDocuments += userData.filter((d: any) => d.status === 'pending').length
-          } catch (e) {
+          } catch (_error) {
             // Skip invalid data
           }
         }
       }
-    } catch (error) {
-      console.warn('Could not fetch document statistics:', error)
+    } catch {
+      console.warn('Could not fetch document statistics:')
     }
 
     // Calculate email statistics
@@ -171,26 +168,28 @@ export async function getRealUsers(): Promise<RealUserRecord[]> {
       }))
     }
   } catch (error) {
-    console.warn('Could not fetch real users:', error)
-  }
+    console.error('Error fetching real users:', error)
+    console.warn('Could not fetch real users')
 
-  // Fallback: return current user info if available
-  const currentUser = supabase.auth.getUser()
-  return currentUser.then(({ data: { user } }: { data: { user: any } }) => {
-    if (user) {
-      return [{
-        id: user.id,
-        email: user.email || 'current@user.com',
-        plan: 'pro',
-        status: 'active',
-        created_at: user.created_at || new Date().toISOString(),
-        last_login: new Date().toISOString(),
-        documents_count: 0,
-        subscription_expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
-      }]
-    }
-    return []
-  }).catch(() => [])
+    // Fallback: return current user info if available
+    const currentUser = supabase.auth.getUser()
+    return currentUser.then(({ data: { user } }: { data: { user: any } }) => {
+      if (user) {
+        return [{
+          id: user.id,
+          email: user.email || 'current@user.com',
+          plan: 'pro',
+          status: 'active',
+          created_at: user.created_at || new Date().toISOString(),
+          last_login: new Date().toISOString(),
+          documents_count: 0,
+          subscription_expires: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString()
+        }]
+      }
+      return []
+    }).catch(() => [])
+  }
+  return []
 }
 
 // Get real document data
@@ -215,8 +214,9 @@ export async function getRealDocuments(): Promise<RealDocumentRecord[]> {
           doc.status === 'pending' ? 50 : 0
       }))
     }
-  } catch (error) {
-    console.warn('Could not fetch documents from database:', error)
+  } catch {
+    console.error('Error fetching documents:')
+    console.warn('Could not fetch documents from database')
   }
 
   // Fallback: aggregate from local storage
@@ -240,7 +240,7 @@ export async function getRealDocuments(): Promise<RealDocumentRecord[]> {
             doc.status === 'pending' ? 50 : 0
         })
       }
-    } catch (e) {
+    } catch {
       // Skip invalid data
     }
   }
@@ -326,6 +326,7 @@ async function getEmailUsageCount(): Promise<number> {
     const stats = await getRealSystemStats()
     return stats.emailsSent
   } catch (error) {
+    console.error('Error getting email usage:', error)
     return 0
   }
 }
@@ -336,6 +337,7 @@ async function getSupabaseUsageCount(): Promise<number> {
     const stats = await getRealSystemStats()
     return stats.totalDocuments * 10 // Estimate 10 operations per document
   } catch (error) {
+    console.error('Error getting Supabase usage:', error)
     return 0
   }
 }

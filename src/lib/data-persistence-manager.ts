@@ -69,8 +69,8 @@ export class DataPersistenceManager {
         `${this.CACHE_PREFIX}${key}`,
         JSON.stringify(cacheEntry)
       )
-    } catch (error) {
-      console.warn('Failed to set cache:', error)
+    } catch {
+      console.warn('Failed to set cache')
     }
   }
 
@@ -83,15 +83,15 @@ export class DataPersistenceManager {
       if (!cached) return null
 
       const cacheEntry: CacheEntry<T> = JSON.parse(cached)
-      
+
       if (Date.now() > cacheEntry.expiresAt) {
         this.clearCache(key)
         return null
       }
 
       return cacheEntry.data
-    } catch (error) {
-      console.warn('Failed to get cache:', error)
+    } catch (_error) {
+      console.warn('Failed to get cache:', _error)
       return null
     }
   }
@@ -102,8 +102,8 @@ export class DataPersistenceManager {
   static clearCache(key: string): void {
     try {
       localStorage.removeItem(`${this.CACHE_PREFIX}${key}`)
-    } catch (error) {
-      console.warn('Failed to clear cache:', error)
+    } catch (_error) {
+      console.warn('Failed to clear cache:', _error)
     }
   }
 
@@ -118,8 +118,8 @@ export class DataPersistenceManager {
           localStorage.removeItem(key)
         }
       })
-    } catch (error) {
-      console.warn('Failed to clear all cache:', error)
+    } catch (_error) {
+      console.warn('Failed to clear all cache:', _error)
     }
   }
 
@@ -143,21 +143,21 @@ export class DataPersistenceManager {
     try {
       // Fetch fresh data
       const data = await this.retryOperation(fetchFunction)
-      
+
       // Cache the result
       this.setCache(key, data, cacheDuration)
-      
+
       return data
     } catch (error) {
       console.error(`Failed to fetch data for ${key}:`, error)
-      
+
       // Try to return stale cache as fallback
       const staleCache = this.getStaleCache<T>(key)
       if (staleCache) {
         console.warn(`Using stale cache for ${key}`)
         return staleCache
       }
-      
+
       throw error
     }
   }
@@ -172,7 +172,7 @@ export class DataPersistenceManager {
 
       const cacheEntry: CacheEntry<T> = JSON.parse(cached)
       return cacheEntry.data
-    } catch (error) {
+    } catch {
       return null
     }
   }
@@ -191,7 +191,7 @@ export class DataPersistenceManager {
         return await operation()
       } catch (error) {
         lastError = error as Error
-        
+
         if (attempt === maxAttempts) {
           break
         }
@@ -199,7 +199,7 @@ export class DataPersistenceManager {
         // Exponential backoff
         const delay = this.RETRY_DELAY * Math.pow(2, attempt - 1)
         console.warn(`Attempt ${attempt} failed, retrying in ${delay}ms:`, error)
-        
+
         await new Promise(resolve => setTimeout(resolve, delay))
       }
     }
@@ -227,8 +227,8 @@ export class DataPersistenceManager {
       localStorage.setItem('signtusk_offline_queue', JSON.stringify(queue))
       this.syncStatus.pendingChanges = queue.length
       this.saveSyncStatus()
-    } catch (error) {
-      console.error('Failed to queue offline operation:', error)
+    } catch (_error) {
+      console.error('Failed to queue offline operation:', _error)
     }
   }
 
@@ -239,8 +239,8 @@ export class DataPersistenceManager {
     try {
       const queue = localStorage.getItem('signtusk_offline_queue')
       return queue ? JSON.parse(queue) : []
-    } catch (error) {
-      console.warn('Failed to get offline queue:', error)
+    } catch (_error) {
+      console.warn('Failed to get offline queue:', _error)
       return []
     }
   }
@@ -263,11 +263,11 @@ export class DataPersistenceManager {
       for (const operation of queue) {
         try {
           await this.executeOperation(operation)
-          
+
           // Remove successful operation from queue
           const updatedQueue = this.getOfflineQueue().filter(op => op.id !== operation.id)
           localStorage.setItem('signtusk_offline_queue', JSON.stringify(updatedQueue))
-          
+
         } catch (error) {
           console.error('Failed to sync operation:', operation, error)
           // Keep failed operations in queue for retry
@@ -276,9 +276,9 @@ export class DataPersistenceManager {
 
       this.syncStatus.lastSync = Date.now()
       this.syncStatus.pendingChanges = this.getOfflineQueue().length
-      
-    } catch (error) {
-      console.error('Sync failed:', error)
+
+    } catch (_error) {
+      console.error('Sync failed:', _error)
     } finally {
       this.syncStatus.syncInProgress = false
       this.saveSyncStatus()
@@ -329,8 +329,8 @@ export class DataPersistenceManager {
       if (stored) {
         this.syncStatus = { ...this.syncStatus, ...JSON.parse(stored) }
       }
-    } catch (error) {
-      console.warn('Failed to load sync status:', error)
+    } catch (_error) {
+      console.warn('Failed to load sync status:', _error)
     }
   }
 
@@ -340,8 +340,8 @@ export class DataPersistenceManager {
   private static saveSyncStatus(): void {
     try {
       localStorage.setItem(this.SYNC_STATUS_KEY, JSON.stringify(this.syncStatus))
-    } catch (error) {
-      console.warn('Failed to save sync status:', error)
+    } catch (_error) {
+      console.warn('Failed to save sync status:', _error)
     }
   }
 
@@ -363,8 +363,8 @@ export class DataPersistenceManager {
           localStorage.removeItem(key)
         }
       })
-    } catch (error) {
-      console.warn('Failed to invalidate cache:', error)
+    } catch (_error) {
+      console.warn('Failed to invalidate cache:', _error)
     }
   }
 
@@ -389,8 +389,8 @@ export class DataPersistenceManager {
       }
 
       console.log('Critical data preloading completed')
-    } catch (error) {
-      console.error('Failed to preload critical data:', error)
+    } catch (_error) {
+      console.error('Failed to preload critical data:', _error)
     }
   }
 
@@ -416,21 +416,21 @@ export class DataPersistenceManager {
           const value = localStorage.getItem(key)
           if (value) {
             totalSize += value.length
-            
+
             try {
               const cacheEntry = JSON.parse(value)
               if (now > cacheEntry.expiresAt) {
                 expiredEntries++
               }
-            } catch (error) {
+            } catch {
               // Invalid cache entry
               expiredEntries++
             }
           }
         }
       })
-    } catch (error) {
-      console.warn('Failed to get cache stats:', error)
+    } catch (_error) {
+      console.warn('Failed to get cache stats:', _error)
     }
 
     return { totalEntries, totalSize, expiredEntries }
@@ -455,7 +455,7 @@ export class DataPersistenceManager {
                 localStorage.removeItem(key)
                 cleanedCount++
               }
-            } catch (error) {
+            } catch {
               // Invalid cache entry, remove it
               localStorage.removeItem(key)
               cleanedCount++
@@ -465,8 +465,8 @@ export class DataPersistenceManager {
       })
 
       console.log(`Cleaned up ${cleanedCount} expired cache entries`)
-    } catch (error) {
-      console.warn('Failed to cleanup expired cache:', error)
+    } catch (_error) {
+      console.warn('Failed to cleanup expired cache:', _error)
     }
   }
 }

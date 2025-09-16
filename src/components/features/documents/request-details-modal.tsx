@@ -1,6 +1,8 @@
 'use client'
 
 import { useState } from 'react'
+
+import Image from 'next/image'
 import { X, Calendar, FileText, Mail, ExternalLink } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -294,15 +296,19 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
                               <p className="text-xs font-medium text-gray-700 mb-2">Signature:</p>
                               <div className="bg-white border border-gray-200 rounded p-2 max-w-xs">
                                 {typeof signer.signature_data === 'string' ? (
-                                  <img
+                                  <Image
                                     src={signer.signature_data}
                                     alt="Signature"
+                                    width={200}
+                                    height={50}
                                     className="max-h-12 max-w-full object-contain"
                                   />
                                 ) : signer.signature_data.signature_image ? (
-                                  <img
+                                  <Image
                                     src={signer.signature_data.signature_image}
                                     alt="Signature"
+                                    width={200}
+                                    height={50}
                                     className="max-h-12 max-w-full object-contain"
                                   />
                                 ) : (
