@@ -1,0 +1,3 @@
+# Deployment configuration - uses public registry
+# Copy this to .npmrc for deployment if private packages cause issues
+registry=https://registry.npmjs.org/
