@@ -107,8 +107,22 @@ export default function VerifyPage() {
   }
 
   const getSignatureType = (totalSigners: number, metadata?: any) => {
-    if (totalSigners > 1) return 'Multi'
-    return 'Single'
+    if (totalSigners === 1) return 'Single'
+
+    // For multi-signature, check the signing mode from metadata
+    let signingMode = 'Sequential' // default
+    if (metadata) {
+      try {
+        const parsedMetadata = typeof metadata === 'string' ? JSON.parse(metadata) : metadata
+        if (parsedMetadata.signing_mode) {
+          signingMode = parsedMetadata.signing_mode === 'parallel' ? 'Parallel' : 'Sequential'
+        }
+      } catch (e) {
+        console.log('Could not parse metadata for signing mode')
+      }
+    }
+
+    return `Multi (${signingMode})`
   }
 
   const getStatusColor = (status: string) => {

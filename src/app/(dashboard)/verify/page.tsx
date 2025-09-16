@@ -132,8 +132,22 @@ export default function VerifyPage() {
   }
 
   const getSignatureType = (totalSigners: number, metadata?: any) => {
-    if (totalSigners > 1) return 'Multi'
-    return 'Single'
+    if (totalSigners === 1) return 'Single'
+
+    // For multi-signature, check the signing mode from metadata
+    let signingMode = 'Sequential' // default
+    if (metadata) {
+      try {
+        const parsedMetadata = typeof metadata === 'string' ? JSON.parse(metadata) : metadata
+        if (parsedMetadata.signing_mode) {
+          signingMode = parsedMetadata.signing_mode === 'parallel' ? 'Parallel' : 'Sequential'
+        }
+      } catch (e) {
+        console.log('Could not parse metadata for signing mode')
+      }
+    }
+
+    return `Multi (${signingMode})`
   }
 
   return (
@@ -266,7 +280,7 @@ export default function VerifyPage() {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Signature Type:</span>
-                        <span className="font-medium">{getSignatureType(verificationResult.data.signing_request.total_signers, verificationResult.data.signing_request.metadata)}</span>
+                        <span className="font-medium">{getSignatureType(verificationResult.data.signing_request.total_signers || verificationResult.data.signing_request.signers?.length || 0, verificationResult.data.signing_request.metadata)}</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-gray-500">Created:</span>

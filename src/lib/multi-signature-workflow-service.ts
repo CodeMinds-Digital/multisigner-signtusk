@@ -1,4 +1,5 @@
 import { supabaseAdmin } from './supabase-admin'
+import { NotificationService } from './notification-service'
 
 export interface MultiSignatureWorkflowConfig {
   requestId: string
@@ -172,6 +173,28 @@ export class MultiSignatureWorkflowService {
           })
           .eq('id', requestId)
 
+        // Get signing request details for PDF notification
+        const { data: signingRequest } = await supabaseAdmin
+          .from('signing_requests')
+          .select('*')
+          .eq('id', requestId)
+          .single()
+
+        // Notify requester that final PDF is ready
+        if (signingRequest && signingRequest.initiated_by) {
+          try {
+            await NotificationService.notifyPdfGenerated(
+              signingRequest.initiated_by,
+              signingRequest.title || 'Document',
+              requestId,
+              finalPdfUrl
+            )
+            console.log('📧 PDF generation notification sent to requester')
+          } catch (error) {
+            console.error('❌ Error sending PDF generation notification:', error)
+          }
+        }
+
         console.log('✅ Final PDF generated and database updated:', finalPdfUrl)
         return finalPdfUrl
       }
@@ -233,9 +256,57 @@ export class MultiSignatureWorkflowService {
       // Check completion status
       const status = await this.checkCompletionStatus(requestId)
 
+      // Get signing request details for notifications
+      const { data: signingRequest } = await supabaseAdmin
+        .from('signing_requests')
+        .select(`
+          *,
+          document:documents!document_template_id(*)
+        `)
+        .eq('id', requestId)
+        .single()
+
+      // Notify requester that someone signed
+      if (signingRequest && signingRequest.initiated_by) {
+        try {
+          await NotificationService.notifySignatureCompleted(
+            requestId,
+            signingRequest.title || 'Document',
+            signerEmail,
+            signingRequest.initiated_by
+          )
+          console.log('📧 Signature completion notification sent to requester')
+        } catch (error) {
+          console.error('❌ Error sending signature completion notification:', error)
+        }
+      }
+
       if (status.allCompleted) {
         // Generate final PDF
         const finalPdfUrl = await this.generateFinalPDF(requestId)
+
+        // Notify requester that all signatures are complete
+        if (signingRequest && signingRequest.initiated_by) {
+          try {
+            // Get all signer emails
+            const { data: allSigners } = await supabaseAdmin
+              .from('signing_request_signers')
+              .select('signer_email')
+              .eq('signing_request_id', requestId)
+
+            const signerEmails = allSigners?.map(s => s.signer_email) || []
+
+            await NotificationService.notifyDocumentCompleted(
+              requestId,
+              signingRequest.title || 'Document',
+              signingRequest.initiated_by,
+              signerEmails
+            )
+            console.log('📧 Document completion notification sent to requester')
+          } catch (error) {
+            console.error('❌ Error sending document completion notification:', error)
+          }
+        }
 
         return {
           success: true,

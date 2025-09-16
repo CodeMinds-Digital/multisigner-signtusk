@@ -3,6 +3,7 @@ import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { MultiSignatureWorkflowService } from '@/lib/multi-signature-workflow-service'
+import { NotificationService } from '@/lib/notification-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,6 +60,32 @@ export async function POST(request: NextRequest) {
         JSON.stringify({ error: 'Failed to track document view' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Get signing request details for notification
+    try {
+      const { data: signingRequest } = await supabaseAdmin
+        .from('signing_requests')
+        .select(`
+          *,
+          document:documents!document_template_id(*)
+        `)
+        .eq('id', requestId)
+        .single()
+
+      if (signingRequest && signingRequest.initiated_by) {
+        // Notify the document owner that someone viewed the document
+        await NotificationService.notifyDocumentViewed(
+          signingRequest.initiated_by,
+          payload.email,
+          signingRequest.title || 'Document',
+          requestId
+        )
+        console.log('📧 Document view notification sent to requester')
+      }
+    } catch (error) {
+      console.error('❌ Error sending document view notification:', error)
+      // Don't fail the request if notification fails
     }
 
     return new Response(
