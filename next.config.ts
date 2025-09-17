@@ -30,14 +30,31 @@ const nextConfig: NextConfig = {
       config.externals = config.externals || [];
       config.externals.push('canvas');
 
-      // Completely externalize problematic email dependencies to prevent Html import conflicts
-      config.externals.push('@react-email/render');
+      // Aggressively externalize ALL email-related dependencies to prevent Html import conflicts
       config.externals.push('resend');
+      config.externals.push('@react-email/render');
+      config.externals.push('@react-email/components');
+      config.externals.push('@react-email/html');
+      config.externals.push('@react-email/head');
+      config.externals.push('@react-email/preview');
 
-      // Also externalize any other packages that might import from next/document
+      // Dynamic externalization for any package that might import from next/document
       config.externals.push(({ request }: { request: string }, callback: any) => {
-        // Externalize any package that might import from next/document
-        if (request && (request.includes('react-email') || request.includes('next/document'))) {
+        if (request && (
+          request.includes('react-email') ||
+          request.includes('next/document') ||
+          request.includes('resend') ||
+          request === 'resend' ||
+          request.startsWith('@react-email/')
+        )) {
+          return callback(null, `commonjs ${request}`);
+        }
+        callback();
+      });
+
+      // Additional safety: prevent any HTML-related imports during build
+      config.externals.push(({ request }: { request: string }, callback: any) => {
+        if (request && request.includes('Html') && request.includes('next')) {
           return callback(null, `commonjs ${request}`);
         }
         callback();

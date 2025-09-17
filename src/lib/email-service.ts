@@ -1,6 +1,32 @@
-import { Resend } from 'resend'
+// Dynamic imports to prevent build-time bundling issues
+let resendInstance: any = null;
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+// Initialize Resend only at runtime, never during build
+async function getResendInstance() {
+  // Always skip during build/static generation to prevent Html import errors
+  if (typeof window === 'undefined' && (
+    process.env.NODE_ENV === 'production' ||
+    process.env.NEXT_PHASE === 'phase-production-build' ||
+    !process.env.RESEND_API_KEY
+  )) {
+    console.log('Skipping Resend initialization during build/static generation');
+    return null;
+  }
+
+  if (!resendInstance && process.env.RESEND_API_KEY) {
+    try {
+      // Dynamic import to prevent bundling during build
+      // Use eval to prevent TypeScript from checking the import at build time
+      const resendModule = await eval('import("resend")');
+      resendInstance = new resendModule.Resend(process.env.RESEND_API_KEY);
+      console.log('Resend initialized successfully');
+    } catch (error) {
+      console.warn('Resend package not available, using simulation mode:', error);
+      return null;
+    }
+  }
+  return resendInstance;
+}
 
 export interface SignatureRequestEmail {
   to: string
@@ -34,8 +60,9 @@ export async function sendSignatureRequestEmail(emailData: SignatureRequestEmail
   try {
     console.log('📧 Sending signature request email to:', emailData.to)
 
-    if (!process.env.RESEND_API_KEY) {
-      console.warn('RESEND_API_KEY not configured, simulating email send')
+    const resend = await getResendInstance();
+    if (!resend) {
+      console.warn('Resend not available, simulating email send')
       return simulateEmailSend(emailData)
     }
 
@@ -123,8 +150,9 @@ export async function sendReminderEmail(emailData: ReminderEmail): Promise<Email
   try {
     console.log('📧 Sending reminder email to:', emailData.to)
 
-    if (!process.env.RESEND_API_KEY) {
-      console.warn('RESEND_API_KEY not configured, simulating email send')
+    const resend = await getResendInstance();
+    if (!resend) {
+      console.warn('Resend not available, simulating email send')
       return simulateEmailSend(emailData)
     }
 
@@ -363,6 +391,14 @@ export async function testEmailConfiguration(): Promise<{ success: boolean; erro
     }
 
     const fromEmail = 'SignTusk <noreply@notifications.signtusk.com>' // Verified domain
+
+    const resend = await getResendInstance();
+    if (!resend) {
+      return {
+        success: false,
+        error: 'Resend service not available'
+      }
+    }
 
     const testResult = await resend.emails.send({
       from: fromEmail,
