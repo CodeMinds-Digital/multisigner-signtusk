@@ -1,6 +1,5 @@
-import type { NextConfig } from "next";
-
-const nextConfig: NextConfig = {
+/** @type {import('next').NextConfig} */
+const nextConfig = {
   images: {
     domains: ['gzxfsojbbfipzvjxucci.supabase.co'],
   },
@@ -17,7 +16,7 @@ const nextConfig: NextConfig = {
   allowedDevOrigins: ['http://192.168.1.2:3001', 'http://192.168.1.2:3000', 'http://192.168.1.2:3002', 'http://192.168.1.2:3003'],
   // Fix Turbopack root directory (only when explicitly enabled)
   turbopack: {
-    root: __dirname,
+    root: process.cwd(),
   },
   // Improve stability
   reactStrictMode: true,
@@ -37,20 +36,18 @@ const nextConfig: NextConfig = {
       config.externals.push('@react-email/html');
       config.externals.push('@react-email/head');
       config.externals.push('@react-email/preview');
-      config.externals.push('nodemailer');
-      config.externals.push('@documenso/nodemailer-resend');
+      config.externals.push('@react-email/body');
+      config.externals.push('@react-email/container');
+      config.externals.push('@react-email/section');
 
       // Dynamic externalization for any package that might import from next/document
-      config.externals.push(({ request }: { request: string }, callback: any) => {
+      config.externals.push(({ request }, callback) => {
         if (request && (
           request.includes('react-email') ||
           request.includes('next/document') ||
           request.includes('resend') ||
           request === 'resend' ||
-          request.startsWith('@react-email/') ||
-          request.includes('nodemailer') ||
-          request === 'nodemailer' ||
-          request.startsWith('@documenso/nodemailer')
+          request.startsWith('@react-email/')
         )) {
           return callback(null, `commonjs ${request}`);
         }
@@ -58,7 +55,7 @@ const nextConfig: NextConfig = {
       });
 
       // Additional safety: prevent any HTML-related imports during build
-      config.externals.push(({ request }: { request: string }, callback: any) => {
+      config.externals.push(({ request }, callback) => {
         if (request && request.includes('Html') && request.includes('next')) {
           return callback(null, `commonjs ${request}`);
         }
@@ -74,9 +71,6 @@ const nextConfig: NextConfig = {
         net: false,
         tls: false,
         canvas: false,
-        dns: false,
-        child_process: false,
-        nodemailer: false,
       };
     }
 

@@ -1,19 +1,6 @@
-import nodemailer from 'nodemailer'
-import { ResendTransport } from '@documenso/nodemailer-resend'
+import { Resend } from 'resend'
 
-// Create transporter with Resend
-let transporter: nodemailer.Transporter | null = null
-
-function getTransporter() {
-  if (!transporter && process.env.RESEND_API_KEY) {
-    transporter = nodemailer.createTransport(
-      new ResendTransport({
-        apiKey: process.env.RESEND_API_KEY,
-      })
-    )
-  }
-  return transporter
-}
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 export interface SignatureRequestEmail {
   to: string
@@ -52,27 +39,30 @@ export async function sendSignatureRequestEmail(emailData: SignatureRequestEmail
       return simulateEmailSend(emailData)
     }
 
-    const transporter = getTransporter()
-    if (!transporter) {
-      console.warn('Email transporter not available, simulating email send')
-      return simulateEmailSend(emailData)
-    }
+    // Domain is verified and account is in production mode - can send to any email
 
     // Use verified domain for all environments
     const fromEmail = 'SignTusk <noreply@notifications.signtusk.com>'
 
-    const result = await transporter.sendMail({
+    const { data, error } = await resend.emails.send({
       from: fromEmail,
-      to: emailData.to,
+      to: [emailData.to],
       subject: `Signature Request: ${emailData.documentTitle}`,
       html: generateSignatureRequestHTML(emailData),
     })
 
-    console.log('Email sent successfully:', result.messageId)
-    return {
-      success: true,
-      messageId: result.messageId
+    if (error) {
+      console.error('Resend API error:', error)
+      // If domain verification error, fall back to simulation
+      if (error.message?.includes('domain') || error.message?.includes('verified')) {
+        console.log('📧 Domain verification issue, falling back to simulation')
+        return simulateEmailSend(emailData)
+      }
+      return { success: false, error: error.message }
     }
+
+    console.log('Email sent successfully:', data?.id)
+    return { success: true, messageId: data?.id }
 
   } catch (error: any) {
     console.error('Email service error:', error)
@@ -138,27 +128,30 @@ export async function sendReminderEmail(emailData: ReminderEmail): Promise<Email
       return simulateEmailSend(emailData)
     }
 
-    const transporter = getTransporter()
-    if (!transporter) {
-      console.warn('Email transporter not available, simulating email send')
-      return simulateEmailSend(emailData)
-    }
+    // Domain is verified and account is in production mode - can send to any email
 
     // Use verified domain for all environments
     const fromEmail = 'SignTusk <noreply@notifications.signtusk.com>'
 
-    const result = await transporter.sendMail({
+    const { data, error } = await resend.emails.send({
       from: fromEmail,
-      to: emailData.to,
+      to: [emailData.to],
       subject: `Reminder: ${emailData.documentTitle} - Signature Required`,
       html: generateReminderHTML(emailData),
     })
 
-    console.log('Reminder email sent successfully:', result.messageId)
-    return {
-      success: true,
-      messageId: result.messageId
+    if (error) {
+      console.error('Resend API error:', error)
+      // If domain verification error, fall back to simulation
+      if (error.message?.includes('domain') || error.message?.includes('verified')) {
+        console.log('📧 Domain verification issue, falling back to simulation')
+        return simulateEmailSend(emailData)
+      }
+      return { success: false, error: error.message }
     }
+
+    console.log('Reminder email sent successfully:', data?.id)
+    return { success: true, messageId: data?.id }
 
   } catch (error: any) {
     console.error('Email service error:', error)
@@ -369,23 +362,26 @@ export async function testEmailConfiguration(): Promise<{ success: boolean; erro
       }
     }
 
-    const transporter = getTransporter()
-    if (!transporter) {
-      console.warn('Email transporter not available')
-      return { success: false, error: 'Email transporter not available' }
-    }
-
     const fromEmail = 'SignTusk <noreply@notifications.signtusk.com>' // Verified domain
 
-    const testResult = await transporter.sendMail({
+    const testResult = await resend.emails.send({
       from: fromEmail,
-      to: 'ramalai13@gmail.com', // Use verified email for testing
+      to: ['ramalai13@gmail.com'], // Use verified email for testing
       subject: 'SignTusk Email Configuration Test',
       html: '<p>This is a test email to verify Resend configuration.</p>',
     })
 
-    console.log('📧 Email sent successfully:', testResult.messageId)
-    console.log('✅ Email test successful:', testResult.messageId)
+    console.log('📧 Resend API response:', testResult)
+
+    if (testResult.error) {
+      console.error('❌ Resend API error:', testResult.error)
+      return {
+        success: false,
+        error: testResult.error.message
+      }
+    }
+
+    console.log('✅ Email test successful:', testResult.data?.id)
     return { success: true }
 
   } catch (error: any) {
