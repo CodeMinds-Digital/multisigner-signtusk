@@ -30,10 +30,17 @@ const nextConfig: NextConfig = {
       config.externals = config.externals || [];
       config.externals.push('canvas');
 
-      // Externalize @react-email/render to prevent Html import conflicts
-      // This allows resend to work while preventing build issues
-      config.externals.push({
-        '@react-email/render': '@react-email/render'
+      // Completely externalize problematic email dependencies to prevent Html import conflicts
+      config.externals.push('@react-email/render');
+      config.externals.push('resend');
+
+      // Also externalize any other packages that might import from next/document
+      config.externals.push(({ request }: { request: string }, callback: any) => {
+        // Externalize any package that might import from next/document
+        if (request && (request.includes('react-email') || request.includes('next/document'))) {
+          return callback(null, `commonjs ${request}`);
+        }
+        callback();
       });
     }
 
