@@ -1,5 +1,6 @@
 import { supabaseAdmin } from './supabase-admin'
 import { NotificationService } from './notification-service'
+import { SequentialNotificationService } from './sequential-notification-service'
 
 export interface MultiSignatureWorkflowConfig {
   requestId: string
@@ -339,7 +340,42 @@ export class MultiSignatureWorkflowService {
 
         if (signingMode === 'sequential' && status.nextSignerEmail) {
           console.log('📧 Sequential signing: next signer is', status.nextSignerEmail)
-          // TODO: Send notification to next signer
+
+          // Get all signers for notification
+          const { data: allSigners } = await supabaseAdmin
+            .from('signing_request_signers')
+            .select('*')
+            .eq('signing_request_id', requestId)
+            .order('signing_order', { ascending: true })
+
+          // Send notification to next signer
+          try {
+            const nextSigner = allSigners?.find((s: any) => s.signer_email === status.nextSignerEmail)
+            if (nextSigner && signingRequest && allSigners) {
+              const notificationConfig = {
+                requestId,
+                nextSignerEmail: status.nextSignerEmail,
+                nextSignerName: nextSigner.signer_name,
+                documentTitle: signingRequest.title || signingRequest.document?.name || 'Document',
+                requesterName: signingRequest.initiated_by || 'Document Requester',
+                requesterEmail: signingRequest.initiated_by || '',
+                signingUrl: '', // Will be generated in the service
+                expiresAt: signingRequest.expires_at,
+                currentSignerOrder: nextSigner.signing_order,
+                totalSigners: allSigners.length,
+                previousSignerName: allSigners.find((s: any) => s.signer_email === signerEmail)?.signer_name
+              }
+
+              const notificationResult = await SequentialNotificationService.notifyNextSigner(notificationConfig)
+              if (notificationResult.success) {
+                console.log('✅ Sequential notification sent successfully')
+              } else {
+                console.error('❌ Failed to send sequential notification:', notificationResult.error)
+              }
+            }
+          } catch (error) {
+            console.error('❌ Error sending sequential notification:', error)
+          }
         }
 
         return {

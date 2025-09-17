@@ -15,6 +15,8 @@ import { getRealSystemStats, getRealUsers, getRealDocuments, getRealAPIKeys, Rea
 import { EnvironmentManagement } from './environment-management'
 import { SupabaseManagement } from './supabase-management'
 import { ConfigurationDiagnostics } from './configuration-diagnostics'
+import { SystemSettingsManagement } from './system-settings-management'
+import { FeatureToggleManagement } from './feature-toggle-management'
 
 export function ComprehensiveAdminDashboard() {
   const router = useRouter()
@@ -40,10 +42,12 @@ export function ComprehensiveAdminDashboard() {
     { id: 'overview', label: 'Overview', icon: Activity },
     { id: 'users', label: 'User Management', icon: Users },
     { id: 'documents', label: 'Documents', icon: FileText },
+    { id: 'settings', label: 'System Settings', icon: Settings },
+    { id: 'features', label: 'Feature Toggles', icon: Shield },
     { id: 'billing', label: 'Billing & Plans', icon: CreditCard },
     { id: 'api-keys', label: 'API Keys', icon: Key },
     { id: 'supabase', label: 'Supabase', icon: Database },
-    { id: 'environment', label: 'Environment', icon: Settings },
+    { id: 'environment', label: 'Environment', icon: TrendingUp },
     { id: 'diagnostics', label: 'Diagnostics', icon: AlertTriangle },
     { id: 'system', label: 'System Health', icon: Server },
 
@@ -122,6 +126,12 @@ export function ComprehensiveAdminDashboard() {
 
           {/* Documents Tab */}
           {activeTab === 'documents' && <DocumentsTab />}
+
+          {/* System Settings Tab */}
+          {activeTab === 'settings' && <SystemSettingsManagement />}
+
+          {/* Feature Toggles Tab */}
+          {activeTab === 'features' && <FeatureToggleManagement />}
 
           {/* Billing Tab */}
           {activeTab === 'billing' && <BillingTab />}
