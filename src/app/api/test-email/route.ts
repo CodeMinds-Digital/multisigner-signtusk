@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { testEmailConfiguration, sendSignatureRequestEmail, sendReminderEmail } from '@/lib/email-service'
 import type { SignatureRequestEmail, ReminderEmail } from '@/lib/email-service'
 
-export async function POST(request: NextRequest) {
+export async function POST() {
     try {
         console.log('🧪 Testing email configuration...')
 

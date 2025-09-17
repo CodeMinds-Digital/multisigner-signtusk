@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Plus, Edit, Trash2, FileText, Save, X } from 'lucide-react'
 import { DocumentMetadataService, DocumentType, CreateDocumentTypeData } from '@/lib/document-metadata-service'
 import { useAuth } from '@/components/providers/secure-auth-provider'
@@ -18,11 +18,7 @@ export function DocumentTypesManagement() {
     icon: 'file-text'
   })
 
-  useEffect(() => {
-    loadDocumentTypes()
-  }, [user?.id])
-
-  const loadDocumentTypes = async () => {
+  const loadDocumentTypes = useCallback(async () => {
     if (!user?.id) return
 
     setLoading(true)
@@ -34,7 +30,13 @@ export function DocumentTypesManagement() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
+
+
+
+  useEffect(() => {
+    loadDocumentTypes()
+  }, [user?.id, loadDocumentTypes])
 
   const handleCreate = async () => {
     if (!user?.id || !formData.name.trim()) return

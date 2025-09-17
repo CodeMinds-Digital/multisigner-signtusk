@@ -51,7 +51,7 @@ export class TemplateLoader {
   private static async loadPdfData(document: DocumentTemplate): Promise<ArrayBuffer> {
     console.log('Loading PDF data...')
 
-    let pdfPath = document.pdf_url ||
+    const pdfPath = document.pdf_url ||
       document.template_data?.pdf_url ||
       (document.template_data && typeof document.template_data === 'object' &&
         Object.values(document.template_data).find((val: any) =>

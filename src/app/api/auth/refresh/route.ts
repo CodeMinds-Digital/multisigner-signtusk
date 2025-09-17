@@ -55,11 +55,14 @@ export async function POST(request: NextRequest) {
     )
 
     // Fetch fresh user profile from database using admin client
-    let { data: profile, error: profileError } = await supabaseAdmin
+    const profileResult = await supabaseAdmin
       .from('user_profiles')
       .select('*')
       .eq('id', payload.userId)
       .single()
+
+    let profile = profileResult.data
+    const profileError = profileResult.error
 
     // If profile doesn't exist, create a basic one
     if (profileError && profileError.code === 'PGRST116') {

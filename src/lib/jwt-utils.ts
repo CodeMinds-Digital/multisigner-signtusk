@@ -26,7 +26,7 @@ export async function generateTokenPair(
 ): Promise<TokenPair> {
   const secret = new TextEncoder().encode(JWT_CONFIG.secret)
   const now = Math.floor(Date.now() / 1000)
-  
+
   // Generate access token (short-lived)
   const accessToken = await new SignJWT({
     userId,
@@ -41,7 +41,7 @@ export async function generateTokenPair(
     .setIssuer(JWT_CONFIG.issuer)
     .setAudience(JWT_CONFIG.audience)
     .sign(secret)
-  
+
   // Generate refresh token (long-lived)
   const refreshToken = await new SignJWT({
     userId,
@@ -55,7 +55,7 @@ export async function generateTokenPair(
     .setIssuer(JWT_CONFIG.issuer)
     .setAudience(JWT_CONFIG.audience)
     .sign(secret)
-  
+
   return {
     accessToken,
     refreshToken,
@@ -69,14 +69,14 @@ export async function generateTokenPair(
 export async function verifyToken(token: string): Promise<TokenPayload> {
   try {
     const secret = new TextEncoder().encode(JWT_CONFIG.secret)
-    
+
     const { payload } = await jwtVerify(token, secret, {
       issuer: JWT_CONFIG.issuer,
       audience: JWT_CONFIG.audience,
     })
-    
+
     return payload as TokenPayload
-  } catch (error) {
+  } catch {
     throw new Error('Invalid or expired token')
   }
 }
@@ -86,11 +86,11 @@ export async function verifyToken(token: string): Promise<TokenPayload> {
  */
 export async function verifyAccessToken(token: string): Promise<TokenPayload> {
   const payload = await verifyToken(token)
-  
+
   if (payload.type !== 'access') {
     throw new Error('Invalid token type')
   }
-  
+
   return payload
 }
 
@@ -99,11 +99,11 @@ export async function verifyAccessToken(token: string): Promise<TokenPayload> {
  */
 export async function verifyRefreshToken(token: string): Promise<TokenPayload> {
   const payload = await verifyToken(token)
-  
+
   if (payload.type !== 'refresh') {
     throw new Error('Invalid token type')
   }
-  
+
   return payload
 }
 
@@ -121,7 +121,7 @@ export function isTokenExpired(payload: TokenPayload): boolean {
 export function shouldRefreshToken(payload: TokenPayload): boolean {
   const now = Math.floor(Date.now() / 1000)
   if (!payload.exp) return true
-  
+
   const timeUntilExpiry = payload.exp - now
   return timeUntilExpiry <= AUTH_CONFIG.REFRESH_THRESHOLD
 }
@@ -133,7 +133,7 @@ export function extractBearerToken(authHeader: string | null): string | null {
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return null
   }
-  
+
   return authHeader.substring(7)
 }
 
@@ -151,7 +151,7 @@ export function decodeTokenUnsafe(token: string): any {
   try {
     const parts = token.split('.')
     if (parts.length !== 3) return null
-    
+
     const payload = parts[1]
     const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
     return JSON.parse(decoded)

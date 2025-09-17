@@ -6,7 +6,19 @@ import {
   Edit3,
   Calendar
 } from 'lucide-react'
-import { DocumentStatus } from '@/types/documents'
+
+// Extended document status type to handle all possible statuses across the app
+export type ExtendedDocumentStatus =
+  | 'draft'
+  | 'ready'
+  | 'pending'
+  | 'sent'
+  | 'in_progress'
+  | 'completed'
+  | 'expired'
+  | 'cancelled'
+  | 'declined'
+  | 'archived'
 
 export interface StatusConfig {
   label: string
@@ -19,7 +31,8 @@ export interface StatusConfig {
   badgeVariant: 'default' | 'secondary' | 'destructive' | 'outline'
 }
 
-export const DOCUMENT_STATUS_CONFIG: Record<DocumentStatus, StatusConfig> = {
+// Extended status configuration to handle all possible statuses across the app
+export const DOCUMENT_STATUS_CONFIG: Record<string, StatusConfig> = {
   draft: {
     label: 'Draft',
     description: 'Document is being created or edited',
@@ -30,6 +43,16 @@ export const DOCUMENT_STATUS_CONFIG: Record<DocumentStatus, StatusConfig> = {
     textColor: 'text-blue-800',
     badgeVariant: 'outline'
   },
+  ready: {
+    label: 'Ready',
+    description: 'Document is ready for signature requests',
+    icon: CheckCircle,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+    textColor: 'text-blue-800',
+    badgeVariant: 'default'
+  },
   pending: {
     label: 'Pending Signatures',
     description: 'Waiting for signatures from recipients',
@@ -38,6 +61,26 @@ export const DOCUMENT_STATUS_CONFIG: Record<DocumentStatus, StatusConfig> = {
     bgColor: 'bg-amber-50',
     borderColor: 'border-amber-200',
     textColor: 'text-amber-800',
+    badgeVariant: 'secondary'
+  },
+  sent: {
+    label: 'Sent',
+    description: 'Signature request has been sent',
+    icon: Clock,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-50',
+    borderColor: 'border-amber-200',
+    textColor: 'text-amber-800',
+    badgeVariant: 'secondary'
+  },
+  in_progress: {
+    label: 'In Progress',
+    description: 'Some signatures have been collected',
+    icon: Clock,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-50',
+    borderColor: 'border-blue-200',
+    textColor: 'text-blue-800',
     badgeVariant: 'secondary'
   },
   completed: {
@@ -69,6 +112,26 @@ export const DOCUMENT_STATUS_CONFIG: Record<DocumentStatus, StatusConfig> = {
     borderColor: 'border-gray-200',
     textColor: 'text-gray-800',
     badgeVariant: 'outline'
+  },
+  declined: {
+    label: 'Declined',
+    description: 'Document was declined by a recipient',
+    icon: XCircle,
+    color: 'text-red-600',
+    bgColor: 'bg-red-50',
+    borderColor: 'border-red-200',
+    textColor: 'text-red-800',
+    badgeVariant: 'destructive'
+  },
+  archived: {
+    label: 'Archived',
+    description: 'Document has been archived',
+    icon: FileText,
+    color: 'text-gray-600',
+    bgColor: 'bg-gray-50',
+    borderColor: 'border-gray-200',
+    textColor: 'text-gray-800',
+    badgeVariant: 'outline'
   }
 }
 
@@ -78,7 +141,7 @@ export interface StatusGroupConfig {
   icon: any
   color: string
   bgColor: string
-  statuses: DocumentStatus[]
+  statuses: ExtendedDocumentStatus[]
   priority: number
 }
 
@@ -89,7 +152,7 @@ export const STATUS_GROUPS: StatusGroupConfig[] = [
     icon: Edit3,
     color: 'text-blue-600',
     bgColor: 'bg-blue-50',
-    statuses: ['draft'],
+    statuses: ['draft', 'ready'],
     priority: 1
   },
   {
@@ -98,7 +161,7 @@ export const STATUS_GROUPS: StatusGroupConfig[] = [
     icon: Clock,
     color: 'text-amber-600',
     bgColor: 'bg-amber-50',
-    statuses: ['pending'],
+    statuses: ['pending', 'sent', 'in_progress'],
     priority: 2
   },
   {
@@ -112,16 +175,16 @@ export const STATUS_GROUPS: StatusGroupConfig[] = [
   },
   {
     label: 'Inactive',
-    description: 'Expired or cancelled documents',
+    description: 'Expired, cancelled, or archived documents',
     icon: XCircle,
     color: 'text-gray-600',
     bgColor: 'bg-gray-50',
-    statuses: ['expired', 'cancelled'],
+    statuses: ['expired', 'cancelled', 'declined', 'archived'],
     priority: 4
   }
 ]
 
-export function getStatusConfig(status: DocumentStatus): StatusConfig {
+export function getStatusConfig(status: ExtendedDocumentStatus | string): StatusConfig {
   // Return the config if it exists, otherwise return a default config
   const config = DOCUMENT_STATUS_CONFIG[status]
 
@@ -143,11 +206,11 @@ export function getStatusConfig(status: DocumentStatus): StatusConfig {
   return config
 }
 
-export function getStatusGroup(status: DocumentStatus): StatusGroupConfig | undefined {
+export function getStatusGroup(status: ExtendedDocumentStatus): StatusGroupConfig | undefined {
   return STATUS_GROUPS.find(group => group.statuses.includes(status))
 }
 
-export function getDocumentCounts(documents: { status: DocumentStatus }[]): { total: number } & Record<string, number> {
+export function getDocumentCounts(documents: { status: ExtendedDocumentStatus }[]): { total: number } & Record<string, number> {
   const total = documents.length
 
   const counts = STATUS_GROUPS.reduce((acc, group) => {
@@ -163,15 +226,15 @@ export function getDocumentCounts(documents: { status: DocumentStatus }[]): { to
 }
 
 export function filterDocumentsByStatus(
-  documents: { status: DocumentStatus }[],
-  statusFilter: DocumentStatus | 'all'
+  documents: { status: ExtendedDocumentStatus }[],
+  statusFilter: ExtendedDocumentStatus | 'all'
 ) {
   if (statusFilter === 'all') return documents
   return documents.filter(doc => doc.status === statusFilter)
 }
 
 export function filterDocumentsByGroup(
-  documents: { status: DocumentStatus }[],
+  documents: { status: ExtendedDocumentStatus }[],
   groupLabel: string
 ) {
   if (groupLabel === 'all') return documents

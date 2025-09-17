@@ -308,7 +308,7 @@ export class PDFGenerationService {
       console.log('📄 Generating signed PDF with pdf-lib')
       console.log('📋 Populated fields for PDF:', populatedFields.length)
 
-      const pdfBytes = await this.createSignedPDFWithPdfLib(originalPdfUrl, populatedFields, requestId)
+      const pdfBytes = await this.createSignedPDFWithPdfLib(originalPdfUrl, populatedFields)
 
       // Upload to Supabase storage
       const timestamp = new Date().getTime()
@@ -361,8 +361,7 @@ export class PDFGenerationService {
    */
   private static async createSignedPDFWithPdfLib(
     originalPdfUrl: string,
-    populatedFields: any[],
-    requestId: string
+    populatedFields: any[]
   ): Promise<Uint8Array> {
     try {
       console.log('📄 Loading original PDF from:', originalPdfUrl)
@@ -467,7 +466,7 @@ export class PDFGenerationService {
     const { type, value, position } = field
 
     // Default position if not specified
-    let x = position?.x || 100
+    const x = position?.x || 100
     let y = position?.y || pageHeight - 200
 
     // Convert coordinates if needed (pdfme uses different coordinate system)

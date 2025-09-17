@@ -42,11 +42,11 @@ export function PreviewSaveStep({
       dummyData['name_1'] = 'John Doe'
       dummyData['date_1'] = new Date().toLocaleDateString()
     } else {
-      signers.forEach((signer, index) => {
-        dummyData[`signature_${index + 1}`] = signer.name
-        dummyData[`name_${index + 1}`] = signer.name
-        dummyData[`date_${index + 1}`] = new Date().toLocaleDateString()
-        dummyData[`role_${index + 1}`] = signer.role
+      signers.forEach((signer, _index) => {
+        dummyData[`signature_${_index + 1}`] = signer.name
+        dummyData[`name_${_index + 1}`] = signer.name
+        dummyData[`date_${_index + 1}`] = new Date().toLocaleDateString()
+        dummyData[`role_${_index + 1}`] = signer.role
       })
     }
 
@@ -72,12 +72,12 @@ export function PreviewSaveStep({
         const dummyData = generateDummyData()
         const schemaFields = schema || []
 
-        const fieldsHtml = schemaFields.map((field: any, index: number) => {
+        const fieldsHtml = schemaFields.map((field: any) => {
           const fieldValue = dummyData[field.name] || `[${field.type || 'field'}]`
           return `
             <div class="mb-4 p-3 bg-gray-50 border border-gray-200 rounded">
               <div class="flex justify-between items-center">
-                <span class="text-sm font-medium text-gray-700">${field.type || 'Field'} ${index + 1}:</span>
+                <span class="text-sm font-medium text-gray-700">${field.type || 'Field'}:</span>
                 <span class="text-sm text-blue-600">${fieldValue}</span>
               </div>
             </div>
@@ -158,12 +158,12 @@ export function PreviewSaveStep({
       if (viewer) {
         try {
           viewer.destroy?.()
-        } catch (err) {
-          console.error('Error destroying viewer:', err)
+        } catch (e) {
+          console.error('Error destroying viewer', e)
         }
       }
     }
-  }, [])
+  }, [fileName, generateDummyData, schema, viewer])
 
   const handleSaveDocument = useCallback(async () => {
     setIsSaving(true)
@@ -276,7 +276,7 @@ export function PreviewSaveStep({
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-2">Signers ({signers.length})</h4>
               <div className="space-y-2">
-                {signers.slice(0, 3).map((signer, index) => (
+                {signers.slice(0, 3).map((signer) => (
                   <div key={signer.id} className="text-sm">
                     <span className="font-medium">{signer.name}</span>
                     <span className="text-gray-500 ml-2">({signer.role})</span>

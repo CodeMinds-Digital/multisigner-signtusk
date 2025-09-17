@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { DriveService } from '@/lib/drive-service'
 import { DocumentTemplate, DocumentManagementState } from '@/types/drive'
@@ -23,12 +23,34 @@ export function DriveMain() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [filteredDocuments, setFilteredDocuments] = useState<DocumentTemplate[]>([])
 
+  const loadDocuments = useCallback(async () => {
+    if (!user) return
+
+    setState(prev => ({ ...prev, loading: true, error: null }))
+
+    try {
+      const documents = await DriveService.getDocumentTemplates()
+
+      setState(prev => ({
+        ...prev,
+        documents,
+        loading: false
+      }))
+    } catch (error) {
+      console.error('Error loading documents:', error)
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: 'Failed to load documents. Please try again.'
+      }))
+    }
+  }, [user])
   // Load documents on component mount
   useEffect(() => {
     if (user) {
       loadDocuments()
     }
-  }, [user])
+  }, [user, loadDocuments])
 
   // Filter documents when documents or filter changes
   useEffect(() => {
@@ -56,27 +78,6 @@ export function DriveMain() {
     }
   }, [state.documents, statusFilter])
 
-  const loadDocuments = async () => {
-    if (!user) return
-
-    setState(prev => ({ ...prev, loading: true, error: null }))
-
-    try {
-      const documents = await DriveService.getDocumentTemplates(user.id)
-      setState(prev => ({
-        ...prev,
-        documents,
-        loading: false
-      }))
-    } catch (error) {
-      console.error('Error loading documents:', error)
-      setState(prev => ({
-        ...prev,
-        loading: false,
-        error: 'Failed to load documents. Please try again.'
-      }))
-    }
-  }
 
   const handleAddDocument = () => {
     setShowAddModal(true)

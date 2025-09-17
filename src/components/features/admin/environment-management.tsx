@@ -75,7 +75,7 @@ export function EnvironmentManagement() {
     }
 
     try {
-      const result = await resetEnvironmentVariablesToDefaults(adminSession.user.id)
+      const result = await resetEnvironmentVariablesToDefaults()
       if (result.success) {
         alert(`Successfully reset ${result.resetCount || 0} environment variables to defaults!`)
         loadEnvironmentVariables()
@@ -92,7 +92,7 @@ export function EnvironmentManagement() {
     if (!adminSession) return
 
     try {
-      const result = await fixConfigurationMismatch(adminSession.user.id)
+      const result = await fixConfigurationMismatch()
       if (result.success) {
         alert(result.message || 'Configuration checked')
         loadEnvironmentVariables()
@@ -140,7 +140,7 @@ export function EnvironmentManagement() {
     }
 
     try {
-      const result = await updateEnvironmentVariable(key, editValues[key] || '', adminSession.user.id)
+      const result = await updateEnvironmentVariable(key, editValues[key] || '')
       if (result.success) {
         // Show success message with specific info for Supabase keys
         if (key === 'NEXT_PUBLIC_SUPABASE_URL' || key === 'NEXT_PUBLIC_SUPABASE_ANON_KEY') {
@@ -164,7 +164,7 @@ export function EnvironmentManagement() {
 
     if (confirm(`Are you sure you want to delete ${key}?`)) {
       try {
-        const result = await deleteEnvironmentVariable(key, adminSession.user.id)
+        const result = await deleteEnvironmentVariable(key)
         if (result.success) {
           loadEnvironmentVariables()
         } else {

@@ -16,11 +16,11 @@ interface UploadDocumentStepProps {
   canProceed?: boolean
 }
 
-export function UploadDocumentStep({ 
-  data = {}, 
+export function UploadDocumentStep({
+  data = {},
   onDataChange,
   onNext,
-  canProceed 
+  canProceed
 }: UploadDocumentStepProps) {
   const [isDragOver, setIsDragOver] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
@@ -76,7 +76,7 @@ export function UploadDocumentStep({
     }
 
     await simulateUpload(selectedFile)
-  }, [data, onDataChange])
+  }, [onDataChange, simulateUpload])
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -133,11 +133,10 @@ export function UploadDocumentStep({
       {/* Upload Area */}
       {!file ? (
         <div
-          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-            isDragOver
-              ? 'border-blue-400 bg-blue-50'
-              : 'border-gray-300 hover:border-gray-400'
-          }`}
+          className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${isDragOver
+            ? 'border-blue-400 bg-blue-50'
+            : 'border-gray-300 hover:border-gray-400'
+            }`}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
@@ -149,7 +148,7 @@ export function UploadDocumentStep({
               Drag and drop your PDF file here, or click to browse
             </p>
           </div>
-          
+
           <div className="mt-6">
             <Button
               onClick={() => fileInputRef.current?.click()}
@@ -188,7 +187,7 @@ export function UploadDocumentStep({
                 <p className="text-sm text-gray-500">
                   {fileSize && formatFileSize(fileSize)}
                 </p>
-                
+
                 {isUploading && (
                   <div className="mt-2">
                     <div className="flex items-center">
@@ -213,7 +212,7 @@ export function UploadDocumentStep({
                 )}
               </div>
             </div>
-            
+
             <Button
               variant="ghost"
               size="sm"

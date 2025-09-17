@@ -112,7 +112,7 @@ export class SignatureRecipientService {
               .eq('id', request.requester_id)
               .single()
             requesterEmail = requesterProfile?.email
-          } catch (error) {
+          } catch (_error) {
             // Ignore error, requester email is optional
           }
 

@@ -40,10 +40,14 @@ export function useToast() {
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([])
 
+  const removeToast = useCallback((id: string) => {
+    setToasts(prev => prev.filter(toast => toast.id !== id))
+  }, [])
+
   const addToast = useCallback((toast: Omit<Toast, 'id'>) => {
     const id = Math.random().toString(36).substr(2, 9)
     const newToast = { ...toast, id }
-    
+
     setToasts(prev => [...prev, newToast])
 
     // Auto-remove toast after duration
@@ -53,11 +57,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
         removeToast(id)
       }, duration)
     }
-  }, [])
-
-  const removeToast = useCallback((id: string) => {
-    setToasts(prev => prev.filter(toast => toast.id !== id))
-  }, [])
+  }, [removeToast])
 
   const success = useCallback((title: string, message?: string, duration?: number) => {
     addToast({ type: 'success', title, message, duration })

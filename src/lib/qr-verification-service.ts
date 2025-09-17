@@ -262,7 +262,7 @@ export class QRVerificationService {
           single: requests.filter((r: any) => r.signature_type === 'single').length,
           multi: requests.filter((r: any) => r.signature_type === 'multi').length
         },
-        completion_rate: requests.length > 0 
+        completion_rate: requests.length > 0
           ? Math.round((requests.filter((r: any) => r.status === 'completed').length / requests.length) * 100)
           : 0
       }
@@ -363,7 +363,7 @@ export class QRVerificationService {
 
       return { success: false, error: 'Invalid QR code format' }
 
-    } catch (error) {
+    } catch (_error) {
       return { success: false, error: 'Failed to parse QR code' }
     }
   }

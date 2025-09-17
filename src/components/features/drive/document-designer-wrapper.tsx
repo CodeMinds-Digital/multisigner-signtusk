@@ -26,24 +26,6 @@ export function DocumentDesignerWrapper({
   const [saving, setSaving] = useState(false)
   const [template, setTemplate] = useState<any>(null)
 
-  // Safety check for document
-  if (!document || !document.id) {
-    console.error('DocumentDesignerWrapper: Invalid document prop:', document)
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="text-center">
-          <p className="text-red-600 font-medium">Error: Invalid document</p>
-          <button
-            onClick={onBack}
-            className="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-          >
-            Back to Documents
-          </button>
-        </div>
-      </div>
-    )
-  }
-
   // Get fonts data
   const getFontsData = useCallback(async () => {
     try {
@@ -55,8 +37,8 @@ export function DocumentDesignerWrapper({
           fallback: true,
         },
       }
-    } catch (error) {
-      console.warn('Could not load default font, using fallback:', error)
+    } catch {
+      console.warn('Could not load default font, using fallback')
       return {
         NotoSerifJP: {
           data: 'https://fonts.gstatic.com/s/notoserifjp/v7/k3kCo84MPvpLmixcA63oeAL7Iqp5JYXV.woff2',
@@ -150,7 +132,7 @@ export function DocumentDesignerWrapper({
       // Force refresh document data to get latest template_url
       console.log('🔄 Refreshing document data to ensure latest template_url...')
       try {
-        const refreshedDoc = await DriveService.getDocumentTemplate(document.id, user?.id || '')
+        const refreshedDoc = await DriveService.getDocumentTemplate(document.id)
         if (refreshedDoc && refreshedDoc.template_url !== document.template_url) {
           console.log('🔄 Document template_url updated:', {
             old: document.template_url,
@@ -169,7 +151,7 @@ export function DocumentDesignerWrapper({
           (window as any).gc()
           console.log('🧹 Forced garbage collection')
         } catch (e) {
-          // Ignore - gc not available
+          console.error('Garbage collection failed:', e)
         }
       }
 
@@ -206,7 +188,7 @@ export function DocumentDesignerWrapper({
         console.log('Clearing DOM container completely...')
         designerRef.current.innerHTML = ''
         // Force reflow
-        designerRef.current.offsetHeight
+        void designerRef.current.offsetHeight;
         designerRef.current.innerHTML = ''
       }
 
@@ -254,7 +236,7 @@ export function DocumentDesignerWrapper({
       console.log('Document status:', document.status)
 
       // Try to get PDF URL from multiple possible locations
-      let pdfPath = document.pdf_url ||
+      const pdfPath = document.pdf_url ||
         document.template_data?.pdf_url ||
         (document.template_data && typeof document.template_data === 'object' &&
           Object.values(document.template_data).find((val: any) =>
@@ -372,9 +354,9 @@ export function DocumentDesignerWrapper({
           if (existingTemplate && existingTemplate.schemas && Array.isArray(existingTemplate.schemas)) {
             // Count fields in template JSON
             let templateFieldCount = 0
-            existingTemplate.schemas.forEach((pageSchemas: any[], pageIndex: number) => {
+            existingTemplate.schemas.forEach((pageSchemas: any[], _pageIndex: number) => {
               if (Array.isArray(pageSchemas)) {
-                console.log(`Template JSON page ${pageIndex} has ${pageSchemas.length} fields:`, pageSchemas)
+                console.log(`Template JSON page ${_pageIndex} has ${pageSchemas.length} fields:`, pageSchemas)
                 templateFieldCount += pageSchemas.length
               }
             })
@@ -404,7 +386,7 @@ export function DocumentDesignerWrapper({
                 const signatureFields = new Set<string>()
 
                 // Extract unique signer IDs from signature fields
-                existingTemplate.schemas.forEach((pageSchemas: any[], pageIndex: number) => {
+                existingTemplate.schemas.forEach((pageSchemas: any[], _pageIndex: number) => {
                   if (Array.isArray(pageSchemas)) {
                     pageSchemas.forEach((field: any) => {
                       if (field.type === 'signature' && field.signerId) {
@@ -485,9 +467,9 @@ export function DocumentDesignerWrapper({
         // Count fields in database schemas
         let dbFieldCount = 0
         if (Array.isArray(pdfmeSchemas)) {
-          pdfmeSchemas.forEach((pageSchemas, pageIndex) => {
+          pdfmeSchemas.forEach((pageSchemas, _pageIndex) => {
             if (Array.isArray(pageSchemas)) {
-              console.log(`Database page ${pageIndex} has ${pageSchemas.length} fields:`, pageSchemas)
+              console.log(`Database page ${_pageIndex} has ${pageSchemas.length} fields:`, pageSchemas)
               dbFieldCount += pageSchemas.length
             }
           })
@@ -498,7 +480,7 @@ export function DocumentDesignerWrapper({
         const dbSignatureFields = new Set<string>()
 
         if (Array.isArray(pdfmeSchemas)) {
-          pdfmeSchemas.forEach((pageSchemas: any[], pageIndex: number) => {
+          pdfmeSchemas.forEach((pageSchemas: any[], _unusedPageIndex: number) => {
             if (Array.isArray(pageSchemas)) {
               pageSchemas.forEach((field: any) => {
                 if (field.type === 'signature' && field.signerId) {
@@ -1138,7 +1120,7 @@ export function DocumentDesignerWrapper({
       console.error('Error building designer:', error)
       setIsLoading(false)
     }
-  }, [document, getFontsData])
+  }, [document, getFontsData, user?.id])
 
   // Save template callback
   const onSaveTemplate = useCallback((template: any) => {
@@ -1149,9 +1131,9 @@ export function DocumentDesignerWrapper({
     // Count total fields across all pages
     let totalFields = 0
     if (template?.schemas && Array.isArray(template.schemas)) {
-      template.schemas.forEach((pageSchemas: any[], pageIndex: number) => {
+      template.schemas.forEach((pageSchemas: any[]) => {
         if (Array.isArray(pageSchemas)) {
-          console.log(`🔄 Page ${pageIndex} has ${pageSchemas.length} fields:`)
+          console.log(`🔄 Page has ${pageSchemas.length} fields:`)
           pageSchemas.forEach((field: any, fieldIndex: number) => {
             console.log(`🔄   Field ${fieldIndex}:`, {
               id: field.id,
@@ -1487,6 +1469,7 @@ export function DocumentDesignerWrapper({
 
   // Initialize designer
   useEffect(() => {
+    const currentRef = designerRef.current
     isMountedRef.current = true
     buildDesigner()
     return () => {
@@ -1494,9 +1477,9 @@ export function DocumentDesignerWrapper({
       isMountedRef.current = false
 
       // Immediate cleanup of DOM to prevent visual artifacts
-      if (designerRef.current) {
+      if (currentRef) {
         console.log('Clearing DOM on unmount...')
-        designerRef.current.innerHTML = ''
+        currentRef.innerHTML = ''
       }
 
       // Clear any global PDFme state immediately
@@ -1521,8 +1504,8 @@ export function DocumentDesignerWrapper({
                 try {
                   designer.current.destroy()
                   designer.current = null
-                } catch (destroyError: any) {
-                  console.warn('Error with destroy method, falling back to manual cleanup:', destroyError)
+                } catch {
+                  console.warn('Error with destroy method, falling back to manual cleanup')
                   designer.current = null
                 }
               }
@@ -1534,8 +1517,8 @@ export function DocumentDesignerWrapper({
               }
             }
           })
-        } catch (e) {
-          console.warn('Error during designer cleanup:', e)
+        } catch {
+          console.warn('Error during designer cleanup')
           designer.current = null
         }
       }
@@ -1543,6 +1526,25 @@ export function DocumentDesignerWrapper({
       console.log('=== UNMOUNT CLEANUP COMPLETE ===')
     }
   }, [buildDesigner])
+
+  if (!document || !document.id) {
+    console.error('DocumentDesignerWrapper: Invalid document prop:', document)
+    return (
+      <AntdWarningSuppressor>
+        <div className="flex items-center justify-center h-64">
+          <div className="text-center">
+            <p className="text-red-600 font-medium">Error: Invalid document</p>
+            <button
+              onClick={onBack}
+              className="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+            >
+              Back to Documents
+            </button>
+          </div>
+        </div>
+      </AntdWarningSuppressor>
+    )
+  }
 
   return (
     <AntdWarningSuppressor>

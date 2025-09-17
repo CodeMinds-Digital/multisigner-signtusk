@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Plus, Edit, Trash2, Folder, Save, X } from 'lucide-react'
 import { DocumentMetadataService, DocumentCategory, CreateDocumentCategoryData } from '@/lib/document-metadata-service'
 import { useAuth } from '@/components/providers/secure-auth-provider'
@@ -18,11 +18,7 @@ export function DocumentCategoriesManagement() {
     icon: 'folder'
   })
 
-  useEffect(() => {
-    loadDocumentCategories()
-  }, [user?.id])
-
-  const loadDocumentCategories = async () => {
+  const loadDocumentCategories = useCallback(async () => {
     if (!user?.id) return
 
     setLoading(true)
@@ -34,7 +30,12 @@ export function DocumentCategoriesManagement() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user?.id])
+
+  useEffect(() => {
+    loadDocumentCategories()
+  }, [user?.id, loadDocumentCategories])
+
 
   const handleCreate = async () => {
     if (!user?.id || !formData.name.trim()) return

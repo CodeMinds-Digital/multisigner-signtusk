@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Plus, Edit, Trash2, Check } from 'lucide-react'
@@ -251,11 +252,13 @@ export default function SignatureManager() {
                             </CardHeader>
 
                             <CardContent className="space-y-4">
-                                <div className="bg-gray-50 p-4 rounded-lg border-2 border-dashed border-gray-200">
-                                    <img
+                                <div className="relative bg-gray-50 p-4 rounded-lg border-2 border-dashed border-gray-200 h-20">
+                                    <Image
+                                        fill
                                         src={signature.signature_data}
                                         alt={signature.name}
-                                        className="max-w-full h-20 object-contain mx-auto"
+                                        className="object-contain mx-auto"
+                                        sizes="100vw"
                                     />
                                 </div>
 

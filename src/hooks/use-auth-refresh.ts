@@ -17,7 +17,7 @@ export function useAuthRefresh(onRefresh: () => void, dependencies: any[] = []) 
   }, [onRefresh])
 
   useEffect(() => {
-    const handleTokenRefresh = async (event: Event) => {
+    const handleTokenRefresh = async () => {
       console.log('🔄 Component received token refresh notification, refreshing auth and reloading data...')
 
       try {
@@ -36,7 +36,8 @@ export function useAuthRefresh(onRefresh: () => void, dependencies: any[] = []) 
     return () => {
       window.removeEventListener('auth-token-refreshed', handleTokenRefresh)
     }
-  }, [...dependencies, refreshAuth])
+
+  }, [dependencies, refreshAuth])
 }
 
 /**
@@ -70,8 +71,7 @@ export function useRefreshTrigger() {
  * Ensures session is valid before calling the function
  */
 export function useValidatedDataLoader<T>(
-  dataLoader: () => Promise<T>,
-  dependencies: any[] = []
+  dataLoader: () => Promise<T>
 ): () => Promise<T> {
   const { refreshAuth } = useAuth()
 

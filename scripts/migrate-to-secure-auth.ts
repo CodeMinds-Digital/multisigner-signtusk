@@ -6,7 +6,6 @@
  */
 
 import fs from 'fs'
-import path from 'path'
 
 interface MigrationStep {
   name: string
@@ -83,7 +82,7 @@ class AuthMigration {
       } catch (error) {
         console.error(`❌ ${step.name} failed:`, error)
         this.failed.push(step.name)
-        
+
         if (step.required) {
           console.log('🛑 Migration stopped due to required step failure')
           break
@@ -98,7 +97,7 @@ class AuthMigration {
   private backupOldAuth = () => {
     const authProviderPath = 'src/components/providers/auth-provider.tsx'
     const backupPath = 'src/components/providers/auth-provider.tsx.backup'
-    
+
     if (fs.existsSync(authProviderPath)) {
       fs.copyFileSync(authProviderPath, backupPath)
       console.log(`  📁 Backed up ${authProviderPath} to ${backupPath}`)
@@ -109,19 +108,19 @@ class AuthMigration {
 
   private updateRootLayout = () => {
     const layoutPath = 'src/app/layout.tsx'
-    
+
     if (!fs.existsSync(layoutPath)) {
       throw new Error(`Layout file not found: ${layoutPath}`)
     }
 
     let content = fs.readFileSync(layoutPath, 'utf8')
-    
+
     // Replace old auth provider import
     content = content.replace(
       /import.*AuthProvider.*from.*auth-provider.*/g,
       "import { SecureAuthProvider } from '@/components/providers/secure-auth-provider'"
     )
-    
+
     // Replace provider usage
     content = content.replace(
       /<AuthProvider>/g,
@@ -138,14 +137,14 @@ class AuthMigration {
 
   private updateLoginPage = () => {
     const loginPath = 'src/app/(auth)/login/page.tsx'
-    
+
     if (!fs.existsSync(loginPath)) {
       console.log('  ℹ️ Login page not found, skipping update')
       return
     }
 
     let content = fs.readFileSync(loginPath, 'utf8')
-    
+
     // Update to use new auth methods
     content = content.replace(
       /signIn\(credentials\)/g,
@@ -169,12 +168,12 @@ class AuthMigration {
       }
 
       let content = fs.readFileSync(filePath, 'utf8')
-      
+
       // Add secure API client import
       if (!content.includes('secure-api-client')) {
         content = `import { api } from '@/lib/secure-api-client'\n${content}`
       }
-      
+
       // Replace direct supabase calls with secure API calls
       content = content.replace(
         /createAuthenticatedSupabaseCall\(async \(\) => \{/g,
@@ -188,13 +187,13 @@ class AuthMigration {
 
   private verifyMiddleware = () => {
     const middlewarePath = 'middleware.ts'
-    
+
     if (!fs.existsSync(middlewarePath)) {
       throw new Error('Middleware file not found')
     }
 
     const content = fs.readFileSync(middlewarePath, 'utf8')
-    
+
     if (!content.includes('verifyAccessToken')) {
       throw new Error('Middleware not updated to use secure auth')
     }
@@ -204,13 +203,13 @@ class AuthMigration {
 
   private setupEnvironment = () => {
     const envPath = '.env.local'
-    
+
     if (!fs.existsSync(envPath)) {
       throw new Error('.env.local file not found')
     }
 
     const content = fs.readFileSync(envPath, 'utf8')
-    
+
     if (!content.includes('JWT_SECRET')) {
       throw new Error('JWT_SECRET not found in environment variables')
     }
@@ -237,10 +236,10 @@ class AuthMigration {
     console.log('\n' + '='.repeat(50))
     console.log('📊 MIGRATION SUMMARY')
     console.log('='.repeat(50))
-    
+
     console.log(`✅ Completed: ${this.completed.length} steps`)
     this.completed.forEach(step => console.log(`   - ${step}`))
-    
+
     if (this.failed.length > 0) {
       console.log(`❌ Failed: ${this.failed.length} steps`)
       this.failed.forEach(step => console.log(`   - ${step}`))
@@ -252,7 +251,7 @@ class AuthMigration {
     console.log('3. Test token refresh behavior')
     console.log('4. Update any remaining API calls')
     console.log('5. Deploy to production with secure environment variables')
-    
+
     console.log('\n🔒 Your application now uses secure authentication!')
   }
 }

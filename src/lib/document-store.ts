@@ -112,7 +112,7 @@ export interface DashboardStats {
 }
 
 // Get documents for a user (client-side function that calls API)
-export async function getDocuments(userId: string): Promise<Document[]> {
+export async function getDocuments(): Promise<Document[]> {
   try {
     const response = await fetch('/api/documents', {
       method: 'GET',
@@ -137,7 +137,7 @@ export async function getDocuments(userId: string): Promise<Document[]> {
 }
 
 // Get documents by status (client-side function that calls API)
-export async function getDocumentsByStatus(userId: string, status: string): Promise<Document[]> {
+export async function getDocumentsByStatus(status: string): Promise<Document[]> {
   try {
     const response = await fetch(`/api/documents?status=${encodeURIComponent(status)}`, {
       method: 'GET',
@@ -162,7 +162,7 @@ export async function getDocumentsByStatus(userId: string, status: string): Prom
 }
 
 // Get dashboard statistics (client-side function that calls API)
-export async function getDashboardStats(userId: string): Promise<DashboardStats> {
+export async function getDashboardStats(): Promise<DashboardStats> {
   try {
     const response = await fetch('/api/dashboard/stats', {
       method: 'GET',
@@ -271,8 +271,7 @@ export async function uploadDocument(
 // Update document status (client-side function that calls API)
 export async function updateDocumentStatus(
   documentId: string,
-  status: Document['status'],
-  userId: string
+  status: Document['status']
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const response = await fetch(`/api/documents/${documentId}/status`, {
@@ -303,8 +302,7 @@ export async function updateDocumentStatus(
 
 // Delete document (client-side function that calls API)
 export async function deleteDocument(
-  documentId: string,
-  userId: string
+  documentId: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
     const response = await fetch(`/api/documents/${documentId}`, {

@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify access token
-    const payload = await verifyAccessToken(accessToken)
+    await verifyAccessToken(accessToken)
 
     // Get request body
     const { pdfPath } = await request.json()
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
     // If it's an absolute URL or app-relative path, fetch directly
     if (pdfPath.startsWith('http') || pdfPath.startsWith('/')) {
       let url = pdfPath
-      
+
       // If it's a relative path, build full URL
       if (pdfPath.startsWith('/')) {
         const host = request.headers.get('host')
@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
 
       const noCacheUrl = url.includes('?') ? `${url}&_=${Date.now()}` : `${url}?_=${Date.now()}`
       const response = await fetch(noCacheUrl, { cache: 'no-store' })
-      
+
       if (!response.ok) {
         throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`)
       }
@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('Error getting PDF data:', error)
-    
+
     if (error instanceof Error && error.message.includes('token')) {
       return NextResponse.json(
         { error: 'Invalid or expired token' },

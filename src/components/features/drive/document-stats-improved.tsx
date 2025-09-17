@@ -189,7 +189,7 @@ export function DocumentStatsImproved({ documents, onFilterChange, activeFilter 
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
             <div className="flex h-full">
-              {STATUS_GROUPS.map((group, index) => {
+              {STATUS_GROUPS.map((group) => {
                 const count = (counts as any)[group.label.toLowerCase().replace(/\s+/g, '_')] || 0
                 const percentage = counts.total > 0 ? (count / counts.total) * 100 : 0
                 const colors = getColorClasses(group.label, false)

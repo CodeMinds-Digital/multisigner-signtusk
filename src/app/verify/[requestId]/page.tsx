@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -64,13 +64,7 @@ export default function VerifyPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (requestId) {
-      verifyDocument()
-    }
-  }, [requestId])
-
-  const verifyDocument = async () => {
+  const verifyDocument = useCallback(async () => {
     setIsLoading(true)
     setError(null)
 
@@ -89,7 +83,13 @@ export default function VerifyPage() {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [requestId])
+
+  useEffect(() => {
+    if (requestId) {
+      verifyDocument()
+    }
+  }, [requestId, verifyDocument])
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -118,7 +118,7 @@ export default function VerifyPage() {
           signingMode = parsedMetadata.signing_mode === 'parallel' ? 'Parallel' : 'Sequential'
         }
       } catch (e) {
-        console.log('Could not parse metadata for signing mode')
+        console.log('Could not parse metadata for signing mode:', e)
       }
     }
 

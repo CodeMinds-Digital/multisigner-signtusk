@@ -94,7 +94,7 @@ export async function generatePDFWithPDFMe(requestId: string): Promise<string | 
     console.log('📋 First schema fields:', schemas[0]?.length || 0)
 
     // Populate schema with signature data
-    const populatedInputs = await populateSchemaWithSignatures(schemas[0], signedSigners, requestId)
+    const populatedInputs = await populateSchemaWithSignatures(schemas[0], signedSigners)
 
     console.log('🎨 Generating PDF with pdfme-complete...')
 
@@ -186,7 +186,7 @@ export async function generatePDFWithPDFMe(requestId: string): Promise<string | 
   }
 }
 
-async function populateSchemaWithSignatures(schema: any[], signers: any[], requestId: string) {
+async function populateSchemaWithSignatures(schema: any[], signers: any[]) {
   const inputs: Record<string, any> = {}
 
   console.log(`📋 Processing ${schema.length} fields for ${signers.length} signers`)
@@ -241,8 +241,8 @@ async function populateSchemaWithSignatures(schema: any[], signers: any[], reque
       signatureData = typeof targetSigner.signature_data === 'string'
         ? JSON.parse(targetSigner.signature_data)
         : targetSigner.signature_data
-    } catch (error) {
-      console.error(`❌ Error parsing signature data for ${fieldName}:`, error)
+    } catch (_error) {
+      console.error(`❌ Error parsing signature data for ${fieldName}:`, _error)
       continue
     }
 

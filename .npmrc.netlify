@@ -1,0 +1,7 @@
+# Netlify deployment configuration
+# This file should be copied to .npmrc during build
+@codeminds-digital:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=YOUR_GITHUB_TOKEN_HERE
+
+# Fallback to public registry for other packages
+registry=https://registry.npmjs.org/

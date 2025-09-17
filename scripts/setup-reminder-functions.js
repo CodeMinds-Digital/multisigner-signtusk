@@ -5,11 +5,15 @@
  * This script creates the necessary database functions and tables for the reminder system
  */
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { createClient } = require('@supabase/supabase-js')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fs = require('fs')
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path')
 
 // Load environment variables
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 require('dotenv').config({ path: '.env.local' })
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -35,14 +39,14 @@ async function setupReminderFunctions() {
     console.log('📄 Executing SQL script...')
 
     // Execute the SQL
-    const { data, error } = await supabase.rpc('exec_sql', {
+    const { error } = await supabase.rpc('exec_sql', {
       sql: sqlContent
     })
 
     if (error) {
       // If exec_sql doesn't exist, try direct execution
       console.log('⚠️  exec_sql function not found, trying direct execution...')
-      
+
       // Split SQL into individual statements and execute them
       const statements = sqlContent
         .split(';')
@@ -52,32 +56,27 @@ async function setupReminderFunctions() {
       for (const statement of statements) {
         if (statement.trim()) {
           console.log(`📝 Executing: ${statement.substring(0, 50)}...`)
-          
-          const { error: execError } = await supabase
-            .from('_dummy_table_that_does_not_exist')
-            .select('*')
-            .limit(0)
-          
-          // This will fail, but we'll use the SQL editor approach instead
+
+          // Direct SQL execution not available via client, skip error handling
           console.log('⚠️  Direct SQL execution not available via client')
           break
         }
       }
-      
+
       console.log('\n📋 Please execute the following SQL manually in your Supabase SQL Editor:')
       console.log('=' * 80)
       console.log(sqlContent)
       console.log('=' * 80)
-      
+
     } else {
       console.log('✅ SQL script executed successfully!')
     }
 
     // Test the functions
     console.log('\n🧪 Testing reminder functions...')
-    
+
     // Test can_send_reminder function
-    const { data: testData, error: testError } = await supabase
+    const { error: testError } = await supabase
       .rpc('can_send_reminder', {
         p_signing_request_id: '00000000-0000-0000-0000-000000000000',
         p_initiated_by: '00000000-0000-0000-0000-000000000000'
@@ -93,7 +92,7 @@ async function setupReminderFunctions() {
 
   } catch (error) {
     console.error('❌ Error setting up reminder functions:', error)
-    
+
     console.log('\n📋 Manual Setup Required:')
     console.log('1. Open Supabase Dashboard > SQL Editor')
     console.log('2. Copy and paste the contents of: src/lib/reminder-analytics.sql')
