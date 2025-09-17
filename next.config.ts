@@ -37,6 +37,8 @@ const nextConfig: NextConfig = {
       config.externals.push('@react-email/html');
       config.externals.push('@react-email/head');
       config.externals.push('@react-email/preview');
+      config.externals.push('nodemailer');
+      config.externals.push('@documenso/nodemailer-resend');
 
       // Dynamic externalization for any package that might import from next/document
       config.externals.push(({ request }: { request: string }, callback: any) => {
@@ -45,7 +47,10 @@ const nextConfig: NextConfig = {
           request.includes('next/document') ||
           request.includes('resend') ||
           request === 'resend' ||
-          request.startsWith('@react-email/')
+          request.startsWith('@react-email/') ||
+          request.includes('nodemailer') ||
+          request === 'nodemailer' ||
+          request.startsWith('@documenso/nodemailer')
         )) {
           return callback(null, `commonjs ${request}`);
         }
@@ -69,6 +74,9 @@ const nextConfig: NextConfig = {
         net: false,
         tls: false,
         canvas: false,
+        dns: false,
+        child_process: false,
+        nodemailer: false,
       };
     }
 
