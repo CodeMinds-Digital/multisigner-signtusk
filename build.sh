@@ -19,16 +19,19 @@ EOF
 
 # 3. Install dependencies
 echo "📦 Installing dependencies..."
-if npm ci; then
+if npm ci --include=dev; then
   echo "✅ npm ci completed successfully"
 else
   echo "⚠️ npm ci failed — falling back to npm install"
-  npm install
+  npm install --include=dev
 fi
 
 # 4. Run Next.js build
 echo "🏗 Running build..."
 # Disable CI mode to prevent ESLint warnings from being treated as errors
-CI=false npm run build
+# Set NODE_ENV to production for proper build
+export CI=false
+export NODE_ENV=production
+npm run build
 
 echo "✅ Build completed successfully!"

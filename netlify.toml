@@ -3,8 +3,9 @@
 
 [build.environment]
   NODE_VERSION = "20"
-  NPM_FLAGS = "--production=false"
+  NPM_FLAGS = "--production=false --include=dev"
   NPM_CONFIG_LEGACY_PEER_DEPS = "true"
+  NPM_CONFIG_INCLUDE = "dev"
   NEXT_TELEMETRY_DISABLED = "1"
   CI = "false"
 
