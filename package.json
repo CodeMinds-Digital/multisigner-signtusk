@@ -12,11 +12,6 @@
     "start": "next start",
     "lint": "eslint"
   },
-  "peerDependenciesMeta": {
-    "@react-email/render": {
-      "optional": true
-    }
-  },
   "dependencies": {
     "@codeminds-digital/pdfme-complete": "^0.0.5",
     "@hugocxl/react-to-image": "^0.0.9",
@@ -26,7 +21,7 @@
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-tabs": "^1.1.13",
-    "@react-email/render": "^1.2.3",
+    "@react-email/render": "0.0.16",
     "@react-pdf-viewer/core": "^3.12.0",
     "@react-pdf-viewer/default-layout": "^3.12.0",
     "@simplepdf/react-embed-pdf": "^1.9.0",
@@ -52,12 +47,12 @@
     "qr-code-styling": "^1.9.2",
     "qrcode": "^1.5.4",
     "qrcode.react": "^4.2.0",
-    "react": "^18",
+    "react": "19.1.0",
     "react-curved-text": "^3.0.1",
-    "react-dom": "^18",
+    "react-dom": "19.1.0",
     "react-icons": "^5.5.0",
     "react-toastify": "^11.0.5",
-    "resend": "^6.1.0",
+    "resend": "^3.5.0",
     "signature_pad": "^5.0.10",
     "simple-icons": "^15.14.0",
     "tailwind-merge": "^3.3.1",
@@ -67,8 +62,8 @@
     "@eslint/eslintrc": "^3",
     "@types/node": "^20.19.11",
     "@types/qrcode": "^1.5.5",
-    "@types/react": "^18",
-    "@types/react-dom": "^18",
+    "@types/react": "19.1.0",
+    "@types/react-dom": "19.1.7",
     "@types/signature_pad": "^2.3.6",
     "autoprefixer": "^10.4.21",
     "eslint": "^9",

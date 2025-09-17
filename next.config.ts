@@ -29,6 +29,12 @@ const nextConfig: NextConfig = {
     if (isServer) {
       config.externals = config.externals || [];
       config.externals.push('canvas');
+
+      // Externalize @react-email/render to prevent Html import conflicts
+      // This allows resend to work while preventing build issues
+      config.externals.push({
+        '@react-email/render': '@react-email/render'
+      });
     }
 
     // Suppress antd compatibility warnings and handle client-side fallbacks
