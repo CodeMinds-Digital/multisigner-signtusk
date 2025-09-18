@@ -19,7 +19,9 @@ export default function NotificationsPage() {
   const fetchNotifications = async (unreadOnly = false) => {
     try {
       setLoading(true)
-      const response = await fetch(`/api/notifications?limit=50&unread_only=${unreadOnly}`)
+      const response = await fetch(`/api/notifications?limit=50&unread_only=${unreadOnly}`, {
+        credentials: 'include' // Include cookies for authentication
+      })
       if (response.ok) {
         const data = await response.json()
         setNotifications(data.notifications || [])

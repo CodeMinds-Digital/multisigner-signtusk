@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { ComprehensiveLogout } from '@/lib/comprehensive-logout'
 
 export interface User {
   id: string
@@ -94,6 +95,9 @@ export function SecureAuthProvider({ children }: AuthProviderProps) {
       // Set user from response
       setUser(data.user)
 
+      // Small delay to ensure cookies are properly set in browser
+      await new Promise(resolve => setTimeout(resolve, 100))
+
       // Redirect to dashboard or intended page
       const urlParams = new URLSearchParams(window.location.search)
       const redirectTo = urlParams.get('redirect') || '/dashboard'
@@ -106,31 +110,24 @@ export function SecureAuthProvider({ children }: AuthProviderProps) {
     }
   }, [router])
 
-  // Sign out
+  // Sign out with comprehensive cleanup
   const signOut = useCallback(async () => {
     try {
       setLoading(true)
 
-      // Call logout API to clear cookies and revoke session
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      })
-
-      // Clear user state
+      // Clear user state immediately
       setUser(null)
 
-      // Redirect to login
-      router.push('/login')
+      // Perform comprehensive logout (this will handle redirect)
+      await ComprehensiveLogout.performCompleteLogout()
     } catch (err) {
       console.error('Logout error:', err)
-      // Clear user state even if API call fails
-      setUser(null)
-      router.push('/login')
+      // Emergency logout if comprehensive logout fails
+      ComprehensiveLogout.emergencyLogout()
     } finally {
       setLoading(false)
     }
-  }, [router])
+  }, [])
 
   // Refresh authentication status
   const refreshAuth = useCallback(async () => {
@@ -160,8 +157,12 @@ export function SecureAuthProvider({ children }: AuthProviderProps) {
         // Add a small delay to prevent hydration mismatch
         await new Promise(resolve => setTimeout(resolve, 100))
 
-        // Try to refresh to check if we have valid cookies
-        await refreshAuth()
+        // Only try to refresh if we're not on the login page
+        // This prevents unnecessary 401 errors on initial load
+        if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
+          // Try to refresh to check if we have valid cookies
+          await refreshAuth()
+        }
       } catch (err) {
         console.error('Initial auth check failed:', err)
       } finally {

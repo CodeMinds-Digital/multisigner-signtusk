@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import type { User, LoginCredentials } from '@/types/auth'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 import { AuthInterceptor, TokenRefreshManager } from '@/lib/auth-interceptor'
+import { ComprehensiveLogout } from '@/lib/comprehensive-logout'
 
 interface AuthContextType {
   user: User | null
@@ -213,28 +214,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       // Clear user state immediately
       setUser(null)
 
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut()
-      if (error) {
-        console.warn('Sign out error (non-critical):', error)
-      }
-
-      // Clear auth storage
-      clearAuthStorage()
-
-      // Redirect to login page
-      try {
-        router.push('/login')
-      } catch (error) {
-        console.error('Sign out router.push error:', error)
-        window.location.href = '/login'
-      }
+      // Perform comprehensive logout (this will handle redirect)
+      await ComprehensiveLogout.performCompleteLogout()
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'An error occurred')
+      console.error('Logout error:', error)
+      // Emergency logout if comprehensive logout fails
+      ComprehensiveLogout.emergencyLogout()
     } finally {
       setLoading(false)
     }
-  }, [clearAuthStorage, router])
+  }, [])
 
   // Ensure valid session before making API calls
   const ensureValidSession = useCallback(async (): Promise<boolean> => {
