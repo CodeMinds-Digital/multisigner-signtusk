@@ -31,7 +31,7 @@ export class SequentialNotificationService {
 
       // Create signing URL with access token
       const signingUrl = await this.generateSigningUrl(config.requestId, config.nextSignerEmail)
-      
+
       // Send email notification
       const emailResult = await this.sendSequentialNotificationEmail({
         ...config,
@@ -41,7 +41,7 @@ export class SequentialNotificationService {
       if (emailResult.success) {
         // Log notification in database
         await this.logNotification(config.requestId, config.nextSignerEmail, 'sequential_next', emailResult.messageId)
-        
+
         console.log('✅ Sequential notification sent successfully')
         return { success: true, messageId: emailResult.messageId }
       } else {
@@ -91,8 +91,16 @@ export class SequentialNotificationService {
     error?: string
   }> {
     try {
+      // Validate Resend API key exists
+      if (!process.env.RESEND_API_KEY) {
+        console.error('❌ RESEND_API_KEY not configured')
+        return { success: false, error: 'Email service not configured' }
+      }
+
       const emailHtml = this.generateSequentialEmailTemplate(config)
       const emailText = this.generateSequentialEmailText(config)
+
+      console.log('📧 Sending email via Resend to:', config.nextSignerEmail)
 
       const result = await resend.emails.send({
         from: `${process.env.EMAIL_FROM_NAME || 'SignTusk'} <${process.env.EMAIL_FROM_ADDRESS || 'noreply@signtusk.com'}>`,
@@ -107,15 +115,20 @@ export class SequentialNotificationService {
         }
       })
 
+      console.log('📧 Resend API response:', result)
+
       if (result.error) {
+        console.error('❌ Resend API error:', result.error)
         return { success: false, error: result.error.message }
       }
 
+      console.log('✅ Email sent successfully, message ID:', result.data?.id)
       return { success: true, messageId: result.data?.id }
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Email sending failed' 
+      console.error('❌ Email sending error:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Email sending failed'
       }
     }
   }
@@ -124,7 +137,7 @@ export class SequentialNotificationService {
    * Generate HTML email template for sequential notification
    */
   private static generateSequentialEmailTemplate(config: SequentialNotificationConfig): string {
-    const expirationText = config.expiresAt 
+    const expirationText = config.expiresAt
       ? `This request expires on ${new Date(config.expiresAt).toLocaleDateString()}.`
       : ''
 
@@ -190,7 +203,7 @@ export class SequentialNotificationService {
    * Generate plain text email for sequential notification
    */
   private static generateSequentialEmailText(config: SequentialNotificationConfig): string {
-    const expirationText = config.expiresAt 
+    const expirationText = config.expiresAt
       ? `This request expires on ${new Date(config.expiresAt).toLocaleDateString()}.`
       : ''
 
@@ -226,9 +239,9 @@ This is an automated message from SignTusk.
    * Log notification in database for tracking
    */
   private static async logNotification(
-    requestId: string, 
-    recipientEmail: string, 
-    type: string, 
+    requestId: string,
+    recipientEmail: string,
+    type: string,
     messageId?: string
   ): Promise<void> {
     try {
@@ -282,7 +295,7 @@ This is an automated message from SignTusk.
       const allSigners = signingRequest.signers.sort((a: any, b: any) => a.signing_order - b.signing_order)
       const currentSignerIndex = allSigners.findIndex((s: any) => s.signer_email === signerEmail)
       const previousSigners = allSigners.slice(0, currentSignerIndex)
-      const incompletePreviousSigners = previousSigners.filter((s: any) => 
+      const incompletePreviousSigners = previousSigners.filter((s: any) =>
         s.status !== 'signed' && s.signer_status !== 'signed'
       )
 
@@ -306,9 +319,9 @@ This is an automated message from SignTusk.
 
       return await this.notifyNextSigner(config)
     } catch (error) {
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       }
     }
   }
@@ -351,7 +364,7 @@ This is an automated message from SignTusk.
         try {
           // Find next signer in sequential order
           const allSigners = request.signers.sort((a: any, b: any) => a.signing_order - b.signing_order)
-          const nextSigner = allSigners.find((s: any) => 
+          const nextSigner = allSigners.find((s: any) =>
             s.status !== 'signed' && s.signer_status !== 'signed' && s.status !== 'declined'
           )
 
@@ -371,10 +384,10 @@ This is an automated message from SignTusk.
       console.log(`✅ Processed ${processed} requests, sent ${sent} reminders`)
       return { processed, sent, errors }
     } catch (error) {
-      return { 
-        processed: 0, 
-        sent: 0, 
-        errors: [error instanceof Error ? error.message : 'Unknown error'] 
+      return {
+        processed: 0,
+        sent: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown error']
       }
     }
   }

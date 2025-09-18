@@ -314,8 +314,36 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             }
 
             if (documentPath) {
-                // Get the PDF URL from storage
-                const buckets = ['documents']
+                console.log('🔍 Attempting to resolve document URL for path:', documentPath)
+
+                // Try to get a working PDF URL using the document URL API first
+                try {
+                    const response = await fetch('/api/drive/document-url', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({ pdfUrl: documentPath })
+                    })
+
+                    if (response.ok) {
+                        const result = await response.json()
+                        if (result.success && result.data?.url) {
+                            console.log('✅ Got PDF URL from API:', result.data.url)
+                            const requestWithPdfUrl = {
+                                ...request,
+                                document_url: result.data.url
+                            }
+                            setSigningRequest(requestWithPdfUrl)
+                            return
+                        }
+                    }
+                } catch (apiError) {
+                    console.log('⚠️ API method failed, trying direct storage access:', apiError)
+                }
+
+                // Fallback: Try direct storage access
+                const buckets = ['documents', 'files']
                 let pdfUrl = null
 
                 for (const bucket of buckets) {
@@ -692,8 +720,11 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
             setSigningRequest(null)
 
-            // Refresh the page to show updated status
-            window.location.reload()
+            // Add a small delay before refresh to ensure database update is complete
+            setTimeout(() => {
+                console.log('🔄 Refreshing page to show updated signature status...')
+                window.location.reload()
+            }, 1000)
         } catch (error) {
             console.error('❌ Error accepting signature:', error)
             alert(`Error saving signature: ${error instanceof Error ? error.message : 'Unknown error'}`)

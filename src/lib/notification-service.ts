@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { supabaseAdmin } from './supabase-admin'
 
 export type NotificationType =
   | 'signature_request_received'
@@ -58,30 +59,33 @@ export class NotificationService {
     expiresAt?: string
   ): Promise<boolean> {
     try {
-      const { error } = await supabase
+      console.log('📧 Creating notification:', { userId, type, title })
+      const { error } = await supabaseAdmin
         .from(this.NOTIFICATIONS_TABLE)
         .insert([{
           user_id: userId,
           type,
           title,
           message,
-          data,
+          metadata: data,
           expires_at: expiresAt,
-          read: false,
+          is_read: false,
           created_at: new Date().toISOString()
         }])
 
       if (error) {
-        console.error('Error creating notification:', error)
+        console.error('❌ Error creating notification:', error)
         return false
       }
+
+      console.log('✅ Notification created successfully')
 
       // Also send email notification if enabled
       await this.sendEmailNotification(userId, type, title, message, data)
 
       return true
     } catch (error) {
-      console.error('Error creating notification:', error)
+      console.error('❌ Error creating notification:', error)
       return false
     }
   }
@@ -103,7 +107,7 @@ export class NotificationService {
         .limit(limit)
 
       if (unreadOnly) {
-        query = query.eq('read', false)
+        query = query.eq('is_read', false)
       }
 
       const { data, error } = await query
@@ -127,7 +131,7 @@ export class NotificationService {
     try {
       const { error } = await supabase
         .from(this.NOTIFICATIONS_TABLE)
-        .update({ read: true })
+        .update({ is_read: true, updated_at: new Date().toISOString() })
         .eq('id', notificationId)
 
       return !error
@@ -144,9 +148,9 @@ export class NotificationService {
     try {
       const { error } = await supabase
         .from(this.NOTIFICATIONS_TABLE)
-        .update({ read: true })
+        .update({ is_read: true, updated_at: new Date().toISOString() })
         .eq('user_id', userId)
-        .eq('read', false)
+        .eq('is_read', false)
 
       return !error
     } catch (error) {
@@ -177,11 +181,11 @@ export class NotificationService {
    */
   static async getUnreadCount(userId: string): Promise<number> {
     try {
-      const { count, error } = await supabase
+      const { count, error } = await supabaseAdmin
         .from(this.NOTIFICATIONS_TABLE)
         .select('*', { count: 'exact', head: true })
         .eq('user_id', userId)
-        .eq('read', false)
+        .eq('is_read', false)
 
       if (error) {
         console.error('Error getting unread count:', error)

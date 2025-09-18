@@ -412,6 +412,40 @@ export class MultiSignatureWorkflowService {
         .eq('id', requestId)
         .single()
 
+      if (requestError || !signingRequest) {
+        console.error('❌ Error fetching signing request:', requestError)
+        return {
+          canSign: false,
+          error: 'Failed to fetch signing request',
+          signingMode: 'sequential'
+        }
+      }
+
+      // Check if this is a single signature document
+      const { data: requestSigners, error: requestSignersError } = await supabaseAdmin
+        .from('signing_request_signers')
+        .select('*')
+        .eq('signing_request_id', requestId)
+
+      if (requestSignersError || !requestSigners) {
+        console.error('❌ Error fetching signers:', requestSignersError)
+        return {
+          canSign: false,
+          error: 'Failed to fetch signers',
+          signingMode: 'sequential'
+        }
+      }
+
+      // For single signature documents, always use 'single' mode
+      if (requestSigners.length === 1) {
+        console.log('📝 SINGLE SIGNATURE DETECTED - Only one signer')
+        return {
+          canSign: true,
+          signingMode: 'single',
+          currentSignerOrder: 1
+        }
+      }
+
       console.log('🔍 Database query result:', {
         requestId,
         hasSigningRequest: !!signingRequest,

@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Settings, Save, RefreshCw, AlertTriangle, CheckCircle, 
+  Settings, Save, RefreshCw, AlertTriangle, CheckCircle,
   XCircle, Edit, Trash2, Plus, Eye, EyeOff, Globe,
   Mail, Shield, Upload, Database, Bell, Users
 } from 'lucide-react'
@@ -218,10 +218,10 @@ export function SystemSettingsManagement() {
     setSaving(true)
     try {
       const newValue = editValues[settingId]
-      
+
       // Update local state
-      setSettings(prev => prev.map(setting => 
-        setting.id === settingId 
+      setSettings(prev => prev.map(setting =>
+        setting.id === settingId
           ? { ...setting, value: newValue, updated_at: new Date().toISOString() }
           : setting
       ))
@@ -239,8 +239,8 @@ export function SystemSettingsManagement() {
 
   const toggleSettingActive = async (settingId: string, isActive: boolean) => {
     try {
-      setSettings(prev => prev.map(setting => 
-        setting.id === settingId 
+      setSettings(prev => prev.map(setting =>
+        setting.id === settingId
           ? { ...setting, is_active: isActive, updated_at: new Date().toISOString() }
           : setting
       ))
@@ -265,7 +265,7 @@ export function SystemSettingsManagement() {
           return (
             <Switch
               checked={currentValue}
-              onCheckedChange={(checked) => 
+              onCheckedChange={(checked) =>
                 setEditValues(prev => ({ ...prev, [setting.id]: checked }))
               }
             />
@@ -275,7 +275,7 @@ export function SystemSettingsManagement() {
             <Input
               type="number"
               value={currentValue}
-              onChange={(e) => 
+              onChange={(e) =>
                 setEditValues(prev => ({ ...prev, [setting.id]: parseInt(e.target.value) }))
               }
               className="w-32"
@@ -285,10 +285,10 @@ export function SystemSettingsManagement() {
           return (
             <Textarea
               value={Array.isArray(currentValue) ? currentValue.join(', ') : currentValue}
-              onChange={(e) => 
-                setEditValues(prev => ({ 
-                  ...prev, 
-                  [setting.id]: e.target.value.split(',').map(s => s.trim()) 
+              onChange={(e) =>
+                setEditValues(prev => ({
+                  ...prev,
+                  [setting.id]: e.target.value.split(',').map(s => s.trim())
                 }))
               }
               className="w-64"
@@ -299,7 +299,7 @@ export function SystemSettingsManagement() {
           return (
             <Input
               value={currentValue}
-              onChange={(e) => 
+              onChange={(e) =>
                 setEditValues(prev => ({ ...prev, [setting.id]: e.target.value }))
               }
               className="w-64"
@@ -361,11 +361,10 @@ export function SystemSettingsManagement() {
             <button
               key={category.id}
               onClick={() => setActiveCategory(category.id)}
-              className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeCategory === category.id
+              className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeCategory === category.id
                   ? 'bg-white text-blue-600 shadow-sm'
                   : 'text-gray-600 hover:text-gray-900'
-              }`}
+                }`}
             >
               <Icon className="w-4 h-4 mr-2" />
               {category.label}
@@ -378,10 +377,16 @@ export function SystemSettingsManagement() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
-            {categories.find(c => c.id === activeCategory)?.icon && (
-              <categories.find(c => c.id === activeCategory)!.icon className="w-5 h-5 mr-2" />
-            )}
-            {categories.find(c => c.id === activeCategory)?.label} Settings
+            {(() => {
+              const category = categories.find(c => c.id === activeCategory)
+              const Icon = category?.icon
+              return (
+                <>
+                  {Icon && <Icon className="w-5 h-5 mr-2" />}
+                  {category?.label} Settings
+                </>
+              )
+            })()}
           </CardTitle>
           <CardDescription>
             {categories.find(c => c.id === activeCategory)?.description}
@@ -398,9 +403,8 @@ export function SystemSettingsManagement() {
               {filteredSettings.map(setting => (
                 <div
                   key={setting.id}
-                  className={`p-4 border rounded-lg ${
-                    setting.is_active ? 'border-gray-200' : 'border-gray-300 bg-gray-50'
-                  }`}
+                  className={`p-4 border rounded-lg ${setting.is_active ? 'border-gray-200' : 'border-gray-300 bg-gray-50'
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex-1">

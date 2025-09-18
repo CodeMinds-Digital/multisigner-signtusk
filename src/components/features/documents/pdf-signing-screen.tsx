@@ -476,22 +476,29 @@ export function PDFSigningScreen({
 
             {/* Signing Mode Alert */}
             {sequentialValidation && (
-              <Alert className={`mb-4 ${sequentialValidation.signingMode === 'sequential'
-                ? (sequentialValidation.canSign ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50')
-                : 'border-blue-200 bg-blue-50'
+              <Alert className={`mb-4 ${sequentialValidation.signingMode === 'single' ? 'border-green-200 bg-green-50' :
+                  sequentialValidation.signingMode === 'sequential'
+                    ? (sequentialValidation.canSign ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50')
+                    : 'border-blue-200 bg-blue-50'
                 }`}>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
                   <div className="space-y-2">
                     <div className="font-medium">
-                      {sequentialValidation.signingMode === 'sequential' ? 'Sequential Signing Mode' : 'Parallel Signing Mode'}
-                      {sequentialValidation.currentSignerOrder && (
+                      {sequentialValidation.signingMode === 'single' ? 'Single Signature Mode' :
+                        sequentialValidation.signingMode === 'sequential' ? 'Sequential Signing Mode' :
+                          'Parallel Signing Mode'}
+                      {sequentialValidation.currentSignerOrder && sequentialValidation.signingMode !== 'single' && (
                         <span className="ml-2 text-sm">
                           (You are signer #{sequentialValidation.currentSignerOrder})
                         </span>
                       )}
                     </div>
-                    {sequentialValidation.signingMode === 'sequential' ? (
+                    {sequentialValidation.signingMode === 'single' ? (
+                      <div className="text-green-700">
+                        ✅ You are the only signer for this document.
+                      </div>
+                    ) : sequentialValidation.signingMode === 'sequential' ? (
                       sequentialValidation.canSign ? (
                         <div className="text-green-700">
                           ✅ It's your turn to sign this document.

@@ -5,7 +5,18 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { MultiSignatureWorkflowService } from '@/lib/multi-signature-workflow-service'
 
 export async function POST(request: NextRequest) {
+  let requestId: string | undefined
+  let payload: any
+
   try {
+    // Environment validation for production debugging
+    console.log('🔧 Environment check:', {
+      hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+      hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+      hasJwtSecret: !!process.env.JWT_SECRET,
+      nodeEnv: process.env.NODE_ENV,
+      timestamp: new Date().toISOString()
+    })
     // Get access token from cookies
     const { accessToken } = getAuthTokensFromRequest(request)
 
@@ -17,11 +28,13 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify access token
-    const payload = await verifyAccessToken(accessToken)
+    payload = await verifyAccessToken(accessToken)
     const userEmail = payload.email
 
     // Get request body
-    const { requestId, signatureData } = await request.json()
+    const requestBody = await request.json()
+    requestId = requestBody.requestId
+    const signatureData = requestBody.signatureData
 
     if (!requestId || !signatureData) {
       return new Response(
@@ -298,16 +311,69 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Error processing signature:', error)
+    console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+    console.error('❌ Error details:', {
+      name: error instanceof Error ? error.name : 'Unknown',
+      message: error instanceof Error ? error.message : String(error),
+      requestId,
+      userEmail: payload?.email || 'Unknown',
+      timestamp: new Date().toISOString()
+    })
 
-    if (error instanceof Error && error.message.includes('token')) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid or expired token' }),
-        { status: 401, headers: { 'Content-Type': 'application/json' } }
-      )
+    // Check for specific error types
+    if (error instanceof Error) {
+      // Authentication/token errors
+      if (error.message.includes('token') || error.message.includes('JWT') || error.message.includes('auth')) {
+        return new Response(
+          JSON.stringify({
+            error: 'Authentication failed',
+            details: 'Invalid or expired authentication token'
+          }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Database connection errors
+      if (error.message.includes('connect') || error.message.includes('timeout') || error.message.includes('ECONNREFUSED')) {
+        return new Response(
+          JSON.stringify({
+            error: 'Database connection failed',
+            details: 'Unable to connect to database. Please try again.'
+          }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Permission/authorization errors
+      if (error.message.includes('permission') || error.message.includes('unauthorized') || error.message.includes('forbidden')) {
+        return new Response(
+          JSON.stringify({
+            error: 'Permission denied',
+            details: 'Insufficient permissions to perform this action'
+          }),
+          { status: 403, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Validation errors
+      if (error.message.includes('validation') || error.message.includes('invalid') || error.message.includes('required')) {
+        return new Response(
+          JSON.stringify({
+            error: 'Validation failed',
+            details: error.message
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
     }
 
+    // Generic server error with more details for debugging
     return new Response(
-      JSON.stringify({ error: 'Internal server error' }),
+      JSON.stringify({
+        error: 'Failed to save signature',
+        details: error instanceof Error ? error.message : 'An unexpected error occurred',
+        timestamp: new Date().toISOString()
+      }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
   }

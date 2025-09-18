@@ -110,8 +110,11 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
       setShowSigningScreen(false)
       onClose()
 
-      // Refresh the page to show updated status
-      window.location.reload()
+      // Add a small delay before refresh to ensure database update is complete
+      setTimeout(() => {
+        console.log('🔄 Refreshing page to show updated signature status...')
+        window.location.reload()
+      }, 1000)
     } catch (error) {
       console.error('❌ Error accepting signature:', error)
       alert(`Error saving signature: ${error instanceof Error ? error.message : 'Unknown error'}`)

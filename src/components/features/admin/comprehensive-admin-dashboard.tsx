@@ -6,17 +6,21 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  Users, FileText, Mail, Settings, Database, Activity, Download, RefreshCw, Eye, EyeOff,
-  Shield, LogOut, DollarSign, Key, AlertTriangle, TrendingUp, UserCheck, CreditCard,
-  Edit, Server
+  Users, FileText, Mail, Database, Download, RefreshCw, Eye, EyeOff,
+  Shield, DollarSign, Key, TrendingUp, UserCheck, Edit
 } from 'lucide-react'
-import { getAdminSession, adminLogout } from '@/lib/admin-auth'
+import { getAdminSession } from '@/lib/admin-auth'
 import { getRealSystemStats, getRealUsers, getRealDocuments, getRealAPIKeys, RealSystemStats, RealUserRecord, RealDocumentRecord, RealAPIKeyRecord } from '@/lib/admin-data-service'
+import { MultiSignatureManagement } from './multi-signature-management'
+import { NotificationManagement } from './notification-management'
 import { EnvironmentManagement } from './environment-management'
 import { SupabaseManagement } from './supabase-management'
 import { ConfigurationDiagnostics } from './configuration-diagnostics'
 import { SystemSettingsManagement } from './system-settings-management'
 import { FeatureToggleManagement } from './feature-toggle-management'
+import { BillingPlansManagement } from './billing-plans-management'
+import { AdminSidebar } from '@/components/layout/admin-sidebar'
+import { AdminHeader } from '@/components/layout/admin-header'
 
 export function ComprehensiveAdminDashboard() {
   const router = useRouter()
@@ -33,25 +37,7 @@ export function ComprehensiveAdminDashboard() {
     setAdminSession(session as any)
   }, [router])
 
-  const handleLogout = async () => {
-    await adminLogout()
-    router.push('/admin/login')
-  }
 
-  const tabs = [
-    { id: 'overview', label: 'Overview', icon: Activity },
-    { id: 'users', label: 'User Management', icon: Users },
-    { id: 'documents', label: 'Documents', icon: FileText },
-    { id: 'settings', label: 'System Settings', icon: Settings },
-    { id: 'features', label: 'Feature Toggles', icon: Shield },
-    { id: 'billing', label: 'Billing & Plans', icon: CreditCard },
-    { id: 'api-keys', label: 'API Keys', icon: Key },
-    { id: 'supabase', label: 'Supabase', icon: Database },
-    { id: 'environment', label: 'Environment', icon: TrendingUp },
-    { id: 'diagnostics', label: 'Diagnostics', icon: AlertTriangle },
-    { id: 'system', label: 'System Health', icon: Server },
-
-  ]
 
   if (!adminSession) {
     return (
@@ -65,94 +51,60 @@ export function ComprehensiveAdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Admin Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <Shield className="w-8 h-8 text-blue-600" />
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-900">SignTusk Admin</h1>
-                  <p className="text-sm text-gray-600">System Administration Portal</p>
-                </div>
-              </div>
-            </div>
+    <div className="min-h-screen bg-gray-50 flex">
+      {/* Sidebar */}
+      <AdminSidebar activeTab={activeTab} setActiveTab={setActiveTab} />
 
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <p className="text-sm font-medium text-gray-900">{(adminSession as any).user?.name || adminSession.email}</p>
-                <p className="text-xs text-gray-500 capitalize">{(adminSession as any).user?.role?.replace('_', ' ') || 'Admin'}</p>
-              </div>
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="w-4 h-4 mr-2" />
-                Logout
-              </Button>
-            </div>
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col">
+        {/* Header */}
+        <AdminHeader activeTab={activeTab} />
+
+        {/* Content Area */}
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-7xl mx-auto">{/* Content will be added here */}
+
+            {/* Overview Tab */}
+            {activeTab === 'overview' && <OverviewTab />}
+
+            {/* User Management Tab */}
+            {activeTab === 'users' && <UserManagementTab />}
+
+            {/* Documents Tab */}
+            {activeTab === 'documents' && <DocumentsTab />}
+
+            {/* Multi-Signature Management Tab */}
+            {activeTab === 'multi-signature' && <MultiSignatureManagement />}
+
+            {/* Notifications Management Tab */}
+            {activeTab === 'notifications' && <NotificationManagement />}
+
+            {/* System Settings Tab */}
+            {activeTab === 'settings' && <SystemSettingsManagement />}
+
+            {/* Feature Toggles Tab */}
+            {activeTab === 'features' && <FeatureToggleManagement />}
+
+            {/* Billing Tab */}
+            {activeTab === 'billing' && <BillingPlansManagement />}
+
+            {/* API Keys Tab */}
+            {activeTab === 'api-keys' && <APIKeysTab />}
+
+            {/* Supabase Management Tab */}
+            {activeTab === 'supabase' && <SupabaseManagement />}
+
+            {/* Environment Management Tab */}
+            {activeTab === 'environment' && <EnvironmentManagement />}
+
+            {/* Configuration Diagnostics Tab */}
+            {activeTab === 'diagnostics' && <ConfigurationDiagnostics />}
+
+            {/* System Health Tab */}
+            {activeTab === 'system' && <SystemHealthTab />}
+
           </div>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="space-y-6">
-          {/* Tab Navigation */}
-          <div className="border-b border-gray-200">
-            <nav className="-mb-px flex space-x-8">
-              {tabs.map((tab) => {
-                const Icon = tab.icon
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center py-2 px-1 border-b-2 font-medium text-sm ${activeTab === tab.id
-                      ? 'border-blue-500 text-blue-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                      }`}
-                  >
-                    <Icon className="w-4 h-4 mr-2" />
-                    {tab.label}
-                  </button>
-                )
-              })}
-            </nav>
-          </div>
-
-          {/* Overview Tab */}
-          {activeTab === 'overview' && <OverviewTab />}
-
-          {/* User Management Tab */}
-          {activeTab === 'users' && <UserManagementTab />}
-
-          {/* Documents Tab */}
-          {activeTab === 'documents' && <DocumentsTab />}
-
-          {/* System Settings Tab */}
-          {activeTab === 'settings' && <SystemSettingsManagement />}
-
-          {/* Feature Toggles Tab */}
-          {activeTab === 'features' && <FeatureToggleManagement />}
-
-          {/* Billing Tab */}
-          {activeTab === 'billing' && <BillingTab />}
-
-          {/* API Keys Tab */}
-          {activeTab === 'api-keys' && <APIKeysTab />}
-
-          {/* Supabase Management Tab */}
-          {activeTab === 'supabase' && <SupabaseManagement />}
-
-          {/* Environment Management Tab */}
-          {activeTab === 'environment' && <EnvironmentManagement />}
-
-          {/* Configuration Diagnostics Tab */}
-          {activeTab === 'diagnostics' && <ConfigurationDiagnostics />}
-
-          {/* System Health Tab */}
-          {activeTab === 'system' && <SystemHealthTab />}
-
-
-        </div>
+        </main>
       </div>
     </div>
   )
@@ -603,19 +555,7 @@ function DocumentsTab() {
   )
 }
 
-function BillingTab() {
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Billing & Subscriptions</CardTitle>
-        <CardDescription>Monitor revenue, subscriptions, and billing</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <p className="text-gray-600">Billing management interface coming soon...</p>
-      </CardContent>
-    </Card>
-  )
-}
+
 
 function APIKeysTab() {
   const [apiKeys, setApiKeys] = useState<RealAPIKeyRecord[]>([])
