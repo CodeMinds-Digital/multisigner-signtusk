@@ -53,3 +53,56 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/auth/signup?error=confirmation_error', request.url))
   }
 }
+
+// PUT method for resending confirmation emails
+export async function PUT(request: NextRequest) {
+  try {
+    const { email } = await request.json()
+
+    if (!email) {
+      return NextResponse.json(
+        { error: { message: 'Email is required', code: 'MISSING_EMAIL' } },
+        { status: 400 }
+      )
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: { message: 'Invalid email format', code: 'INVALID_EMAIL' } },
+        { status: 400 }
+      )
+    }
+
+    console.log('📧 Resending confirmation email to:', email)
+
+    // Use EmailConfirmationService to resend
+    const result = await EmailConfirmationService.resendConfirmation(email)
+
+    if (!result.success) {
+      return NextResponse.json(
+        { error: { message: result.error, code: 'RESEND_FAILED' } },
+        { status: 400 }
+      )
+    }
+
+    console.log('✅ Confirmation email resent successfully')
+
+    return NextResponse.json({
+      message: 'Confirmation email sent successfully',
+      email
+    })
+  } catch (error) {
+    console.error('❌ API Error:', error)
+    return NextResponse.json(
+      {
+        error: {
+          message: 'Internal server error',
+          code: 'INTERNAL_ERROR',
+        },
+      },
+      { status: 500 }
+    )
+  }
+}

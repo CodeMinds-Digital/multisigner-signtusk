@@ -106,8 +106,8 @@ export function NotificationManagement() {
     try {
       console.log('Resending notification:', notificationId)
       // Call resend API
-      const response = await fetch('/api/admin/resend-notification', {
-        method: 'POST',
+      const response = await fetch('/api/admin/notification-logs', {
+        method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ notificationId })
       })
