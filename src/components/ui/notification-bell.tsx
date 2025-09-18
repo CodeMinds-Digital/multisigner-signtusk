@@ -24,7 +24,9 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const fetchNotifications = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/notifications?limit=10&unread_only=false')
+      const response = await fetch('/api/notifications?limit=10&unread_only=false', {
+        credentials: 'include' // Include cookies for authentication
+      })
       if (response.ok) {
         const data = await response.json()
         setNotifications(data.notifications || [])
@@ -40,7 +42,9 @@ export function NotificationBell({ className }: NotificationBellProps) {
   // Fetch unread count only
   const fetchUnreadCount = async () => {
     try {
-      const response = await fetch('/api/notifications/unread-count')
+      const response = await fetch('/api/notifications/unread-count', {
+        credentials: 'include' // Include cookies for authentication
+      })
       if (response.ok) {
         const data = await response.json()
         setUnreadCount(data.unread_count || 0)

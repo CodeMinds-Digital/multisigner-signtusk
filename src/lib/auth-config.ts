@@ -15,7 +15,7 @@ export const AUTH_CONFIG = {
     ACCESS_TOKEN: {
       name: 'access_token',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_APP_URL?.includes('localhost'),
+      secure: process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_APP_URL?.includes('localhost') && !process.env.NEXT_PUBLIC_APP_URL?.includes('192.168.'),
       sameSite: 'lax' as const,
       maxAge: 15 * 60, // 15 minutes
       path: '/',
@@ -23,7 +23,7 @@ export const AUTH_CONFIG = {
     REFRESH_TOKEN: {
       name: 'refresh_token',
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_APP_URL?.includes('localhost'),
+      secure: process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_APP_URL?.includes('localhost') && !process.env.NEXT_PUBLIC_APP_URL?.includes('192.168.'),
       sameSite: 'lax' as const,
       maxAge: 7 * 24 * 60 * 60, // 7 days
       path: '/',

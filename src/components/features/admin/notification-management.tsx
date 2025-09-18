@@ -36,7 +36,9 @@ export function NotificationManagement() {
       console.log('🔄 Loading notification data from API...')
 
       // Load data from API endpoint instead of direct database access
-      const response = await fetch('/api/admin/notification-logs?includeStats=true&includeTemplates=true')
+      const response = await fetch('/api/admin/notification-logs?includeStats=true&includeTemplates=true', {
+        credentials: 'include' // Include cookies for authentication
+      })
       const data = await response.json()
 
       if (data.success) {

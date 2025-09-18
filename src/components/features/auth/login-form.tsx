@@ -262,7 +262,10 @@ export function LoginForm() {
                     type="button"
                     onClick={async () => {
                       try {
-                        const response = await fetch('/api/create-test-user', { method: 'POST' })
+                        const response = await fetch('/api/create-test-user', {
+                          method: 'POST',
+                          credentials: 'include' // Include cookies for authentication
+                        })
                         const result = await response.json()
                         if (response.ok) {
                           alert('Test user created/verified successfully!')

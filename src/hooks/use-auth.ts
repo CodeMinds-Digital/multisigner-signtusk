@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import type { User, LoginCredentials, SignUpData, CorporateValidationResult } from '@/types/auth'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
+import { ComprehensiveLogout } from '@/lib/comprehensive-logout'
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
@@ -249,26 +250,12 @@ export function useAuth() {
       // Clear user state immediately
       setUser(null)
 
-      // Sign out from Supabase
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-
-      // Clear any cached data in localStorage
-      if (typeof window !== 'undefined') {
-        // Clear any auth-related localStorage items
-        const keysToRemove = []
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i)
-          if (key && (key.startsWith('supabase.') || key.includes('auth'))) {
-            keysToRemove.push(key)
-          }
-        }
-        keysToRemove.forEach(key => localStorage.removeItem(key))
-      }
-
-      router.push('/login')
+      // Perform comprehensive logout (this will handle redirect)
+      await ComprehensiveLogout.performCompleteLogout()
     } catch (error) {
       setError(error instanceof Error ? error.message : 'An error occurred')
+      // Emergency logout if comprehensive logout fails
+      ComprehensiveLogout.emergencyLogout()
     } finally {
       setLoading(false)
     }
