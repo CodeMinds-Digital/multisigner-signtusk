@@ -38,7 +38,7 @@ export async function GET(request: NextRequest) {
 
     // Test database connection
     try {
-      const { data, error } = await supabaseAdmin
+      const { error } = await supabaseAdmin
         .from('signing_requests')
         .select('id')
         .limit(1)
@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     try {
       const { SignJWT } = await import('jose')
       const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'test')
-      
+
       const testToken = await new SignJWT({ test: true })
         .setProtectedHeader({ alg: 'HS256' })
         .setIssuedAt()
@@ -70,19 +70,19 @@ export async function GET(request: NextRequest) {
 
     return new Response(
       JSON.stringify(diagnostics, null, 2),
-      { 
-        status: 200, 
-        headers: { 
+      {
+        status: 200,
+        headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache, no-store, must-revalidate'
-        } 
+        }
       }
     )
 
   } catch (error) {
     console.error('Debug endpoint error:', error)
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: 'Debug endpoint failed',
         details: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString()

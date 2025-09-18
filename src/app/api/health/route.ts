@@ -1,7 +1,6 @@
-import { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   try {
     const health = {
       status: 'healthy',
@@ -21,7 +20,7 @@ export async function GET(request: NextRequest) {
     ]
 
     const missingEnvVars = requiredEnvVars.filter(envVar => !process.env[envVar])
-    
+
     if (missingEnvVars.length > 0) {
       health.checks.environment = `missing: ${missingEnvVars.join(', ')}`
       health.status = 'unhealthy'
@@ -51,18 +50,18 @@ export async function GET(request: NextRequest) {
 
     return new Response(
       JSON.stringify(health),
-      { 
-        status: statusCode, 
-        headers: { 
+      {
+        status: statusCode,
+        headers: {
           'Content-Type': 'application/json',
           'Cache-Control': 'no-cache'
-        } 
+        }
       }
     )
 
   } catch (error) {
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         status: 'error',
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: new Date().toISOString()

@@ -241,8 +241,7 @@ export class WebhookService {
       const response = await fetch(webhook.url, {
         method: 'POST',
         headers,
-        body: JSON.stringify(payload),
-        timeout: 30000 // 30 second timeout
+        body: JSON.stringify(payload)
       })
 
       // Update webhook event status

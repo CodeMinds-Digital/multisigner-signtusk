@@ -26,13 +26,13 @@ export interface SSOConfig {
   token_url?: string
   userinfo_url?: string
   scope?: string[]
-  
+
   // SAML Config
   sso_url?: string
   entity_id?: string
   certificate?: string
   private_key?: string
-  
+
   // Common Config
   redirect_uri: string
   attribute_mapping: {
@@ -260,7 +260,7 @@ export class SSOService {
 
       // Decode and parse SAML response
       const decodedResponse = Buffer.from(samlResponse, 'base64').toString('utf-8')
-      
+
       // In a production environment, you would use a proper SAML library
       // to validate the signature and parse the response
       // For now, we'll simulate the parsing
@@ -408,12 +408,12 @@ export class SSOService {
   private static parseSAMLResponse(samlResponse: string): any {
     // This is a simplified parser - in production, use a proper SAML library
     // like node-saml or passport-saml
-    
+
     // Extract basic information from SAML response
-    const emailMatch = samlResponse.match(/<saml:Attribute Name="email".*?<saml:AttributeValue>(.*?)<\/saml:AttributeValue>/s)
-    const nameIdMatch = samlResponse.match(/<saml:NameID.*?>(.*?)<\/saml:NameID>/s)
-    const firstNameMatch = samlResponse.match(/<saml:Attribute Name="firstName".*?<saml:AttributeValue>(.*?)<\/saml:AttributeValue>/s)
-    const lastNameMatch = samlResponse.match(/<saml:Attribute Name="lastName".*?<saml:AttributeValue>(.*?)<\/saml:AttributeValue>/s)
+    const emailMatch = samlResponse.match(/<saml:Attribute Name="email"[\s\S]*?<saml:AttributeValue>(.*?)<\/saml:AttributeValue>/)
+    const nameIdMatch = samlResponse.match(/<saml:NameID[\s\S]*?>(.*?)<\/saml:NameID>/)
+    const firstNameMatch = samlResponse.match(/<saml:Attribute Name="firstName"[\s\S]*?<saml:AttributeValue>(.*?)<\/saml:AttributeValue>/)
+    const lastNameMatch = samlResponse.match(/<saml:Attribute Name="lastName"[\s\S]*?<saml:AttributeValue>(.*?)<\/saml:AttributeValue>/)
 
     return {
       email: emailMatch?.[1],

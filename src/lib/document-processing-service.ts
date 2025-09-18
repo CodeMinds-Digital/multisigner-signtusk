@@ -164,7 +164,7 @@ export class DocumentProcessingService {
   static addWatermark(documentId: string, watermark: DocumentWatermark): string {
     // In real implementation, this would modify the PDF
     console.log(`Adding watermark "${watermark.text}" to document ${documentId}`)
-    
+
     // Return new document URL with watermark
     return `${documentId}_watermarked_${Date.now()}.pdf`
   }
@@ -202,7 +202,7 @@ export class DocumentProcessingService {
    */
   static getDocumentAnnotations(documentId: string, pageNumber?: number): DocumentAnnotation[] {
     let annotations = this.documentAnnotations.filter(a => a.documentId === documentId)
-    
+
     if (pageNumber !== undefined) {
       annotations = annotations.filter(a => a.pageNumber === pageNumber)
     }
@@ -219,13 +219,13 @@ export class DocumentProcessingService {
   } {
     const mergedDocumentId = this.generateId()
     const pageMapping: { originalDocId: string; originalPage: number; newPage: number }[] = []
-    
+
     let currentPage = 1
-    
+
     documentIds.forEach(docId => {
       // In real implementation, would get actual page count
       const pageCount = 5 // Mock page count
-      
+
       for (let page = 1; page <= pageCount; page++) {
         pageMapping.push({
           originalDocId: docId,
@@ -236,7 +236,7 @@ export class DocumentProcessingService {
     })
 
     console.log(`Merged ${documentIds.length} documents into ${mergedDocumentId}`)
-    
+
     return {
       mergedDocumentId,
       pageMapping
@@ -251,18 +251,18 @@ export class DocumentProcessingService {
     splitPoints: number[]
   ): { documentId: string; pages: number[]; title: string }[] {
     const results: { documentId: string; pages: number[]; title: string }[] = []
-    
+
     let startPage = 1
-    
+
     splitPoints.forEach((endPage, index) => {
       const pages = Array.from({ length: endPage - startPage + 1 }, (_, i) => startPage + i)
-      
+
       results.push({
         documentId: this.generateId(),
         pages,
         title: `Document Part ${index + 1}`
       })
-      
+
       startPage = endPage + 1
     })
 
@@ -332,27 +332,27 @@ export class DocumentProcessingService {
       const canvas = document.createElement('canvas')
       canvas.width = width
       canvas.height = height
-      
+
       const ctx = canvas.getContext('2d')
       if (ctx) {
         // Draw a simple document representation
         ctx.fillStyle = '#ffffff'
         ctx.fillRect(0, 0, width, height)
-        
+
         ctx.strokeStyle = '#cccccc'
         ctx.strokeRect(0, 0, width, height)
-        
+
         ctx.fillStyle = '#333333'
         ctx.font = '12px Arial'
         ctx.fillText('Document', 10, 30)
         ctx.fillText(`Page ${pageNumber}`, 10, 50)
-        
+
         // Add some lines to represent text
         for (let i = 0; i < 10; i++) {
           ctx.fillRect(10, 70 + (i * 15), width - 20, 2)
         }
       }
-      
+
       resolve(canvas.toDataURL('image/png'))
     })
   }
@@ -432,9 +432,10 @@ export class DocumentProcessingService {
       return acc
     }, {} as Record<string, number>)
 
-    const mostAnnotatedDocument = Object.keys(annotationCounts).reduce((a, b) => 
-      annotationCounts[a] > annotationCounts[b] ? a : b, null
-    )
+    const keys = Object.keys(annotationCounts)
+    const mostAnnotatedDocument = keys.length > 0
+      ? keys.reduce((a, b) => annotationCounts[a] > annotationCounts[b] ? a : b)
+      : null
 
     return {
       totalVersions: this.documentVersions.length,

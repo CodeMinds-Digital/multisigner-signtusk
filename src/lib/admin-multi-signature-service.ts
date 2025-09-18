@@ -90,19 +90,20 @@ export async function getMultiSignatureRequests(): Promise<AdminMultiSignatureRe
     // Transform data to admin format
     const adminRequests: AdminMultiSignatureRequest[] = signingRequests.map(request => {
       const requestSigners = allSigners?.filter(s => s.signing_request_id === request.id) || []
-      
-      const signedCount = requestSigners.filter(s => 
+
+      const signedCount = requestSigners.filter(s =>
         s.status === 'signed' || s.signer_status === 'signed'
       ).length
-      
+
       const viewedCount = requestSigners.filter(s => s.viewed_at).length
-      
+
       // Find next signer for sequential mode
       let nextSignerEmail: string | undefined
-      if (request.document?.signing_mode === 'sequential' && signedCount < requestSigners.length) {
-        const nextSigner = requestSigners.find(s => 
-          s.status !== 'signed' && 
-          s.signer_status !== 'signed' && 
+      const documentData = Array.isArray(request.document) ? request.document[0] : request.document
+      if (documentData?.signing_mode === 'sequential' && signedCount < requestSigners.length) {
+        const nextSigner = requestSigners.find(s =>
+          s.status !== 'signed' &&
+          s.signer_status !== 'signed' &&
           s.status !== 'declined'
         )
         nextSignerEmail = nextSigner?.signer_email
@@ -112,13 +113,13 @@ export async function getMultiSignatureRequests(): Promise<AdminMultiSignatureRe
         id: request.id,
         title: request.title,
         status: request.status as any,
-        signingMode: request.document?.signing_mode || 'parallel',
+        signingMode: documentData?.signing_mode || 'parallel',
         totalSigners: requestSigners.length,
         signedCount,
         viewedCount,
         createdAt: request.created_at,
         expiresAt: request.expires_at,
-        initiatedBy: request.document?.created_by || 'unknown',
+        initiatedBy: documentData?.created_by || 'unknown',
         errorMessage: request.error_message,
         nextSignerEmail,
         finalPdfUrl: request.final_pdf_url,
@@ -167,18 +168,18 @@ export async function getMultiSignatureStats(): Promise<MultiSignatureStats> {
 
     const total = requests?.length || 0
     const inProgress = requests?.filter(r => r.status === 'in_progress').length || 0
-    const needAttention = requests?.filter(r => 
+    const needAttention = requests?.filter(r =>
       r.status === 'pdf_generation_failed' || r.status === 'declined'
     ).length || 0
     const completed = requests?.filter(r => r.status === 'completed').length || 0
 
     // Calculate today's stats
     const today = new Date().toISOString().split('T')[0]
-    const todayCreated = requests?.filter(r => 
+    const todayCreated = requests?.filter(r =>
       r.created_at.startsWith(today)
     ).length || 0
-    
-    const todayCompleted = requests?.filter(r => 
+
+    const todayCompleted = requests?.filter(r =>
       r.status === 'completed' && r.created_at.startsWith(today)
     ).length || 0
 
@@ -213,8 +214,8 @@ export async function getMultiSignatureStats(): Promise<MultiSignatureStats> {
 export async function getRequestsNeedingAttention(): Promise<AdminMultiSignatureRequest[]> {
   try {
     const allRequests = await getMultiSignatureRequests()
-    
-    return allRequests.filter(request => 
+
+    return allRequests.filter(request =>
       request.status === 'pdf_generation_failed' ||
       request.status === 'declined' ||
       request.status === 'expired' ||
@@ -236,19 +237,19 @@ export async function searchMultiSignatureRequests(
 ): Promise<AdminMultiSignatureRequest[]> {
   try {
     const allRequests = await getMultiSignatureRequests()
-    
+
     return allRequests.filter(request => {
-      const matchesSearch = !searchTerm || 
+      const matchesSearch = !searchTerm ||
         request.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
         request.initiatedBy.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        request.signers.some(s => 
+        request.signers.some(s =>
           s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
           s.name.toLowerCase().includes(searchTerm.toLowerCase())
         )
-      
+
       const matchesStatus = !statusFilter || statusFilter === 'all' || request.status === statusFilter
       const matchesMode = !modeFilter || modeFilter === 'all' || request.signingMode === modeFilter
-      
+
       return matchesSearch && matchesStatus && matchesMode
     })
   } catch (error) {

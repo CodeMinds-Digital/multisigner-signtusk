@@ -117,7 +117,7 @@ export class EmailConfirmationService {
       // Check if token is expired
       const now = new Date()
       const expiresAt = new Date(confirmation.expires_at)
-      
+
       if (now > expiresAt) {
         return { success: false, error: 'Confirmation token has expired' }
       }
@@ -143,14 +143,14 @@ export class EmailConfirmationService {
 
       // Create user account
       const userCreated = await this.createUserAccount(email, confirmation.user_data)
-      
+
       if (!userCreated.success) {
         return { success: false, error: userCreated.error }
       }
 
-      return { 
-        success: true, 
-        userData: confirmation.user_data 
+      return {
+        success: true,
+        userData: confirmation.user_data
       }
     } catch (error) {
       console.error('Error verifying confirmation token:', error)
@@ -239,7 +239,7 @@ export class EmailConfirmationService {
   ): Promise<boolean> {
     try {
       const template = this.getEmailTemplate(type)
-      
+
       const htmlContent = template.html_content
         .replace('{{firstName}}', firstName)
         .replace('{{confirmationUrl}}', confirmationUrl)
@@ -394,6 +394,22 @@ If you didn't create an account with SignTusk, you can safely ignore this email.
 Best regards,
 The SignTusk Team
         `,
+        variables: ['firstName', 'confirmationUrl', 'email']
+      },
+      email_change: {
+        id: 'email-change-confirmation',
+        name: 'Email Change Confirmation',
+        subject: 'SignTusk - Confirm Your New Email Address',
+        html_content: `<html><body><h2>Confirm Email Change</h2><p>Please confirm your new email address.</p></body></html>`,
+        text_content: `Confirm Email Change\n\nPlease confirm your new email address.`,
+        variables: ['firstName', 'confirmationUrl', 'email']
+      },
+      password_reset: {
+        id: 'password-reset-confirmation',
+        name: 'Password Reset Confirmation',
+        subject: 'SignTusk - Password Reset Request',
+        html_content: `<html><body><h2>Password Reset</h2><p>Click the link to reset your password.</p></body></html>`,
+        text_content: `Password Reset\n\nClick the link to reset your password.`,
         variables: ['firstName', 'confirmationUrl', 'email']
       }
     }

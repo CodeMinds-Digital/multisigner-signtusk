@@ -362,8 +362,8 @@ export function SystemSettingsManagement() {
               key={category.id}
               onClick={() => setActiveCategory(category.id)}
               className={`flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors ${activeCategory === category.id
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white text-blue-600 shadow-sm'
+                : 'text-gray-600 hover:text-gray-900'
                 }`}
             >
               <Icon className="w-4 h-4 mr-2" />
@@ -413,7 +413,6 @@ export function SystemSettingsManagement() {
                         <Switch
                           checked={setting.is_active}
                           onCheckedChange={(checked) => toggleSettingActive(setting.id, checked)}
-                          size="sm"
                         />
                         {setting.is_sensitive && (
                           <Badge variant="outline" className="text-xs">

@@ -1,4 +1,5 @@
 // Legal compliance service - standalone implementation without external dependencies
+import { supabaseAdmin } from './supabase-admin'
 
 export interface ComplianceFramework {
   id: string
@@ -184,7 +185,7 @@ export class LegalComplianceService {
   ): void {
     try {
       const auditEntry: AuditTrail = {
-        id: this.generateId(),
+        id: crypto.randomUUID(),
         user_id: userId,
         action,
         resource_type: resourceType,
@@ -221,7 +222,7 @@ export class LegalComplianceService {
   ): ConsentRecord | null {
     try {
       const consentRecord: ConsentRecord = {
-        id: this.generateId(),
+        id: crypto.randomUUID(),
         user_id: userId,
         document_id: documentId,
         consent_type: consentType,
@@ -263,7 +264,7 @@ export class LegalComplianceService {
     userAgent: string
   ): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from('consent_records')
         .update({
           consent_given: false,
@@ -306,7 +307,7 @@ export class LegalComplianceService {
   ): Promise<any> {
     try {
       // Get framework
-      const { data: framework } = await supabase
+      const { data: framework } = await supabaseAdmin
         .from('compliance_frameworks')
         .select('*')
         .eq('name', frameworkName)
@@ -317,7 +318,7 @@ export class LegalComplianceService {
       }
 
       // Get audit trails for the period
-      const { data: auditTrails } = await supabase
+      const { data: auditTrails } = await supabaseAdmin
         .from('audit_trails')
         .select('*')
         .contains('compliance_frameworks', [frameworkName])
@@ -326,7 +327,7 @@ export class LegalComplianceService {
         .order('timestamp', { ascending: false })
 
       // Get consent records
-      const { data: consentRecords } = await supabase
+      const { data: consentRecords } = await supabaseAdmin
         .from('consent_records')
         .select('*')
         .gte('consent_date', startDate)
@@ -368,7 +369,7 @@ export class LegalComplianceService {
       const issues: string[] = []
 
       // Get signature details
-      const { data: signature } = await supabase
+      const { data: signature } = await supabaseAdmin
         .from('signatures')
         .select(`
           *,
@@ -458,7 +459,7 @@ export class LegalComplianceService {
     try {
       const version = this.generateVersion()
 
-      const { data, error } = await supabase
+      const { data, error } = await supabaseAdmin
         .from('legal_documents')
         .insert([{
           type,
@@ -493,14 +494,14 @@ export class LegalComplianceService {
   static async activateLegalDocument(documentId: string): Promise<boolean> {
     try {
       // Archive current active document of same type
-      const { data: currentDoc } = await supabase
+      const { data: currentDoc } = await supabaseAdmin
         .from('legal_documents')
         .select('type')
         .eq('id', documentId)
         .single()
 
       if (currentDoc) {
-        await supabase
+        await supabaseAdmin
           .from('legal_documents')
           .update({ status: 'archived' })
           .eq('type', currentDoc.type)
@@ -508,7 +509,7 @@ export class LegalComplianceService {
       }
 
       // Activate new document
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from('legal_documents')
         .update({
           status: 'active',
@@ -529,7 +530,7 @@ export class LegalComplianceService {
    */
   static async getActiveLegalDocuments(jurisdiction?: string): Promise<LegalDocument[]> {
     try {
-      let query = supabase
+      let query = supabaseAdmin
         .from('legal_documents')
         .select('*')
         .eq('status', 'active')
@@ -574,7 +575,7 @@ export class LegalComplianceService {
         const cutoffDate = new Date()
         cutoffDate.setDate(cutoffDate.getDate() - days)
 
-        const { data } = await supabase
+        const { data } = await supabaseAdmin
           .from(table)
           .select('id, created_at')
           .lt('created_at', cutoffDate.toISOString())

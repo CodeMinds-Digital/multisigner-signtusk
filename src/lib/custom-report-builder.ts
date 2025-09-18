@@ -77,27 +77,27 @@ export class CustomReportBuilder {
       { id: 'user_name', name: 'User Name', type: 'string', source: 'users' },
       { id: 'user_created_at', name: 'User Registration Date', type: 'date', source: 'users' },
       { id: 'user_last_login', name: 'Last Login Date', type: 'date', source: 'users' },
-      
+
       // Document fields
       { id: 'document_id', name: 'Document ID', type: 'string', source: 'documents' },
       { id: 'document_title', name: 'Document Title', type: 'string', source: 'documents' },
       { id: 'document_status', name: 'Document Status', type: 'string', source: 'documents' },
       { id: 'document_created_at', name: 'Document Created Date', type: 'date', source: 'documents' },
       { id: 'document_size', name: 'Document Size (bytes)', type: 'number', source: 'documents' },
-      
+
       // Signature fields
       { id: 'signature_id', name: 'Signature ID', type: 'string', source: 'signatures' },
       { id: 'signature_status', name: 'Signature Status', type: 'string', source: 'signatures' },
       { id: 'signature_created_at', name: 'Signature Request Date', type: 'date', source: 'signatures' },
       { id: 'signature_completed_at', name: 'Signature Completion Date', type: 'date', source: 'signatures' },
       { id: 'signature_type', name: 'Signature Type', type: 'string', source: 'signatures' },
-      
+
       // Compliance fields
       { id: 'audit_action', name: 'Audit Action', type: 'string', source: 'audit_trails' },
       { id: 'audit_timestamp', name: 'Audit Timestamp', type: 'date', source: 'audit_trails' },
       { id: 'audit_user_id', name: 'Audit User ID', type: 'string', source: 'audit_trails' },
       { id: 'audit_ip_address', name: 'IP Address', type: 'string', source: 'audit_trails' },
-      
+
       // Analytics fields
       { id: 'session_duration', name: 'Session Duration (minutes)', type: 'number', source: 'sessions' },
       { id: 'page_views', name: 'Page Views', type: 'number', source: 'analytics' },
@@ -142,7 +142,7 @@ export class CustomReportBuilder {
   ): ReportResult | null {
     try {
       const startTime = Date.now()
-      
+
       const definition = this.reportDefinitions.find(d => d.id === definitionId)
       if (!definition) {
         throw new Error('Report definition not found')
@@ -297,7 +297,7 @@ export class CustomReportBuilder {
 
     for (let i = 0; i < recordCount; i++) {
       const record: any = {}
-      
+
       definition.fields.forEach(field => {
         switch (field.type) {
           case 'string':
@@ -324,7 +324,7 @@ export class CustomReportBuilder {
   }
 
   private static generateMockString(fieldId: string): string {
-    const mockData = {
+    const mockData: Record<string, string> = {
       user_email: `user${Math.floor(Math.random() * 1000)}@example.com`,
       user_name: `User ${Math.floor(Math.random() * 1000)}`,
       document_title: `Document ${Math.floor(Math.random() * 1000)}`,
@@ -332,7 +332,7 @@ export class CustomReportBuilder {
       signature_status: ['pending', 'signed', 'declined'][Math.floor(Math.random() * 3)],
       audit_action: ['login', 'logout', 'document_upload', 'signature_request', 'signature_complete'][Math.floor(Math.random() * 5)]
     }
-    
+
     return mockData[fieldId] || `Mock ${fieldId}`
   }
 
@@ -347,7 +347,7 @@ export class CustomReportBuilder {
     return data.filter(record => {
       return filters.every(filter => {
         const value = record[filter.field]
-        
+
         switch (filter.operator) {
           case 'equals':
             return value === filter.value
@@ -378,7 +378,7 @@ export class CustomReportBuilder {
       for (const sort of sorting) {
         const aVal = a[sort.field]
         const bVal = b[sort.field]
-        
+
         if (aVal < bVal) return sort.direction === 'asc' ? -1 : 1
         if (aVal > bVal) return sort.direction === 'asc' ? 1 : -1
       }
@@ -403,13 +403,13 @@ export class CustomReportBuilder {
 
   private static exportToCSV(data: any[]): string {
     if (data.length === 0) return ''
-    
+
     const headers = Object.keys(data[0])
     const csvContent = [
       headers.join(','),
       ...data.map(row => headers.map(header => `"${row[header] || ''}"`).join(','))
     ].join('\n')
-    
+
     return csvContent
   }
 

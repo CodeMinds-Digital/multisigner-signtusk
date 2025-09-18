@@ -103,7 +103,7 @@ export class APIDocumentationService {
           description: 'Development server'
         }
       ],
-      paths: {},
+      paths: {} as Record<string, any>,
       components: {
         securitySchemes: {
           BearerAuth: {
@@ -155,7 +155,7 @@ export class APIDocumentationService {
             content: response.content
           }
           return acc
-        }, {}),
+        }, {} as Record<number, any>),
         security: endpoint.security?.map(scheme => ({ [scheme]: [] }))
       }
     })
@@ -256,7 +256,7 @@ export class APIDocumentationService {
    * Get description for API tag
    */
   private static getTagDescription(tag: string): string {
-    const descriptions = {
+    const descriptions: Record<string, string> = {
       'Authentication': 'User authentication and session management',
       'Documents': 'Document upload, management, and templates',
       'Signatures': 'Signature requests and signing workflows',
@@ -484,7 +484,7 @@ export class APIDocumentationService {
    */
   static generateHTMLDocs(): string {
     const spec = this.generateOpenAPISpec()
-    
+
     return `
 <!DOCTYPE html>
 <html>

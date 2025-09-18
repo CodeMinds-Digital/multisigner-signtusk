@@ -276,7 +276,7 @@ export class DigitalCertificateService {
       // Verify signature
       const md = forge.md.sha256.create()
       md.update(signature.signature_hash, 'utf8')
-      const verified = publicKey.verify(md.digest().bytes(), signatureBytes)
+      const verified = (publicKey as any).verify(md.digest().bytes(), signatureBytes)
 
       // Check certificate validity
       const now = new Date()
@@ -286,7 +286,7 @@ export class DigitalCertificateService {
 
       // Update verification status
       const verificationStatus = verified && certificateValid ? 'valid' : 'invalid'
-      
+
       await supabase
         .from('digital_signatures')
         .update({ verification_status: verificationStatus })

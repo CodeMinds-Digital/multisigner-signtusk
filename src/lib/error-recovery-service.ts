@@ -87,12 +87,12 @@ export class ErrorRecoveryService {
 
         // Notify requester
         try {
-          await NotificationService.notifySignatureDeclined(
-            requestId,
-            signingRequest.title || 'Document',
-            signerEmail,
+          await NotificationService.createNotification(
             signingRequest.initiated_by || '',
-            reason
+            'signature_request_declined',
+            'Signature Declined',
+            `${signerEmail} has declined to sign "${signingRequest.title || 'Document'}". Reason: ${reason}`,
+            { requestId, signerEmail, reason }
           )
         } catch (notificationError) {
           console.error('❌ Error sending decline notification:', notificationError)
@@ -127,10 +127,10 @@ export class ErrorRecoveryService {
       }
     } catch (error) {
       console.error('❌ Error handling signer decline:', error)
-      return { 
-        success: false, 
-        action: 'none', 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        action: 'none',
+        error: error instanceof Error ? error.message : 'Unknown error'
       }
     }
   }
@@ -166,7 +166,7 @@ export class ErrorRecoveryService {
       }
 
       // Check if any signers have signed
-      const signedSigners = signingRequest.signers.filter((s: any) => 
+      const signedSigners = signingRequest.signers.filter((s: any) =>
         s.status === 'signed' || s.signer_status === 'signed'
       )
 
@@ -184,12 +184,12 @@ export class ErrorRecoveryService {
 
         // Notify requester about partial completion
         try {
-          await NotificationService.notifyPartialExpiration(
-            requestId,
-            signingRequest.title || 'Document',
+          await NotificationService.createNotification(
             signingRequest.initiated_by || '',
-            signedSigners.length,
-            signingRequest.signers.length
+            'signature_request_expired',
+            'Document Partially Expired',
+            `"${signingRequest.title || 'Document'}" has expired with partial completion. ${signedSigners.length} of ${signingRequest.signers.length} signers completed.`,
+            { requestId, signedCount: signedSigners.length, totalSigners: signingRequest.signers.length }
           )
         } catch (notificationError) {
           console.error('❌ Error sending partial expiration notification:', notificationError)
@@ -210,10 +210,12 @@ export class ErrorRecoveryService {
 
         // Notify requester about full expiration
         try {
-          await NotificationService.notifyFullExpiration(
-            requestId,
-            signingRequest.title || 'Document',
-            signingRequest.initiated_by || ''
+          await NotificationService.createNotification(
+            signingRequest.initiated_by || '',
+            'signature_request_expired',
+            'Document Expired',
+            `"${signingRequest.title || 'Document'}" has expired without any signatures.`,
+            { requestId }
           )
         } catch (notificationError) {
           console.error('❌ Error sending expiration notification:', notificationError)
@@ -223,10 +225,10 @@ export class ErrorRecoveryService {
       }
     } catch (error) {
       console.error('❌ Error handling expired request:', error)
-      return { 
-        success: false, 
-        action: 'none', 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        action: 'none',
+        error: error instanceof Error ? error.message : 'Unknown error'
       }
     }
   }
@@ -290,9 +292,9 @@ export class ErrorRecoveryService {
       }
     } catch (error) {
       console.error('❌ Error retrying PDF generation:', error)
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       }
     }
   }
@@ -348,11 +350,22 @@ export class ErrorRecoveryService {
 
       // Send notification to signer about reset
       try {
-        await NotificationService.notifySignerReset(
-          requestId,
-          signerEmail,
-          adminEmail
-        )
+        // Get signer's user ID
+        const { data: signerUser } = await supabaseAdmin
+          .from('users')
+          .select('id')
+          .eq('email', signerEmail)
+          .single()
+
+        if (signerUser) {
+          await NotificationService.createNotification(
+            signerUser.id,
+            'signature_request_updated',
+            'Signature Reset',
+            `Your signature status has been reset by an administrator. You can now sign the document again.`,
+            { requestId, adminEmail }
+          )
+        }
       } catch (notificationError) {
         console.error('❌ Error sending reset notification:', notificationError)
       }
@@ -361,9 +374,9 @@ export class ErrorRecoveryService {
       return { success: true }
     } catch (error) {
       console.error('❌ Error resetting signer:', error)
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       }
     }
   }
@@ -411,11 +424,22 @@ export class ErrorRecoveryService {
       if (pendingSigners) {
         for (const signer of pendingSigners) {
           try {
-            await NotificationService.notifyDeadlineExtension(
-              requestId,
-              signer.signer_email,
-              newExpirationDate
-            )
+            // Get signer's user ID
+            const { data: signerUser } = await supabaseAdmin
+              .from('users')
+              .select('id')
+              .eq('email', signer.signer_email)
+              .single()
+
+            if (signerUser) {
+              await NotificationService.createNotification(
+                signerUser.id,
+                'signature_request_updated',
+                'Deadline Extended',
+                `The deadline for signing the document has been extended to ${newExpirationDate}.`,
+                { requestId, newDeadline: newExpirationDate }
+              )
+            }
           } catch (notificationError) {
             console.error(`❌ Error sending extension notification to ${signer.signer_email}:`, notificationError)
           }
@@ -426,9 +450,9 @@ export class ErrorRecoveryService {
       return { success: true }
     } catch (error) {
       console.error('❌ Error extending deadline:', error)
-      return { 
-        success: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       }
     }
   }
@@ -477,10 +501,10 @@ export class ErrorRecoveryService {
       console.log(`✅ Processed ${processed} expired requests, marked ${expired} as expired`)
       return { processed, expired, errors }
     } catch (error) {
-      return { 
-        processed: 0, 
-        expired: 0, 
-        errors: [error instanceof Error ? error.message : 'Unknown error'] 
+      return {
+        processed: 0,
+        expired: 0,
+        errors: [error instanceof Error ? error.message : 'Unknown error']
       }
     }
   }
