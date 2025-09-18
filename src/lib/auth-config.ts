@@ -15,16 +15,16 @@ export const AUTH_CONFIG = {
     ACCESS_TOKEN: {
       name: 'access_token',
       httpOnly: true,
-      secure: false, // Disabled for localhost compatibility in production
-      sameSite: 'lax' as const, // Changed from strict to lax for better compatibility
+      secure: process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_APP_URL?.includes('localhost'),
+      sameSite: 'lax' as const,
       maxAge: 15 * 60, // 15 minutes
       path: '/',
     },
     REFRESH_TOKEN: {
       name: 'refresh_token',
       httpOnly: true,
-      secure: false, // Disabled for localhost compatibility in production
-      sameSite: 'lax' as const, // Changed from strict to lax for better compatibility
+      secure: process.env.NODE_ENV === 'production' && !process.env.NEXT_PUBLIC_APP_URL?.includes('localhost'),
+      sameSite: 'lax' as const,
       maxAge: 7 * 24 * 60 * 60, // 7 days
       path: '/',
     }

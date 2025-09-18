@@ -34,11 +34,13 @@ interface DocumentSchema {
 export class PDFGenerationService {
 
   /**
-   * Generate final signed PDF after all signers complete
+   * Generate final signed PDF after all signers complete with enhanced error handling
    */
-  static async generateFinalPDF(requestId: string): Promise<string | null> {
+  static async generateFinalPDF(requestId: string, retryCount: number = 0): Promise<string | null> {
+    const maxRetries = 3
+
     try {
-      console.log('🎯 Starting PDF generation for request:', requestId)
+      console.log(`🎯 Starting PDF generation for request: ${requestId} (attempt ${retryCount + 1}/${maxRetries + 1})`)
 
       // Get signing request details
       const { data: signingRequest, error: requestError } = await supabaseAdmin
@@ -52,6 +54,22 @@ export class PDFGenerationService {
 
       if (requestError || !signingRequest) {
         console.error('❌ Error fetching signing request:', requestError)
+        if (retryCount < maxRetries) {
+          console.log(`🔄 Retrying PDF generation (${retryCount + 1}/${maxRetries})...`)
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1))) // Exponential backoff
+          return this.generateFinalPDF(requestId, retryCount + 1)
+        }
+        return null
+      }
+
+      // Validate signing request data
+      if (!signingRequest.document) {
+        console.error('❌ No document found for signing request:', requestId)
+        return null
+      }
+
+      if (!signingRequest.document.pdf_url && !signingRequest.document.file_url) {
+        console.error('❌ No PDF URL found for document:', signingRequest.document.id)
         return null
       }
 
@@ -63,8 +81,50 @@ export class PDFGenerationService {
 
       if (signersError || !allSigners) {
         console.error('❌ Error fetching signers:', signersError)
+        if (retryCount < maxRetries) {
+          console.log(`🔄 Retrying PDF generation due to signers fetch error (${retryCount + 1}/${maxRetries})...`)
+          await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)))
+          return this.generateFinalPDF(requestId, retryCount + 1)
+        }
         return null
       }
+
+      // Validate that we have signers
+      if (allSigners.length === 0) {
+        console.error('❌ No signers found for signing request:', requestId)
+        return null
+      }
+
+      // Validate signature data
+      const signedSigners = allSigners.filter(s =>
+        (s.status === 'signed' || s.signer_status === 'signed') && s.signature_data
+      )
+
+      if (signedSigners.length === 0) {
+        console.error('❌ No signed signers with signature data found')
+        return null
+      }
+
+      // Validate signature data format
+      const validSigners = signedSigners.filter(signer => {
+        try {
+          const signatureData = typeof signer.signature_data === 'string'
+            ? JSON.parse(signer.signature_data)
+            : signer.signature_data
+
+          return signatureData && (signatureData.signature || signatureData.signatureDataUrl)
+        } catch (error) {
+          console.error(`❌ Invalid signature data for signer ${signer.signer_email}:`, error)
+          return false
+        }
+      })
+
+      if (validSigners.length === 0) {
+        console.error('❌ No signers with valid signature data found')
+        return null
+      }
+
+      console.log(`✅ Found ${validSigners.length} valid signed signers out of ${allSigners.length} total signers`)
 
       // Filter for signed signers (check both status fields for compatibility)
       const signers = allSigners.filter(s =>
@@ -157,33 +217,87 @@ export class PDFGenerationService {
       // Map signers to schema fields
       const populatedFields = this.populateSchemaFields(documentSchema, transformedSigners)
 
-      // Generate the final PDF
-      const finalPdfUrl = await this.createSignedPDF(
-        signingRequest.document.pdf_url || signingRequest.document.file_url,
-        populatedFields,
-        requestId
-      )
+      // Generate the final PDF with error handling
+      try {
+        const finalPdfUrl = await this.createSignedPDF(
+          signingRequest.document.pdf_url || signingRequest.document.file_url,
+          populatedFields,
+          requestId
+        )
 
-      if (finalPdfUrl) {
-        // Update signing request with final PDF URL
+        if (finalPdfUrl) {
+          // Update signing request with final PDF URL
+          const { error: updateError } = await supabaseAdmin
+            .from('signing_requests')
+            .update({
+              final_pdf_url: finalPdfUrl,
+              document_status: 'completed',
+              status: 'completed',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', requestId)
+
+          if (updateError) {
+            console.error('❌ Error updating signing request with final PDF URL:', updateError)
+            // PDF was generated but database update failed - this is recoverable
+          }
+
+          console.log('✅ Final PDF generated and saved:', finalPdfUrl)
+          return finalPdfUrl
+        } else {
+          console.error('❌ PDF generation returned null')
+          if (retryCount < maxRetries) {
+            console.log(`🔄 Retrying PDF generation due to null result (${retryCount + 1}/${maxRetries})...`)
+            await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)))
+            return this.generateFinalPDF(requestId, retryCount + 1)
+          }
+          return null
+        }
+      } catch (pdfError) {
+        console.error('❌ Error during PDF generation:', pdfError)
+        if (retryCount < maxRetries) {
+          console.log(`🔄 Retrying PDF generation due to error (${retryCount + 1}/${maxRetries})...`)
+          await new Promise(resolve => setTimeout(resolve, 2000 * (retryCount + 1)))
+          return this.generateFinalPDF(requestId, retryCount + 1)
+        }
+        throw pdfError
+      }
+
+    } catch (error) {
+      console.error(`❌ Error generating final PDF (attempt ${retryCount + 1}/${maxRetries + 1}):`, error)
+
+      // Log error details for debugging
+      if (error instanceof Error) {
+        console.error('Error details:', {
+          message: error.message,
+          stack: error.stack,
+          requestId,
+          retryCount
+        })
+      }
+
+      // Retry logic for unexpected errors
+      if (retryCount < maxRetries) {
+        console.log(`🔄 Retrying PDF generation due to unexpected error (${retryCount + 1}/${maxRetries})...`)
+        await new Promise(resolve => setTimeout(resolve, 3000 * (retryCount + 1))) // Longer delay for unexpected errors
+        return this.generateFinalPDF(requestId, retryCount + 1)
+      }
+
+      // Final failure - log to database for admin review
+      try {
         await supabaseAdmin
           .from('signing_requests')
           .update({
-            final_pdf_url: finalPdfUrl,
-            document_status: 'completed',
-            status: 'completed',
+            document_status: 'pdf_generation_failed',
+            status: 'error',
+            error_message: error instanceof Error ? error.message : 'PDF generation failed',
             updated_at: new Date().toISOString()
           })
           .eq('id', requestId)
-
-        console.log('✅ Final PDF generated and saved:', finalPdfUrl)
-        return finalPdfUrl
+      } catch (dbError) {
+        console.error('❌ Failed to update signing request with error status:', dbError)
       }
 
-      return null
-
-    } catch (error) {
-      console.error('❌ Error generating final PDF:', error)
       return null
     }
   }

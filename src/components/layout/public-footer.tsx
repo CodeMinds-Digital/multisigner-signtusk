@@ -57,10 +57,10 @@ export function PublicFooter() {
                 <span className="text-xl font-bold">SignTusk</span>
               </div>
               <p className="text-gray-400 mb-6 leading-relaxed">
-                The most trusted digital signature platform for businesses worldwide. 
+                The most trusted digital signature platform for businesses worldwide.
                 Sign documents securely, legally, and efficiently.
               </p>
-              
+
               {/* Contact Info */}
               <div className="space-y-3">
                 <div className="flex items-center text-gray-400">
@@ -84,8 +84,8 @@ export function PublicFooter() {
               <ul className="space-y-3">
                 {footerLinks.product.map((link) => (
                   <li key={link.name}>
-                    <Link 
-                      href={link.href} 
+                    <Link
+                      href={link.href}
                       className="text-gray-400 hover:text-white transition-colors"
                     >
                       {link.name}
@@ -101,8 +101,8 @@ export function PublicFooter() {
               <ul className="space-y-3">
                 {footerLinks.company.map((link) => (
                   <li key={link.name}>
-                    <Link 
-                      href={link.href} 
+                    <Link
+                      href={link.href}
                       className="text-gray-400 hover:text-white transition-colors"
                     >
                       {link.name}
@@ -118,8 +118,8 @@ export function PublicFooter() {
               <ul className="space-y-3">
                 {footerLinks.resources.map((link) => (
                   <li key={link.name}>
-                    <Link 
-                      href={link.href} 
+                    <Link
+                      href={link.href}
                       className="text-gray-400 hover:text-white transition-colors"
                     >
                       {link.name}
@@ -135,8 +135,8 @@ export function PublicFooter() {
               <ul className="space-y-3">
                 {footerLinks.legal.map((link) => (
                   <li key={link.name}>
-                    <Link 
-                      href={link.href} 
+                    <Link
+                      href={link.href}
                       className="text-gray-400 hover:text-white transition-colors"
                     >
                       {link.name}
@@ -175,10 +175,10 @@ export function PublicFooter() {
           <div className="lg:flex lg:items-center lg:justify-between">
             <div className="text-center lg:text-left">
               <p className="text-gray-400">
-                © 2024 SignTusk. All rights reserved.
+                © 2025 SignTusk. All rights reserved.
               </p>
             </div>
-            
+
             {/* Social Links */}
             <div className="mt-6 lg:mt-0">
               <div className="flex justify-center lg:justify-end space-x-6">
