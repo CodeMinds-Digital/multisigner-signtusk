@@ -105,8 +105,9 @@ export class MultiSignatureWorkflowService {
       }
 
       return true
-    } catch {
-      console.error('❌ Error in updateSigningProgress')
+    } catch (error) {
+      console.error('❌ Error in updateSigningProgress:', error)
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace')
       return false
     }
   }
@@ -167,10 +168,10 @@ export class MultiSignatureWorkflowService {
         await supabaseAdmin
           .from('signing_requests')
           .update({
-            completed_at: new Date().toISOString(),
             final_pdf_url: finalPdfUrl,
             document_status: 'completed',
-            status: 'completed'
+            status: 'completed',
+            updated_at: new Date().toISOString()
           })
           .eq('id', requestId)
 
@@ -201,8 +202,9 @@ export class MultiSignatureWorkflowService {
       }
 
       return null
-    } catch {
-      console.error('❌ Error generating final PDF')
+    } catch (error) {
+      console.error('❌ Error generating final PDF:', error)
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace')
       return null
     }
   }
@@ -228,8 +230,9 @@ export class MultiSignatureWorkflowService {
         return null
       }
 
-    } catch {
-      console.error('❌ Error in PDF generation')
+    } catch (error) {
+      console.error('❌ Error in PDF generation:', error)
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace')
       return null
     }
   }
@@ -384,8 +387,16 @@ export class MultiSignatureWorkflowService {
           nextSignerEmail: status.nextSignerEmail
         }
       }
-    } catch {
-      console.error('❌ Error handling signer completion')
+    } catch (error) {
+      console.error('❌ Error handling signer completion:', error)
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace')
+      console.error('❌ Error details:', {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        requestId,
+        signerEmail,
+        timestamp: new Date().toISOString()
+      })
       return { success: false, allCompleted: false }
     }
   }
@@ -649,8 +660,9 @@ export class MultiSignatureWorkflowService {
       }
 
       return true
-    } catch {
-      console.error('❌ Error tracking document view')
+    } catch (error) {
+      console.error('❌ Error tracking document view:', error)
+      console.error('❌ Error stack:', error instanceof Error ? error.stack : 'No stack trace')
       return false
     }
   }
