@@ -18,18 +18,22 @@ export async function POST(request: NextRequest) {
       timestamp: new Date().toISOString()
     })
     // Get access token from cookies
+    console.log('🔐 Extracting authentication tokens...')
     const { accessToken } = getAuthTokensFromRequest(request)
 
     if (!accessToken) {
+      console.log('❌ No access token found in request')
       return new Response(
         JSON.stringify({ error: 'Authentication required' }),
         { status: 401, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
+    console.log('🔑 Access token found, verifying...')
     // Verify access token
     payload = await verifyAccessToken(accessToken)
     const userEmail = payload.email
+    console.log('✅ Token verified for user:', userEmail)
 
     // Get request body
     const requestBody = await request.json()
@@ -46,12 +50,19 @@ export async function POST(request: NextRequest) {
     console.log('🖊️ Processing signature for request:', requestId, 'by user:', userEmail)
 
     // Check if user is a signer for this request
+    console.log('🔍 Querying signing_request_signers table...')
     const { data: signer, error: signerError } = await supabaseAdmin
       .from('signing_request_signers')
       .select('*')
       .eq('signing_request_id', requestId)
       .eq('signer_email', userEmail)
       .single()
+
+    console.log('📊 Signer query result:', {
+      found: !!signer,
+      error: signerError?.message || 'none',
+      signerData: signer ? { id: signer.id, email: signer.signer_email, status: signer.status } : null
+    })
 
     if (signerError || !signer) {
       console.log('❌ User is not a signer for this request:', signerError)
@@ -146,8 +157,13 @@ export async function POST(request: NextRequest) {
 
     console.log(`📋 Signing mode for request ${requestId}: ${signingMode}`)
 
+    // Handle single signature mode
+    if (signingMode === 'single') {
+      console.log('📝 Single signature mode: Only one signer, no validation needed')
+    }
+
     // For sequential signing, validate signing order (strict order enforcement)
-    if (signingMode === 'sequential') {
+    else if (signingMode === 'sequential') {
       console.log('🔄 Sequential mode: Enforcing strict signing order...')
 
       // Get all signers ordered by signing_order
@@ -232,28 +248,46 @@ export async function POST(request: NextRequest) {
     }
 
     // Update signer record with both status fields for compatibility
+    console.log('💾 Updating signer record with signature data...')
+    const updateData = {
+      status: 'signed',
+      signer_status: 'signed',
+      signed_at: new Date().toISOString(),
+      viewed_at: signer.viewed_at || new Date().toISOString(), // Set viewed_at if not already set
+      signature_data: JSON.stringify(completeSignatureData),
+      location: locationData,
+      ip_address: clientIP,
+      user_agent: userAgent,
+      updated_at: new Date().toISOString()
+    }
+
+    console.log('📝 Update data prepared:', {
+      signerId: signer.id,
+      status: updateData.status,
+      hasSignatureData: !!updateData.signature_data,
+      hasLocation: !!updateData.location
+    })
+
     const { error: updateError } = await supabaseAdmin
       .from('signing_request_signers')
-      .update({
-        status: 'signed',
-        signer_status: 'signed',
-        signed_at: new Date().toISOString(),
-        viewed_at: signer.viewed_at || new Date().toISOString(), // Set viewed_at if not already set
-        signature_data: JSON.stringify(completeSignatureData),
-        location: locationData,
-        ip_address: clientIP,
-        user_agent: userAgent,
-        updated_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', signer.id)
 
     if (updateError) {
       console.error('❌ Error updating signer record:', updateError)
+      console.error('❌ Update error details:', {
+        code: updateError.code,
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint
+      })
       return new Response(
         JSON.stringify({ error: 'Failed to save signature' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
     }
+
+    console.log('✅ Signer record updated successfully')
 
     // Get all signers to check completion status
     const { data: allSigners, error: signersError } = await supabaseAdmin
