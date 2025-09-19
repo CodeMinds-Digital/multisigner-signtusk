@@ -35,17 +35,26 @@ CREATE POLICY "System can insert notifications" ON notifications
 
 -- Notification Types (for reference)
 -- 'signature_request_received' - When assigned as signer
--- 'signature_request_updated' - When request is modified  
+-- 'signature_request_updated' - When request is modified
 -- 'signature_request_cancelled' - When request is cancelled
+-- 'signature_request_declined' - When someone declines to sign
 -- 'document_viewed' - When someone views the document
+-- 'document_accessed' - When someone accesses document for first time
 -- 'document_signed' - When someone signs
+-- 'document_declined_by_signer' - When document is declined by a signer
 -- 'all_signatures_complete' - When all signers finish
+-- 'final_document_ready' - When final signed document is available
 -- 'reminder_sent' - When reminder is sent to signers
 -- 'reminder_received' - When you receive a reminder
 -- 'expiry_warning' - 24h before expiry
+-- 'deadline_approaching' - Configurable deadline warning
 -- 'document_expired' - When document expires
+-- 'deadline_missed' - When deadline passes without completion
 -- 'pdf_generated' - When final PDF is ready
 -- 'qr_verification' - When someone verifies via QR
+-- 'signer_added' - When new signer is added to request
+-- 'signer_removed' - When signer is removed from request
+-- 'deadline_extended' - When deadline is extended
 
 -- Auto-cleanup function (optional - removes notifications older than 30 days)
 CREATE OR REPLACE FUNCTION cleanup_old_notifications()

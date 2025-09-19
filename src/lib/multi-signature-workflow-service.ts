@@ -193,6 +193,24 @@ export class MultiSignatureWorkflowService {
               finalPdfUrl
             )
             console.log('📧 PDF generation notification sent to requester')
+
+            // Get all signer emails for final document notification
+            const { data: allSigners } = await supabaseAdmin
+              .from('signing_request_signers')
+              .select('signer_email')
+              .eq('signing_request_id', requestId)
+
+            const signerEmails = allSigners?.map(s => s.signer_email) || []
+
+            // Send final document ready notification
+            await NotificationService.notifyFinalDocumentReady(
+              requestId,
+              signingRequest.title || 'Document',
+              signingRequest.initiated_by,
+              signerEmails,
+              finalPdfUrl
+            )
+            console.log('📧 Final document ready notifications sent')
           } catch (error) {
             console.error('❌ Error sending PDF generation notification:', error)
           }
