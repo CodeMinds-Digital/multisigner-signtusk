@@ -74,6 +74,9 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (signingRequest && signingRequest.initiated_by) {
+        // Check if this is the first time the signer is viewing the document
+        const isFirstView = !signer.viewed_at
+
         // Notify the document owner that someone viewed the document
         await NotificationService.notifyDocumentViewed(
           signingRequest.initiated_by,
@@ -81,6 +84,19 @@ export async function POST(request: NextRequest) {
           signingRequest.title || 'Document',
           requestId
         )
+
+        // If this is the first access, send additional notification
+        if (isFirstView) {
+          await NotificationService.notifyDocumentAccessed(
+            requestId,
+            signingRequest.title || 'Document',
+            payload.email,
+            signer.signer_name || payload.email,
+            signingRequest.initiated_by
+          )
+          console.log('📧 First-time document access notification sent to requester')
+        }
+
         console.log('📧 Document view notification sent to requester')
       }
     } catch (error) {

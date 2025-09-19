@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { NotificationService } from '@/lib/notification-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -152,8 +153,52 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Document declined successfully by:', userEmail)
 
-    // TODO: Send notification emails to all signers about the decline
-    // await sendDeclineNotifications(requestId, reason, userEmail)
+    // Send decline notifications
+    try {
+      // Get signing request details for notifications
+      const { data: signingRequest } = await supabaseAdmin
+        .from('signing_requests')
+        .select('*')
+        .eq('id', requestId)
+        .single()
+
+      if (signingRequest && signingRequest.initiated_by) {
+        // Notify the requester about the decline
+        await NotificationService.notifyDocumentDeclined(
+          requestId,
+          signingRequest.title || 'Document',
+          userEmail,
+          signer.signer_name || userEmail,
+          signingRequest.initiated_by,
+          reason
+        )
+
+        // Get other signers who haven't signed yet
+        const otherSignerEmails = allSigners
+          .filter(s =>
+            s.id !== signer.id &&
+            s.status !== 'signed' &&
+            s.signer_status !== 'signed'
+          )
+          .map(s => s.signer_email)
+
+        // Notify other signers about the decline
+        if (otherSignerEmails.length > 0) {
+          await NotificationService.notifyOtherSignersOfDecline(
+            requestId,
+            signingRequest.title || 'Document',
+            userEmail,
+            signer.signer_name || userEmail,
+            otherSignerEmails
+          )
+        }
+
+        console.log('📧 Decline notifications sent successfully')
+      }
+    } catch (notificationError) {
+      console.error('❌ Error sending decline notifications:', notificationError)
+      // Don't fail the decline operation if notifications fail
+    }
 
     return new Response(
       JSON.stringify({

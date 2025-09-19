@@ -126,21 +126,36 @@ export function NotificationBell({ className }: NotificationBellProps) {
       case 'reminder_received':
         return '📝'
       case 'document_viewed':
+      case 'document_accessed':
         return '👁️'
       case 'document_signed':
       case 'signature_request_signed':
         return '✅'
+      case 'signature_request_declined':
+      case 'document_declined_by_signer':
+        return '❌'
       case 'all_signatures_complete':
       case 'signature_request_completed':
         return '🎉'
       case 'pdf_generated':
+      case 'final_document_ready':
         return '📄'
       case 'qr_verification':
         return '🔍'
       case 'expiry_warning':
+      case 'deadline_approaching':
         return '⚠️'
+      case 'document_expired':
+      case 'deadline_missed':
+        return '⏰'
       case 'signature_request_cancelled':
         return '❌'
+      case 'signer_added':
+        return '➕'
+      case 'signer_removed':
+        return '➖'
+      case 'deadline_extended':
+        return '📅'
       default:
         return '📧'
     }
