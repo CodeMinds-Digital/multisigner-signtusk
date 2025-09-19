@@ -168,6 +168,7 @@ export class MultiSignatureWorkflowService {
         await supabaseAdmin
           .from('signing_requests')
           .update({
+            completed_at: new Date().toISOString(),
             final_pdf_url: finalPdfUrl,
             document_status: 'completed',
             status: 'completed',
