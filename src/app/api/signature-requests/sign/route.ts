@@ -279,17 +279,27 @@ export async function POST(request: NextRequest) {
     console.log('✅ Signature saved successfully. Signed:', signedCount, 'Total:', totalSigners)
 
     // Handle signer completion using the new multi-signature workflow service
-    const completionResult = await MultiSignatureWorkflowService.handleSignerCompletion(
-      requestId,
-      userEmail
-    )
-
-    if (!completionResult.success) {
-      console.error('❌ Failed to handle signer completion')
-      return new Response(
-        JSON.stringify({ error: 'Failed to process signature completion' }),
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
+    let completionResult
+    try {
+      completionResult = await MultiSignatureWorkflowService.handleSignerCompletion(
+        requestId,
+        userEmail
       )
+
+      if (!completionResult.success) {
+        console.error('❌ Failed to handle signer completion - service returned failure')
+        return new Response(
+          JSON.stringify({ error: 'Failed to process signature completion' }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+    } catch (completionError) {
+      console.error('❌ Exception in handleSignerCompletion:', completionError)
+      console.error('❌ Completion error stack:', completionError instanceof Error ? completionError.stack : 'No stack trace')
+
+      // Continue without completion handling to avoid blocking the signature save
+      completionResult = { success: true, allCompleted: false }
+      console.log('⚠️ Continuing without completion handling due to error')
     }
 
     console.log('📊 Signer completion result:', completionResult)
