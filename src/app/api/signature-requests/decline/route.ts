@@ -57,9 +57,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Get client IP and user agent for audit trail
-    const clientIP = request.headers.get('x-forwarded-for') ||
+    const rawClientIP = request.headers.get('x-forwarded-for') ||
       request.headers.get('x-real-ip') ||
-      'unknown'
+      '127.0.0.1'
+
+    // Extract first IP if there are multiple (x-forwarded-for can have multiple IPs)
+    const clientIP = rawClientIP.split(',')[0].trim()
+
+    // Validate IP format for inet type (PostgreSQL inet type requires valid IP)
+    const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/
+    const validIP = ipRegex.test(clientIP) ? clientIP : '127.0.0.1'
+
     const userAgent = request.headers.get('user-agent') || 'unknown'
 
     // Update the declining signer's record
@@ -70,7 +78,7 @@ export async function POST(request: NextRequest) {
         signer_status: 'declined',
         decline_reason: reason,
         declined_at: new Date().toISOString(),
-        ip_address: clientIP,
+        ip_address: validIP,
         user_agent: userAgent,
         updated_at: new Date().toISOString()
       })
@@ -78,8 +86,17 @@ export async function POST(request: NextRequest) {
 
     if (updateSignerError) {
       console.error('❌ Error updating declining signer:', updateSignerError)
+      console.error('❌ Update error details:', {
+        code: updateSignerError.code,
+        message: updateSignerError.message,
+        details: updateSignerError.details,
+        hint: updateSignerError.hint
+      })
       return new Response(
-        JSON.stringify({ error: 'Failed to record decline' }),
+        JSON.stringify({
+          error: 'Failed to record decline',
+          details: updateSignerError.message
+        }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       )
     }

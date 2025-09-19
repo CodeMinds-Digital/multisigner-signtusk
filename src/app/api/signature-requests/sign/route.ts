@@ -31,9 +31,32 @@ export async function POST(request: NextRequest) {
 
     console.log('🔑 Access token found, verifying...')
     // Verify access token
-    payload = await verifyAccessToken(accessToken)
-    const userEmail = payload.email
-    console.log('✅ Token verified for user:', userEmail)
+    let userEmail: string
+    try {
+      payload = await verifyAccessToken(accessToken)
+      userEmail = payload.email
+      console.log('✅ Token verified for user:', userEmail)
+    } catch (tokenError) {
+      console.error('❌ Token verification failed:', tokenError)
+      console.error('❌ Token error details:', {
+        message: tokenError instanceof Error ? tokenError.message : 'Unknown',
+        hasJwtSecret: !!process.env.JWT_SECRET,
+        jwtSecretLength: process.env.JWT_SECRET?.length || 0,
+        tokenPrefix: accessToken.substring(0, 20) + '...'
+      })
+      return new Response(
+        JSON.stringify({
+          error: 'Authentication failed',
+          details: 'Invalid or expired authentication token',
+          debugInfo: {
+            hasJwtSecret: !!process.env.JWT_SECRET,
+            jwtSecretLength: process.env.JWT_SECRET?.length || 0,
+            tokenError: tokenError instanceof Error ? tokenError.message : 'Unknown'
+          }
+        }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Get request body
     const requestBody = await request.json()
@@ -51,23 +74,59 @@ export async function POST(request: NextRequest) {
 
     // Check if user is a signer for this request
     console.log('🔍 Querying signing_request_signers table...')
-    const { data: signer, error: signerError } = await supabaseAdmin
-      .from('signing_request_signers')
-      .select('*')
-      .eq('signing_request_id', requestId)
-      .eq('signer_email', userEmail)
-      .single()
+    let signer: any
+    let signerError: any
 
-    console.log('📊 Signer query result:', {
-      found: !!signer,
-      error: signerError?.message || 'none',
-      signerData: signer ? { id: signer.id, email: signer.signer_email, status: signer.status } : null
-    })
+    try {
+      const result = await supabaseAdmin
+        .from('signing_request_signers')
+        .select('*')
+        .eq('signing_request_id', requestId)
+        .eq('signer_email', userEmail)
+        .single()
+
+      signer = result.data
+      signerError = result.error
+
+      console.log('📊 Signer query result:', {
+        found: !!signer,
+        error: signerError?.message || 'none',
+        signerData: signer ? { id: signer.id, email: signer.signer_email, status: signer.status } : null
+      })
+    } catch (dbError) {
+      console.error('❌ Database connection error:', dbError)
+      console.error('❌ Database error details:', {
+        message: dbError instanceof Error ? dbError.message : 'Unknown',
+        hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+        hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+        supabaseUrlPrefix: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...'
+      })
+      return new Response(
+        JSON.stringify({
+          error: 'Database connection failed',
+          details: 'Unable to connect to database',
+          debugInfo: {
+            hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+            hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
+            dbError: dbError instanceof Error ? dbError.message : 'Unknown'
+          }
+        }),
+        { status: 503, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
 
     if (signerError || !signer) {
       console.log('❌ User is not a signer for this request:', signerError)
       return new Response(
-        JSON.stringify({ error: 'User is not authorized to sign this document' }),
+        JSON.stringify({
+          error: 'User is not authorized to sign this document',
+          details: signerError?.message || 'Signer not found',
+          debugInfo: {
+            requestId,
+            userEmail,
+            signerError: signerError?.message || 'Signer not found'
+          }
+        }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
       )
     }
@@ -233,9 +292,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Get client IP and user agent for audit trail
-    const clientIP = request.headers.get('x-forwarded-for') ||
+    const rawClientIP = request.headers.get('x-forwarded-for') ||
       request.headers.get('x-real-ip') ||
-      'unknown'
+      '127.0.0.1'
+
+    // Extract first IP if there are multiple (x-forwarded-for can have multiple IPs)
+    const clientIP = rawClientIP.split(',')[0].trim()
+
+    // Validate IP format for inet type (PostgreSQL inet type requires valid IP)
+    const ipRegex = /^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$|^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$/
+    const validIP = ipRegex.test(clientIP) ? clientIP : '127.0.0.1'
+
     const userAgent = request.headers.get('user-agent') || 'unknown'
 
     // Prepare signature data with timestamp and location
@@ -243,7 +310,7 @@ export async function POST(request: NextRequest) {
       ...signatureData,
       signed_at: new Date().toISOString(),
       location: locationData,
-      ip_address: clientIP,
+      ip_address: validIP,
       user_agent: userAgent
     }
 
@@ -256,7 +323,7 @@ export async function POST(request: NextRequest) {
       viewed_at: signer.viewed_at || new Date().toISOString(), // Set viewed_at if not already set
       signature_data: JSON.stringify(completeSignatureData),
       location: locationData,
-      ip_address: clientIP,
+      ip_address: validIP,
       user_agent: userAgent,
       updated_at: new Date().toISOString()
     }
