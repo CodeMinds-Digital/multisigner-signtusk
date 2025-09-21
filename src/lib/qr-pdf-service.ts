@@ -49,6 +49,20 @@ export class QRPDFService {
 
       console.log('🔄 Adding QR code to PDF for request:', requestId)
 
+      // Fetch signing request to get document_sign_id
+      const { data: signingRequest, error: requestError } = await supabaseAdmin
+        .from('signing_requests')
+        .select('document_sign_id, title')
+        .eq('id', requestId)
+        .single()
+
+      if (requestError) {
+        console.error('❌ Error fetching signing request for QR PDF:', requestError)
+      }
+
+      const documentSignId = signingRequest?.document_sign_id
+      console.log('📋 Document Sign ID for PDF:', documentSignId)
+
       const qrOptions = { ...this.DEFAULT_QR_OPTIONS, ...options }
 
       // Generate verification URL
@@ -170,9 +184,20 @@ export class QRPDFService {
           color: rgb(0.3, 0.3, 0.6),
         })
 
+        // Add Document Sign ID if available
+        if (documentSignId) {
+          newPage.drawText(`Document ID: ${documentSignId}`, {
+            x: 20,
+            y: 40,
+            font: textFont,
+            size: 9,
+            color: rgb(0, 0, 0.8),
+          })
+        }
+
         newPage.drawText('Added: ' + new Date().toLocaleDateString(), {
           x: 20,
-          y: 35,
+          y: documentSignId ? 25 : 35, // Adjust position based on whether Document ID is shown
           font: textFont,
           size: 8,
           color: rgb(0.5, 0.5, 0.5),

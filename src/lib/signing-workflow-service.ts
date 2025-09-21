@@ -54,6 +54,7 @@ export interface SigningRequestListItem {
   expires_at?: string
   days_remaining?: number
   initiated_by_name?: string // For received requests, shows who sent it
+  document_sign_id?: string // NEW: Document Sign ID
 }
 
 export class SigningWorkflowService {
@@ -366,7 +367,8 @@ export class SigningWorkflowService {
       })),
       initiated_at: request.initiated_at,
       expires_at: request.expires_at,
-      days_remaining: this.calculateDaysRemaining(request.expires_at)
+      days_remaining: this.calculateDaysRemaining(request.expires_at),
+      document_sign_id: request.document_sign_id // NEW: Include document sign ID
     }
   }
 
