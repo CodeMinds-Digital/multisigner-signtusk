@@ -243,7 +243,7 @@ export class NotificationService {
       const { data: profile, error: profileError } = await supabaseAdmin
         .from('user_profiles')
         .select('email, full_name')
-        .eq('user_id', userId)
+        .eq('id', userId)
         .single()
 
       if (profileError || !profile?.email) {
@@ -850,13 +850,13 @@ export class NotificationService {
       for (const signerEmail of signerEmails) {
         const { data: profile } = await supabaseAdmin
           .from('user_profiles')
-          .select('user_id')
+          .select('id')
           .eq('email', signerEmail)
           .single()
 
         if (profile) {
           await this.createNotification(
-            profile.user_id,
+            profile.id,
             'deadline_approaching',
             'Signature Deadline Approaching',
             `"${documentTitle}" needs to be signed within ${hoursRemaining} hours.`,
@@ -904,13 +904,13 @@ export class NotificationService {
       // Notify the new signer
       const { data: profile } = await supabaseAdmin
         .from('user_profiles')
-        .select('user_id')
+        .select('id')
         .eq('email', newSignerEmail)
         .single()
 
       if (profile) {
         await this.createNotification(
-          profile.user_id,
+          profile.id,
           'signature_request_received',
           'New Signature Request',
           `You have been added as a signer for "${documentTitle}".`,

@@ -65,7 +65,7 @@ export class DocumentIdService {
     /**
      * Validate a custom document sign ID with detailed error information
      */
-    static async validateCustomId(documentSignId: string): Promise<{ isValid: boolean; error?: string }> {
+    static async validateCustomId(documentSignId: string, userId?: string): Promise<{ isValid: boolean; error?: string }> {
         try {
             // Check if ID is not empty
             if (!documentSignId || documentSignId.trim().length === 0) {
@@ -79,8 +79,21 @@ export class DocumentIdService {
                 return { isValid: false, error: 'Document Sign ID must be at least 3 characters long' }
             }
 
-            if (trimmedId.length > 50) {
-                return { isValid: false, error: 'Document Sign ID cannot exceed 50 characters' }
+            // Get user's custom length settings if userId provided
+            let maxLength = 50 // Default fallback
+            if (userId) {
+                try {
+                    const userSettings = await this.getUserSettings(userId)
+                    if (userSettings?.total_length) {
+                        maxLength = userSettings.total_length
+                    }
+                } catch (error) {
+                    console.warn('Could not load user settings for validation, using default max length:', error)
+                }
+            }
+
+            if (trimmedId.length > maxLength) {
+                return { isValid: false, error: `Document Sign ID cannot exceed ${maxLength} characters (based on your settings)` }
             }
 
             // Check for valid characters (alphanumeric, hyphens, underscores, dots)
@@ -129,8 +142,8 @@ export class DocumentIdService {
     /**
      * Legacy method for backward compatibility
      */
-    static async validateCustomIdLegacy(documentSignId: string): Promise<boolean> {
-        const result = await this.validateCustomId(documentSignId)
+    static async validateCustomIdLegacy(documentSignId: string, userId?: string): Promise<boolean> {
+        const result = await this.validateCustomId(documentSignId, userId)
         return result.isValid
     }
 
@@ -139,20 +152,17 @@ export class DocumentIdService {
      */
     static async getUserSettings(userId: string): Promise<DocumentIdSettings | null> {
         try {
-            const { data, error } = await supabase
-                .from(this.TABLE_NAME)
-                .select('*')
-                .eq('user_id', userId)
-                .single()
+            const response = await fetch(`/api/document-id-settings?user_id=${userId}`)
+            const result = await response.json()
 
-            if (error && error.code !== 'PGRST116') {
-                console.error('Error fetching user settings:', error)
+            if (!response.ok) {
+                console.error('Error fetching user settings:', result.error)
                 return null
             }
 
-            return data || null
+            return result.data as DocumentIdSettings | null
         } catch (error) {
-            console.error('Error getting user settings:', error)
+            console.error('Error fetching user settings:', error)
             return null
         }
     }
@@ -165,57 +175,25 @@ export class DocumentIdService {
         settingsData: CreateDocumentIdSettingsData
     ): Promise<DocumentIdSettings | null> {
         try {
-            // Check if settings already exist
-            const existingSettings = await this.getUserSettings(userId)
+            const response = await fetch('/api/document-id-settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    user_id: userId,
+                    ...settingsData
+                })
+            })
 
-            const settingsToSave = {
-                user_id: userId,
-                generation_type: settingsData.generation_type,
-                prefix: settingsData.prefix || 'DOC',
-                separator: settingsData.separator || '-',
-                total_length: settingsData.total_length || 8,
-                character_count: settingsData.character_count || 3,
-                number_count: settingsData.number_count || 5,
-                include_year: settingsData.include_year || false,
-                include_month: settingsData.include_month || false,
-                case_style: settingsData.case_style || 'upper',
-                custom_format: settingsData.custom_format || null,
-                ensure_uniqueness: settingsData.ensure_uniqueness !== false,
-                max_retries: settingsData.max_retries || 10,
-                updated_at: new Date().toISOString()
-            }
+            const result = await response.json()
 
-            let result
-            if (existingSettings) {
-                // Update existing settings
-                const { data, error } = await supabase
-                    .from(this.TABLE_NAME)
-                    .update(settingsToSave)
-                    .eq('user_id', userId)
-                    .select()
-                    .single()
-
-                result = { data, error }
-            } else {
-                // Create new settings
-                const { data, error } = await supabase
-                    .from(this.TABLE_NAME)
-                    .insert({
-                        ...settingsToSave,
-                        created_at: new Date().toISOString()
-                    })
-                    .select()
-                    .single()
-
-                result = { data, error }
-            }
-
-            if (result.error) {
+            if (!response.ok) {
                 console.error('Error saving user settings:', result.error)
                 return null
             }
 
-            return result.data
+            return result.data as DocumentIdSettings
         } catch (error) {
             console.error('Error saving user settings:', error)
             return null
@@ -289,8 +267,8 @@ export class DocumentIdService {
 
             // Check uniqueness if required
             if (settings.ensure_uniqueness) {
-                const isUnique = await this.validateCustomId(id)
-                if (isUnique) {
+                const validationResult = await this.validateCustomId(id, settings.user_id)
+                if (validationResult.isValid) {
                     return id
                 }
             } else {

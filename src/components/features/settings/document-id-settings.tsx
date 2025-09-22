@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Settings, Eye, RefreshCw, Save, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { DocumentIdService, CreateDocumentIdSettingsData, type DocumentIdSettings } from '@/lib/document-id-service'
 
 export function DocumentIdSettings() {
     const { user } = useAuth()
-    const [settings, setSettings] = useState<DocumentIdSettings | null>(null)
+    const [, setSettings] = useState<DocumentIdSettings | null>(null)
     const [formData, setFormData] = useState<CreateDocumentIdSettingsData>(() => {
         const defaultData = {
             generation_type: 'auto',
@@ -49,25 +49,7 @@ export function DocumentIdSettings() {
     const [warnings, setWarnings] = useState<string[]>([]) // NEW: Array of warning messages
     const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({}) // NEW: Field-specific errors
 
-    // Load user settings on component mount
-    useEffect(() => {
-        if (user) {
-            loadUserSettings()
-        }
-    }, [user])
-
-    // Update sample IDs when form data changes
-    useEffect(() => {
-        if (formData.generation_type === 'auto') {
-            generateSampleIds()
-        } else {
-            setSampleIds(['Enter your custom ID when creating signature requests'])
-        }
-    }, [formData])
-
-
-
-    const loadUserSettings = async () => {
+    const loadUserSettings = useCallback(async () => {
         if (!user) return
 
         setLoading(true)
@@ -107,9 +89,9 @@ export function DocumentIdSettings() {
         } finally {
             setLoading(false)
         }
-    }
+    }, [user])
 
-    const generateSampleIds = async () => {
+    const generateSampleIds = useCallback(async () => {
         try {
             const samples = await DocumentIdService.generateSampleIds(formData, 3)
             setSampleIds(samples)
@@ -117,7 +99,7 @@ export function DocumentIdSettings() {
             console.error('Error generating sample IDs:', err)
             setSampleIds(['Error generating samples'])
         }
-    }
+    }, [formData])
 
     const calculateTotalLength = (data: CreateDocumentIdSettingsData): number => {
         const prefixLength = (data.prefix || 'DOC').length
@@ -131,6 +113,22 @@ export function DocumentIdSettings() {
         return prefixLength + mainSeparatorLength + dateLength + dateSeparatorLength + characterLength + numberLength
     }
 
+    // Load user settings on component mount
+    useEffect(() => {
+        if (user) {
+            loadUserSettings()
+        }
+    }, [user, loadUserSettings])
+
+    // Update sample IDs when form data changes
+    useEffect(() => {
+        if (formData.generation_type === 'auto') {
+            generateSampleIds()
+        } else {
+            setSampleIds(['Enter your custom ID when creating signature requests'])
+        }
+    }, [formData, generateSampleIds])
+
     const handleFormChange = (field: keyof CreateDocumentIdSettingsData, value: any) => {
         // Clear previous errors for this field
         setFieldErrors(prev => {
@@ -143,8 +141,44 @@ export function DocumentIdSettings() {
         setFormData(prev => {
             const updated = { ...prev, [field]: value }
 
-            // Auto-adjust character and number counts when total length changes manually
-            if (field === 'total_length') {
+            // Handle generation type change
+            if (field === 'generation_type') {
+
+
+                if (value === 'custom') {
+                    // Set defaults for custom entry mode
+                    updated.total_length = 25 // Default max length for custom IDs
+                    // Clear automatic generation specific fields
+                    updated.prefix = undefined
+                    updated.separator = undefined
+                    updated.character_count = undefined
+                    updated.number_count = undefined
+                    updated.include_year = false
+                    updated.include_month = false
+                    updated.case_style = undefined
+                    updated.number_generation = undefined
+                    updated.sequential_start_number = undefined
+                    updated.custom_format = undefined
+                    // Clear warnings when switching to custom mode
+                    setWarnings([])
+                    setFieldErrors({})
+                } else if (value === 'auto') {
+                    // Set defaults for automatic generation mode
+                    updated.prefix = 'DOC'
+                    updated.separator = '-'
+                    updated.character_count = 3
+                    updated.number_count = 5
+                    updated.include_year = false
+                    updated.include_month = false
+                    updated.case_style = 'upper'
+                    updated.number_generation = 'random'
+                    updated.sequential_start_number = 1
+                    updated.custom_format = undefined
+                    updated.total_length = calculateTotalLength(updated)
+                }
+            }
+            // Auto-adjust character and number counts when total length changes manually (only for auto mode)
+            else if (field === 'total_length' && updated.generation_type === 'auto') {
                 const prefixLength = (updated.prefix || 'DOC').length + (updated.separator || '-').length
                 const dateLength = (updated.include_year ? 4 : 0) + (updated.include_month ? 2 : 0) +
                     (updated.include_year || updated.include_month ? (updated.separator || '-').length : 0)
@@ -157,13 +191,21 @@ export function DocumentIdSettings() {
                 updated.character_count = Math.floor(availableLength * charRatio)
                 updated.number_count = availableLength - updated.character_count
             }
-            // Auto-calculate total length when component lengths change
-            else if (['prefix', 'separator', 'character_count', 'number_count', 'include_year', 'include_month'].includes(field)) {
+            // Auto-calculate total length when component lengths change (only for auto mode)
+            else if (updated.generation_type === 'auto' && ['prefix', 'separator', 'character_count', 'number_count', 'include_year', 'include_month'].includes(field)) {
                 updated.total_length = calculateTotalLength(updated)
             }
 
             return updated
         })
+
+
+
+        // For generation type changes, clear warnings immediately
+        if (field === 'generation_type') {
+            setWarnings([])
+            setFieldErrors({})
+        }
 
         // Trigger validation after a short delay to avoid excessive validation during typing
         setTimeout(() => {
@@ -181,6 +223,7 @@ export function DocumentIdSettings() {
         try {
             // Run comprehensive validation
             const isValid = validateFormData()
+
             if (!isValid) {
                 setError('Please fix the validation errors before saving.')
                 setSaving(false)
@@ -214,49 +257,65 @@ export function DocumentIdSettings() {
         const errors: Record<string, string> = {}
         const warnings: string[] = []
 
-        // Validate prefix
-        if (!formData.prefix || formData.prefix.trim().length === 0) {
-            errors.prefix = 'Prefix is required'
-        } else if (formData.prefix.length > 10) {
-            errors.prefix = 'Prefix must be 10 characters or less'
-        } else if (!/^[A-Za-z0-9-_]+$/.test(formData.prefix)) {
-            errors.prefix = 'Prefix can only contain letters, numbers, hyphens, and underscores'
-        }
 
-        // Validate separator
-        if (formData.separator && formData.separator.length > 3) {
-            errors.separator = 'Separator must be 3 characters or less'
-        }
 
-        // Validate character count
-        if (formData.character_count !== undefined && (formData.character_count < 0 || formData.character_count > 20)) {
-            errors.character_count = 'Character count must be between 0 and 20'
-        }
 
-        // Validate number count
-        if (formData.number_count !== undefined && (formData.number_count < 1 || formData.number_count > 20)) {
-            errors.number_count = 'Number count must be between 1 and 20'
-        }
 
-        // Validate sequential starting number
-        if (formData.number_generation === 'sequential') {
-            if (!formData.sequential_start_number || formData.sequential_start_number < 1) {
-                errors.sequential_start_number = 'Starting number must be at least 1'
-            } else if (formData.sequential_start_number > 9999999) {
-                errors.sequential_start_number = 'Starting number cannot exceed 9,999,999'
+        // Only validate automatic generation fields if in auto mode
+        if (formData.generation_type === 'auto') {
+            // Validate prefix
+            if (!formData.prefix || formData.prefix.trim().length === 0) {
+                errors.prefix = 'Prefix is required'
+            } else if (formData.prefix.length > 10) {
+                errors.prefix = 'Prefix must be 10 characters or less'
+            } else if (!/^[A-Za-z0-9-_]+$/.test(formData.prefix)) {
+                errors.prefix = 'Prefix can only contain letters, numbers, hyphens, and underscores'
             }
 
-            // Check if starting number fits in allocated space
-            if (formData.sequential_start_number && formData.number_count) {
-                const startingNumberLength = formData.sequential_start_number.toString().length
-                if (startingNumberLength > formData.number_count) {
-                    errors.sequential_start_number = `Starting number (${formData.sequential_start_number}) has ${startingNumberLength} digits, but only ${formData.number_count} digits are allocated. Increase number count to at least ${startingNumberLength}.`
+            // Validate separator
+            if (formData.separator && formData.separator.length > 3) {
+                errors.separator = 'Separator must be 3 characters or less'
+            }
+
+            // Validate character count
+            if (formData.character_count !== undefined && (formData.character_count < 0 || formData.character_count > 20)) {
+                errors.character_count = 'Character count must be between 0 and 20'
+            }
+
+            // Validate number count
+            if (formData.number_count !== undefined && (formData.number_count < 1 || formData.number_count > 20)) {
+                errors.number_count = 'Number count must be between 1 and 20'
+            }
+
+            // Validate sequential starting number
+            if (formData.number_generation === 'sequential') {
+                if (!formData.sequential_start_number || formData.sequential_start_number < 1) {
+                    errors.sequential_start_number = 'Starting number must be at least 1'
+                } else if (formData.sequential_start_number > 9999999) {
+                    errors.sequential_start_number = 'Starting number cannot exceed 9,999,999'
+                }
+
+                // Check if starting number fits in allocated space
+                if (formData.sequential_start_number && formData.number_count) {
+                    const startingNumberLength = formData.sequential_start_number.toString().length
+                    if (startingNumberLength > formData.number_count) {
+                        errors.sequential_start_number = `Starting number (${formData.sequential_start_number}) has ${startingNumberLength} digits, but only ${formData.number_count} digits are allocated. Increase number count to at least ${startingNumberLength}.`
+                    }
                 }
             }
         }
 
         // Validate total length
-        if (formData.total_length !== undefined) {
+        if (formData.generation_type === 'custom') {
+            // For custom entries, total_length is required
+            if (!formData.total_length || formData.total_length < 1) {
+                errors.total_length = 'Sign ID Length is required for custom entries'
+            } else if (formData.total_length > 100) {
+                warnings.push('Total length is very long (over 100 characters). This may cause display issues.')
+            } else if (formData.total_length < 3) {
+                warnings.push('Total length is very short (under 3 characters). This may not provide enough uniqueness.')
+            }
+        } else if (formData.total_length !== undefined) {
             if (formData.total_length > 100) {
                 warnings.push('Total length is very long (over 100 characters). This may cause display issues.')
             } else if (formData.total_length < 5) {
@@ -264,14 +323,18 @@ export function DocumentIdSettings() {
             }
         }
 
-        // Check for potential issues
-        if (formData.character_count === 0 && formData.number_generation === 'random') {
-            warnings.push('Using only numbers with random generation may reduce uniqueness. Consider adding characters.')
-        }
+        // Check for potential issues (only for automatic generation)
 
-        if (!formData.include_year && !formData.include_month && formData.number_generation === 'random') {
-            warnings.push('Without date components, random IDs may be harder to organize chronologically.')
+        if (formData.generation_type === 'auto') {
+            if (formData.character_count === 0 && formData.number_generation === 'random') {
+                warnings.push('Using only numbers with random generation may reduce uniqueness. Consider adding characters.')
+            }
+
+            if (!formData.include_year && !formData.include_month && formData.number_generation === 'random') {
+                warnings.push('Without date components, random IDs may be harder to organize chronologically.')
+            }
         }
+        // For custom entries, no warnings should be shown
 
         setFieldErrors(errors)
         setWarnings(warnings)
@@ -672,6 +735,58 @@ export function DocumentIdSettings() {
                     </div>
                 )}
 
+                {/* Custom Entry Settings */}
+                {formData.generation_type === 'custom' && (
+                    <div className="space-y-4 border-t pt-6">
+                        <h3 className="text-lg font-medium text-gray-900">Custom Entry Settings</h3>
+                        <p className="text-sm text-gray-600">
+                            Configure validation rules for manually entered document IDs.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Sign ID Length
+                                    <span className="text-red-500 ml-1">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    value={formData.total_length || ''}
+                                    onChange={(e) => handleFormChange('total_length', parseInt(e.target.value) || 0)}
+                                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 ${fieldErrors.total_length
+                                        ? 'border-red-300 focus:ring-red-500 focus:border-red-500'
+                                        : 'border-gray-300 focus:ring-blue-500 focus:border-blue-500'
+                                        }`}
+                                    placeholder="Enter maximum length"
+                                    min={3}
+                                    max={100}
+                                />
+                                {fieldErrors.total_length && (
+                                    <p className="mt-1 text-sm text-red-600">{fieldErrors.total_length}</p>
+                                )}
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Maximum length allowed for custom document IDs (3-100 characters)
+                                </p>
+                            </div>
+
+                            <div>
+                                <label className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.ensure_uniqueness}
+                                        onChange={(e) => handleFormChange('ensure_uniqueness', e.target.checked)}
+                                        className="mr-2"
+                                    />
+                                    Ensure Uniqueness
+                                </label>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Check database for duplicate IDs when creating signature requests
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Live Preview */}
                 <div className="border-t pt-6">
                     <div className="flex items-center justify-between mb-3">
@@ -690,45 +805,68 @@ export function DocumentIdSettings() {
                         )}
                     </div>
                     <div className="bg-gray-50 rounded-lg p-4">
-                        <p className="text-sm text-gray-600 mb-2">Sample Document IDs:</p>
-                        <div className="space-y-1">
-                            {sampleIds.map((id, index) => (
-                                <div key={index} className="font-mono text-sm bg-white px-3 py-2 rounded border">
-                                    {id}
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Action Buttons */}
-                <div className="border-t pt-6 flex justify-between">
-                    <button
-                        onClick={resetToDefaults}
-                        className="px-4 py-2 text-gray-600 hover:text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
-                    >
-                        Reset to Defaults
-                    </button>
-
-                    <button
-                        onClick={saveSettings}
-                        disabled={saving || hasValidationErrors()}
-                        className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
-                        title={hasValidationErrors() ? "Please fix validation errors before saving" : ""}
-                    >
-                        {saving ? (
+                        {formData.generation_type === 'auto' ? (
                             <>
-                                <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                                Saving...
+                                <p className="text-sm text-gray-600 mb-2">Sample Document IDs:</p>
+                                <div className="space-y-1">
+                                    {sampleIds.map((id, index) => (
+                                        <div key={index} className="font-mono text-sm bg-white px-3 py-2 rounded border">
+                                            {id}
+                                        </div>
+                                    ))}
+                                </div>
                             </>
                         ) : (
                             <>
-                                <Save className="w-4 h-4 mr-2" />
-                                Save Settings
+                                <p className="text-sm text-gray-600 mb-2">Custom Entry Configuration:</p>
+                                <div className="space-y-2">
+                                    <div className="bg-white px-3 py-2 rounded border">
+                                        <span className="text-sm font-medium">Maximum Length:</span>
+                                        <span className="ml-2 font-mono text-sm">{formData.total_length || 'Not set'} characters</span>
+                                    </div>
+                                    <div className="bg-white px-3 py-2 rounded border">
+                                        <span className="text-sm font-medium">Uniqueness Check:</span>
+                                        <span className="ml-2 text-sm">{formData.ensure_uniqueness ? 'Enabled' : 'Disabled'}</span>
+                                    </div>
+                                    <div className="bg-blue-50 px-3 py-2 rounded border border-blue-200">
+                                        <p className="text-sm text-blue-700">
+                                            <strong>Example valid IDs:</strong> CONTRACT-2024-001, AGREEMENT_ABC123, DOC.FINAL.V2
+                                        </p>
+                                    </div>
+                                </div>
                             </>
                         )}
-                    </button>
+                    </div>
                 </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="border-t pt-6 flex justify-between">
+                <button
+                    onClick={resetToDefaults}
+                    className="px-4 py-2 text-gray-600 hover:text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                    Reset to Defaults
+                </button>
+
+                <button
+                    onClick={saveSettings}
+                    disabled={saving || hasValidationErrors()}
+                    className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    title={hasValidationErrors() ? "Please fix validation errors before saving" : ""}
+                >
+                    {saving ? (
+                        <>
+                            <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                            Saving...
+                        </>
+                    ) : (
+                        <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Save Settings
+                        </>
+                    )}
+                </button>
             </div>
         </div>
     )

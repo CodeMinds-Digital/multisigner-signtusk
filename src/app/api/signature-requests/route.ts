@@ -354,7 +354,7 @@ export async function POST(request: NextRequest) {
       console.log('🆔 Auto-generated document sign ID:', finalDocumentSignId)
     } else {
       // Validate custom ID if provided (new behavior)
-      const validationResult = await DocumentIdService.validateCustomId(documentSignId)
+      const validationResult = await DocumentIdService.validateCustomId(documentSignId, userId)
       if (!validationResult.isValid) {
         return new Response(
           JSON.stringify({
@@ -710,14 +710,14 @@ export async function POST(request: NextRequest) {
         // Find the corresponding user ID for this signer email
         const { data: signerUser } = await supabaseAdmin
           .from('user_profiles')
-          .select('user_id')
+          .select('id')
           .eq('email', signerData.signer_email)
           .single()
 
         if (signerUser) {
           // Create notification for registered users
           await NotificationService.createNotification(
-            signerUser.user_id,
+            signerUser.id,
             'signature_request_received',
             'New Signature Request',
             `You have been requested to sign "${documentTitle}"`,

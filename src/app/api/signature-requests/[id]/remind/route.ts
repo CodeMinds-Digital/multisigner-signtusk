@@ -263,13 +263,13 @@ export async function POST(
           try {
             const { data: signerUser } = await supabaseAdmin
               .from('user_profiles')
-              .select('user_id')
+              .select('id')
               .eq('email', signer.email)
               .single()
 
             if (signerUser) {
               await NotificationService.createNotification(
-                signerUser.user_id,
+                signerUser.id,
                 'reminder_received',
                 'Signature Reminder',
                 `Reminder: Please sign "${combinedRequest.title}"`,
