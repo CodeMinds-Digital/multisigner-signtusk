@@ -449,7 +449,7 @@ export class DocumentIdService {
                 const prefix = settings.prefix || 'DOC'
                 const separator = settings.separator || ''
 
-                existingRequests.forEach(request => {
+                existingRequests.forEach((request: { document_sign_id: string | null }) => {
                     const docId = request.document_sign_id
                     if (docId && docId.startsWith(prefix)) {
                         // Extract the numeric part from the end

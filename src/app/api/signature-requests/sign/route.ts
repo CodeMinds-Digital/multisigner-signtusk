@@ -380,7 +380,7 @@ export async function POST(request: NextRequest) {
     // Also calculate viewed count (signers who have viewed_at timestamp)
     console.log('✅ Signature saved successfully. Signed:', signedCount, 'Total:', totalSigners)
 
-    // Send signature completion notification
+    // Send signature completion notifications
     try {
       // Get signing request details for notifications
       const { data: signingRequest } = await supabaseAdmin
@@ -390,6 +390,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (signingRequest && signingRequest.initiated_by) {
+        // Notify the requester that someone signed
         await NotificationService.notifySignatureCompleted(
           requestId,
           signingRequest.title || 'Document',
@@ -397,9 +398,38 @@ export async function POST(request: NextRequest) {
           signingRequest.initiated_by
         )
         console.log('📧 Signature completion notification sent to requester')
+
+        // Get all signers for this request to notify other signers
+        const { data: allSigners } = await supabaseAdmin
+          .from('signing_request_signers')
+          .select('signer_email, signer_name')
+          .eq('signing_request_id', requestId)
+
+        if (allSigners) {
+          // Get other signers who haven't signed yet (excluding current signer)
+          const otherSignerEmails = allSigners
+            .filter(s => s.signer_email !== userEmail)
+            .map(s => s.signer_email)
+
+          // Get current signer's name
+          const currentSigner = allSigners.find(s => s.signer_email === userEmail)
+          const signerName = currentSigner?.signer_name || userEmail
+
+          // Notify other signers about this signature
+          if (otherSignerEmails.length > 0) {
+            await NotificationService.notifyOtherSignersOfSignature(
+              requestId,
+              signingRequest.title || 'Document',
+              userEmail,
+              signerName,
+              otherSignerEmails
+            )
+            console.log('📧 Signature progress notifications sent to other signers:', otherSignerEmails)
+          }
+        }
       }
     } catch (notificationError) {
-      console.error('❌ Error sending signature completion notification:', notificationError)
+      console.error('❌ Error sending signature completion notifications:', notificationError)
       // Don't fail the signing operation if notifications fail
     }
 
@@ -429,32 +459,7 @@ export async function POST(request: NextRequest) {
 
     console.log('📊 Signer completion result:', completionResult)
 
-    // Send signature completion notifications
-    try {
-      // Get signing request details for notifications
-      const { data: signingRequest } = await supabaseAdmin
-        .from('signing_requests')
-        .select('*')
-        .eq('id', requestId)
-        .single()
 
-      if (signingRequest && signingRequest.initiated_by) {
-        // Notify the requester that someone signed
-        await NotificationService.notifySignatureCompleted(
-          requestId,
-          signingRequest.title || 'Document',
-          userEmail,
-          signingRequest.initiated_by
-        )
-        console.log('📧 Signature completion notification sent to requester')
-
-        // If not all completed and there's a next signer, they're already notified by the workflow service
-        // The MultiSignatureWorkflowService handles next signer notifications in sequential mode
-      }
-    } catch (notificationError) {
-      console.error('❌ Error sending signature notifications:', notificationError)
-      // Don't fail the signature operation if notifications fail
-    }
 
     return new Response(
       JSON.stringify({

@@ -800,8 +800,21 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             alert('Signature declined successfully.')
             setSigningRequest(null)
 
-            // Refresh the page to show updated status
-            window.location.reload()
+            // Refresh the data instead of full page reload
+            await loadAllRequests()
+
+            // Trigger notification refresh for all users
+            if (typeof (window as any).refreshNotifications === 'function') {
+                (window as any).refreshNotifications()
+            }
+
+            // Force a small delay to ensure database updates are reflected
+            setTimeout(async () => {
+                await loadAllRequests()
+                if (typeof (window as any).refreshNotifications === 'function') {
+                    (window as any).refreshNotifications()
+                }
+            }, 1000)
         } catch (error) {
             console.error('❌ Error declining signature:', error)
             alert(`Error declining signature: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -878,8 +891,18 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                     </Select>
                 </div>
 
-                {/* NEW: Search Bar */}
+                {/* NEW: Search Bar and Refresh */}
                 <div className="flex items-center gap-2">
+                    <button
+                        onClick={loadAllRequests}
+                        className="px-3 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center gap-2"
+                        title="Refresh data"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                    </button>
                     <div className="relative">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                         <input

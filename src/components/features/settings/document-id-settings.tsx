@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { Settings, Eye, RefreshCw, Save, AlertCircle, CheckCircle } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
-import { DocumentIdService, CreateDocumentIdSettingsData, DocumentIdSettings } from '@/lib/document-id-service'
+import { DocumentIdService, CreateDocumentIdSettingsData, type DocumentIdSettings } from '@/lib/document-id-service'
 
 export function DocumentIdSettings() {
     const { user } = useAuth()
@@ -151,7 +151,9 @@ export function DocumentIdSettings() {
                 const availableLength = Math.max(0, value - prefixLength - dateLength)
 
                 // Distribute available length between characters and numbers
-                const charRatio = updated.character_count / (updated.character_count + updated.number_count)
+                const charCount = updated.character_count || 0
+                const numCount = updated.number_count || 0
+                const charRatio = charCount / (charCount + numCount)
                 updated.character_count = Math.floor(availableLength * charRatio)
                 updated.number_count = availableLength - updated.character_count
             }
@@ -227,12 +229,12 @@ export function DocumentIdSettings() {
         }
 
         // Validate character count
-        if (formData.character_count < 0 || formData.character_count > 20) {
+        if (formData.character_count !== undefined && (formData.character_count < 0 || formData.character_count > 20)) {
             errors.character_count = 'Character count must be between 0 and 20'
         }
 
         // Validate number count
-        if (formData.number_count < 1 || formData.number_count > 20) {
+        if (formData.number_count !== undefined && (formData.number_count < 1 || formData.number_count > 20)) {
             errors.number_count = 'Number count must be between 1 and 20'
         }
 
@@ -254,10 +256,12 @@ export function DocumentIdSettings() {
         }
 
         // Validate total length
-        if (formData.total_length > 100) {
-            warnings.push('Total length is very long (over 100 characters). This may cause display issues.')
-        } else if (formData.total_length < 5) {
-            warnings.push('Total length is very short (under 5 characters). This may not provide enough uniqueness.')
+        if (formData.total_length !== undefined) {
+            if (formData.total_length > 100) {
+                warnings.push('Total length is very long (over 100 characters). This may cause display issues.')
+            } else if (formData.total_length < 5) {
+                warnings.push('Total length is very short (under 5 characters). This may not provide enough uniqueness.')
+            }
         }
 
         // Check for potential issues
