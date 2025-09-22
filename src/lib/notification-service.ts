@@ -67,7 +67,7 @@ export class NotificationService {
     title: string,
     message: string,
     data?: any,
-    expiresAt?: string
+    actionUrl?: string
   ): Promise<boolean> {
     try {
       console.log('📧 Creating notification:', { userId, type, title })
@@ -79,7 +79,7 @@ export class NotificationService {
           title,
           message,
           metadata: data,
-          expires_at: expiresAt,
+          action_url: actionUrl,
           is_read: false,
           created_at: new Date().toISOString()
         }])
@@ -110,7 +110,7 @@ export class NotificationService {
     unreadOnly: boolean = false
   ): Promise<Notification[]> {
     try {
-      let query = supabase
+      let query = supabaseAdmin
         .from(this.NOTIFICATIONS_TABLE)
         .select('*')
         .eq('user_id', userId)
@@ -140,7 +140,7 @@ export class NotificationService {
    */
   static async markAsRead(notificationId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from(this.NOTIFICATIONS_TABLE)
         .update({ is_read: true, updated_at: new Date().toISOString() })
         .eq('id', notificationId)
@@ -157,7 +157,7 @@ export class NotificationService {
    */
   static async markAllAsRead(userId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from(this.NOTIFICATIONS_TABLE)
         .update({ is_read: true, updated_at: new Date().toISOString() })
         .eq('user_id', userId)
@@ -175,7 +175,7 @@ export class NotificationService {
    */
   static async deleteNotification(notificationId: string): Promise<boolean> {
     try {
-      const { error } = await supabase
+      const { error } = await supabaseAdmin
         .from(this.NOTIFICATIONS_TABLE)
         .delete()
         .eq('id', notificationId)
@@ -243,7 +243,7 @@ export class NotificationService {
       const { data: profile, error: profileError } = await supabaseAdmin
         .from('user_profiles')
         .select('email, full_name')
-        .eq('user_id', userId)
+        .eq('id', userId)
         .single()
 
       if (profileError || !profile?.email) {
@@ -512,6 +512,76 @@ export class NotificationService {
   }
 
   /**
+   * Notify other signers when someone signs a document
+   */
+  static async notifyOtherSignersOfSignature(
+    requestId: string,
+    documentName: string,
+    signerEmail: string,
+    signerName: string,
+    otherSignerEmails: string[]
+  ): Promise<void> {
+    try {
+      console.log('📧 Starting signature notifications for other signers:', otherSignerEmails)
+
+      for (const otherSignerEmail of otherSignerEmails) {
+        console.log('📧 Looking up user profile for:', otherSignerEmail)
+
+        // Get user ID from email - try both user_profiles and profiles tables
+        let profile = null
+
+        // First try user_profiles table
+        const { data: userProfile, error: userProfileError } = await supabaseAdmin
+          .from('user_profiles')
+          .select('id')
+          .eq('email', otherSignerEmail)
+          .single()
+
+        if (userProfile) {
+          profile = { user_id: userProfile.id }
+          console.log('📧 Found user in user_profiles:', otherSignerEmail)
+        } else {
+          console.log('📧 User not found in user_profiles, trying profiles table:', userProfileError)
+
+          // Try profiles table as fallback
+          const { data: profileData, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('id')
+            .eq('email', otherSignerEmail)
+            .single()
+
+          if (profileData) {
+            profile = { user_id: profileData.id }
+            console.log('📧 Found user in profiles table:', otherSignerEmail)
+          } else {
+            console.log('📧 User not found in profiles table either:', profileError)
+          }
+        }
+
+        if (profile) {
+          await this.createNotification(
+            profile.user_id,
+            'signature_request_signed',
+            'Document Progress Update',
+            `${signerName || signerEmail} has signed "${documentName}". You may still need to sign this document.`,
+            {
+              request_id: requestId,
+              document_name: documentName,
+              signer_email: signerEmail,
+              signer_name: signerName
+            }
+          )
+          console.log('📧 Created signature progress notification for:', otherSignerEmail)
+        } else {
+          console.log('📧 Skipping notification for unregistered user:', otherSignerEmail)
+        }
+      }
+    } catch (error) {
+      console.error('Error creating signature progress notifications:', error)
+    }
+  }
+
+  /**
    * Notify other signers when document is declined
    */
   static async notifyOtherSignersOfDecline(
@@ -522,13 +592,41 @@ export class NotificationService {
     otherSignerEmails: string[]
   ): Promise<void> {
     try {
+      console.log('📧 Starting decline notifications for signers:', otherSignerEmails)
+
       for (const signerEmail of otherSignerEmails) {
-        // Get user ID from email
-        const { data: profile } = await supabaseAdmin
+        console.log('📧 Looking up user profile for:', signerEmail)
+
+        // Get user ID from email - try both user_profiles and profiles tables
+        let profile = null
+
+        // First try user_profiles table
+        const { data: userProfile, error: userProfileError } = await supabaseAdmin
           .from('user_profiles')
-          .select('user_id')
+          .select('id')
           .eq('email', signerEmail)
           .single()
+
+        if (userProfile) {
+          profile = { user_id: userProfile.id }
+          console.log('📧 Found user in user_profiles:', signerEmail)
+        } else {
+          console.log('📧 User not found in user_profiles, trying profiles table:', userProfileError)
+
+          // Try profiles table as fallback
+          const { data: profileData, error: profileError } = await supabaseAdmin
+            .from('profiles')
+            .select('id')
+            .eq('email', signerEmail)
+            .single()
+
+          if (profileData) {
+            profile = { user_id: profileData.id }
+            console.log('📧 Found user in profiles table:', signerEmail)
+          } else {
+            console.log('📧 User not found in profiles table either:', profileError)
+          }
+        }
 
         if (profile) {
           await this.createNotification(
@@ -544,6 +642,8 @@ export class NotificationService {
             }
           )
           console.log('📧 Created decline cascade notification for:', signerEmail)
+        } else {
+          console.log('📧 Skipping notification for unregistered user:', signerEmail)
         }
       }
     } catch (error) {
@@ -750,13 +850,13 @@ export class NotificationService {
       for (const signerEmail of signerEmails) {
         const { data: profile } = await supabaseAdmin
           .from('user_profiles')
-          .select('user_id')
+          .select('id')
           .eq('email', signerEmail)
           .single()
 
         if (profile) {
           await this.createNotification(
-            profile.user_id,
+            profile.id,
             'deadline_approaching',
             'Signature Deadline Approaching',
             `"${documentTitle}" needs to be signed within ${hoursRemaining} hours.`,
@@ -804,13 +904,13 @@ export class NotificationService {
       // Notify the new signer
       const { data: profile } = await supabaseAdmin
         .from('user_profiles')
-        .select('user_id')
+        .select('id')
         .eq('email', newSignerEmail)
         .single()
 
       if (profile) {
         await this.createNotification(
-          profile.user_id,
+          profile.id,
           'signature_request_received',
           'New Signature Request',
           `You have been added as a signer for "${documentTitle}".`,

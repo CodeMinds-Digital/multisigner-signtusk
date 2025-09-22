@@ -40,6 +40,7 @@ interface RequestDetailsModalProps {
     sender_name?: string
     document_url?: string
     document_id?: string
+    document_sign_id?: string // NEW: Document Sign ID
     document_type?: string
     document_category?: string
   }
@@ -202,7 +203,17 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
                       <FileText className="w-5 h-5 text-gray-400 mr-3" />
                       <div className="flex-1">
                         <p className="font-medium text-gray-900">{request.title}</p>
-                        <p className="text-sm text-gray-600">Document ID: {request.id.slice(0, 8)}...</p>
+
+                        {/* Document Sign ID - Prominently displayed */}
+                        {request.document_sign_id ? (
+                          <div className="mt-2 mb-2">
+                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800">
+                              🆔 {request.document_sign_id}
+                            </span>
+                          </div>
+                        ) : (
+                          <p className="text-sm text-gray-600 mt-1">Internal ID: {request.id.slice(0, 8)}...</p>
+                        )}
 
                         {/* Category and Type Display */}
                         <div className="flex gap-2 mt-2">

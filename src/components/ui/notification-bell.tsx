@@ -27,10 +27,16 @@ export function NotificationBell({ className }: NotificationBellProps) {
       const response = await fetch('/api/notifications?limit=10&unread_only=false', {
         credentials: 'include' // Include cookies for authentication
       })
+
       if (response.ok) {
         const data = await response.json()
         setNotifications(data.notifications || [])
         setUnreadCount(data.unread_count || 0)
+      } else {
+        // If authentication error, don't spam the console
+        if (response.status !== 401) {
+          console.error('Error fetching notifications:', response.status)
+        }
       }
     } catch (error) {
       console.error('Error fetching notifications:', error)
@@ -45,9 +51,15 @@ export function NotificationBell({ className }: NotificationBellProps) {
       const response = await fetch('/api/notifications/unread-count', {
         credentials: 'include' // Include cookies for authentication
       })
+
       if (response.ok) {
         const data = await response.json()
         setUnreadCount(data.unread_count || 0)
+      } else {
+        // If authentication error, don't spam the console
+        if (response.status !== 401) {
+          console.error('Error fetching unread count:', response.status)
+        }
       }
     } catch (error) {
       console.error('Error fetching unread count:', error)
@@ -175,12 +187,22 @@ export function NotificationBell({ className }: NotificationBellProps) {
 
   // Initial load and polling
   useEffect(() => {
-    fetchNotifications()
+    // Add a small delay to ensure user is authenticated
+    const timer = setTimeout(() => {
+      fetchNotifications()
+    }, 1000) // 1 second delay
 
-    // Poll for updates every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000)
+    // Poll for updates more frequently for better real-time experience
+    const interval = setInterval(fetchUnreadCount, 10000) // Every 10 seconds
 
-    return () => clearInterval(interval)
+    // Also refresh full notifications periodically
+    const fullRefreshInterval = setInterval(fetchNotifications, 60000) // Every minute
+
+    return () => {
+      clearTimeout(timer)
+      clearInterval(interval)
+      clearInterval(fullRefreshInterval)
+    }
   }, [])
 
   // Fetch notifications when dropdown opens
@@ -189,6 +211,20 @@ export function NotificationBell({ className }: NotificationBellProps) {
       fetchNotifications()
     }
   }, [isOpen])
+
+  // Expose refresh function globally for other components to trigger
+  useEffect(() => {
+    // @ts-expect-error - Adding to window for global access
+    window.refreshNotifications = () => {
+      fetchNotifications()
+      fetchUnreadCount()
+    }
+
+    return () => {
+      // @ts-expect-error - Deleting custom property from window object
+      delete window.refreshNotifications
+    }
+  }, [])
 
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>

@@ -4,6 +4,7 @@ import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendBulkSignatureRequests } from '@/lib/email-service'
 import { NotificationService } from '@/lib/notification-service'
+import { DocumentIdService } from '@/lib/document-id-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -215,6 +216,7 @@ export async function GET(request: NextRequest) {
         document_status: request.document_status,
         can_sign: canSign,
         decline_reason: declineReason,
+        document_sign_id: request.document_sign_id, // NEW: Include Document Sign ID
         progress: {
           viewed: request.viewed_signers || 0,
           signed: request.completed_signers || 0,
@@ -312,7 +314,8 @@ export async function POST(request: NextRequest) {
       signers,
       signingOrder = 'sequential',
       message = 'Please review and sign this document.',
-      dueDate
+      dueDate,
+      documentSignId // NEW: Optional document sign ID
     } = body
 
     console.log('🔍 SIGNATURE REQUEST CREATION DEBUG:', {
@@ -321,6 +324,7 @@ export async function POST(request: NextRequest) {
       signingOrder,
       signersCount: signers?.length,
       requestedMode: signingOrder || 'sequential (default)',
+      documentSignId: documentSignId || 'auto-generate',
       timestamp: new Date().toISOString()
     })
 
@@ -339,6 +343,28 @@ export async function POST(request: NextRequest) {
           { status: 400, headers: { 'Content-Type': 'application/json' } }
         )
       }
+    }
+
+    // Generate or validate document sign ID
+    let finalDocumentSignId = documentSignId
+
+    if (!finalDocumentSignId) {
+      // Auto-generate if not provided (existing behavior)
+      finalDocumentSignId = await DocumentIdService.generateDocumentId(userId)
+      console.log('🆔 Auto-generated document sign ID:', finalDocumentSignId)
+    } else {
+      // Validate custom ID if provided (new behavior)
+      const validationResult = await DocumentIdService.validateCustomId(documentSignId, userId)
+      if (!validationResult.isValid) {
+        return new Response(
+          JSON.stringify({
+            error: validationResult.error || 'Document ID is invalid. Please choose a different ID.',
+            field: 'documentSignId'
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+      console.log('✅ Custom document sign ID validated:', finalDocumentSignId)
     }
 
     // Calculate expiration date
@@ -429,6 +455,7 @@ export async function POST(request: NextRequest) {
     const signatureRequestData = {
       document_template_id: realDocumentId,
       title: documentTitle,
+      document_sign_id: finalDocumentSignId, // NEW: Add document sign ID
       initiated_by: userId,
       initiated_at: now,
       expires_at: expiresAt.toISOString(),
@@ -683,14 +710,14 @@ export async function POST(request: NextRequest) {
         // Find the corresponding user ID for this signer email
         const { data: signerUser } = await supabaseAdmin
           .from('user_profiles')
-          .select('user_id')
+          .select('id')
           .eq('email', signerData.signer_email)
           .single()
 
         if (signerUser) {
           // Create notification for registered users
           await NotificationService.createNotification(
-            signerUser.user_id,
+            signerUser.id,
             'signature_request_received',
             'New Signature Request',
             `You have been requested to sign "${documentTitle}"`,
@@ -745,6 +772,7 @@ export async function POST(request: NextRequest) {
         success: true,
         data: {
           id: signatureRequest.id,
+          document_sign_id: finalDocumentSignId, // NEW: Include document sign ID in response
           status: signatureRequest.status,
           created_at: signatureRequest.created_at
         }

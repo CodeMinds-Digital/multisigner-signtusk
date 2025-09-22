@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { File, CheckCircle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Send, Inbox, Filter, Info, X } from 'lucide-react'
+import { File, CheckCircle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Send, Inbox, Filter, Info, X, Search, Shield } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { type SigningRequestListItem } from '@/lib/signing-workflow-service'
 import { supabase } from '@/lib/supabase'
@@ -45,6 +45,7 @@ interface UnifiedSigningRequest extends SigningRequestListItem {
     decline_reason?: string
     document_url?: string
     document_id?: string
+    document_sign_id?: string // NEW: Document Sign ID
     final_pdf_url?: string
     context_display?: string
 }
@@ -57,10 +58,13 @@ interface RequestStats {
 
 export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequestsListProps) {
     const [requests, setRequests] = useState<UnifiedSigningRequest[]>([])
+    const [filteredRequests, setFilteredRequests] = useState<UnifiedSigningRequest[]>([]) // NEW: Filtered requests for search
     const [stats, setStats] = useState<RequestStats>({ total: 0, sent: 0, received: 0 })
+    const [filteredStats, setFilteredStats] = useState<RequestStats>({ total: 0, sent: 0, received: 0 }) // NEW: Stats for filtered results
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
     const [timeRange, setTimeRange] = useState<TimeRange>('30d')
+    const [searchQuery, setSearchQuery] = useState('') // NEW: Search query state
     const [viewingRequest, setViewingRequest] = useState<UnifiedSigningRequest | null>(null)
     const [showSignersSheet, setShowSignersSheet] = useState<UnifiedSigningRequest | null>(null)
     const [showActionsSheet, setShowActionsSheet] = useState<UnifiedSigningRequest | null>(null)
@@ -148,6 +152,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             const receivedCount = filteredRequests.filter((req: any) => req.type === 'received').length
 
             setRequests(filteredRequests)
+            setFilteredRequests(filteredRequests) // NEW: Initialize filtered requests
             setStats({
                 total: filteredRequests.length,
                 sent: sentCount,
@@ -160,6 +165,43 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             setLoading(false)
         }
     }, [user, timeRange])
+
+    // NEW: Search filtering effect
+    useEffect(() => {
+        if (!searchQuery.trim()) {
+            setFilteredRequests(requests)
+            setFilteredStats(stats)
+            return
+        }
+
+        const query = searchQuery.toLowerCase().trim()
+        const filtered = requests.filter(request => {
+            // Search in document title
+            if (request.title?.toLowerCase().includes(query)) return true
+
+            // Search in document sign ID
+            if (request.document_sign_id?.toLowerCase().includes(query)) return true
+
+            // Search in sender name
+            if (request.sender_name?.toLowerCase().includes(query)) return true
+
+            // Search in status
+            if (request.status?.toLowerCase().includes(query)) return true
+
+            return false
+        })
+
+        // Calculate filtered stats
+        const filteredSentCount = filtered.filter(req => req.type === 'sent').length
+        const filteredReceivedCount = filtered.filter(req => req.type === 'received').length
+
+        setFilteredRequests(filtered)
+        setFilteredStats({
+            total: filtered.length,
+            sent: filteredSentCount,
+            received: filteredReceivedCount
+        })
+    }, [requests, searchQuery, stats])
 
     useEffect(() => {
         loadAllRequests()
@@ -758,8 +800,21 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             alert('Signature declined successfully.')
             setSigningRequest(null)
 
-            // Refresh the page to show updated status
-            window.location.reload()
+            // Refresh the data instead of full page reload
+            await loadAllRequests()
+
+            // Trigger notification refresh for all users
+            if (typeof (window as any).refreshNotifications === 'function') {
+                (window as any).refreshNotifications()
+            }
+
+            // Force a small delay to ensure database updates are reflected
+            setTimeout(async () => {
+                await loadAllRequests()
+                if (typeof (window as any).refreshNotifications === 'function') {
+                    (window as any).refreshNotifications()
+                }
+            }, 1000)
         } catch (error) {
             console.error('❌ Error declining signature:', error)
             alert(`Error declining signature: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -819,8 +874,8 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
     return (
         <div className="space-y-6">
-            {/* Time Range Selector */}
-            <div className="flex justify-between items-center">
+            {/* Time Range Selector and Search */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
                 <div className="flex items-center gap-2">
                     <Filter className="w-4 h-4 text-gray-500" />
                     <Select value={timeRange} onValueChange={(value: TimeRange) => setTimeRange(value)}>
@@ -835,9 +890,41 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                         </SelectContent>
                     </Select>
                 </div>
-                <span className="text-sm text-gray-500">
-                    Showing data for {getTimeRangeLabel(timeRange).toLowerCase()}
-                </span>
+
+                {/* NEW: Search Bar and Refresh */}
+                <div className="flex items-center gap-2">
+                    <button
+                        onClick={loadAllRequests}
+                        className="px-3 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center gap-2"
+                        title="Refresh data"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Refresh
+                    </button>
+                    <div className="relative">
+                        <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                        <input
+                            type="text"
+                            placeholder="Search by title, sign ID, or sender..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-10 pr-10 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent w-80"
+                        />
+                        {searchQuery && (
+                            <button
+                                onClick={() => setSearchQuery('')}
+                                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                                <X className="w-4 h-4" />
+                            </button>
+                        )}
+                    </div>
+                    <span className="text-sm text-gray-500">
+                        Showing data for {getTimeRangeLabel(timeRange).toLowerCase()}
+                    </span>
+                </div>
             </div>
 
             {/* Summary Cards */}
@@ -846,8 +933,10 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                     <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-gray-600">Total Requests</p>
-                                <p className="text-2xl font-bold text-gray-900">{stats.total}</p>
+                                <p className="text-sm font-medium text-gray-600">
+                                    Total Requests {searchQuery && <span className="text-xs text-blue-600">(filtered)</span>}
+                                </p>
+                                <p className="text-2xl font-bold text-gray-900">{filteredStats.total}</p>
                             </div>
                             <div className="p-3 bg-blue-100 rounded-full">
                                 <File className="w-6 h-6 text-blue-600" />
@@ -860,8 +949,10 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                     <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-gray-600">Signing Requests</p>
-                                <p className="text-2xl font-bold text-gray-900">{stats.sent}</p>
+                                <p className="text-sm font-medium text-gray-600">
+                                    Signing Requests {searchQuery && <span className="text-xs text-blue-600">(filtered)</span>}
+                                </p>
+                                <p className="text-2xl font-bold text-gray-900">{filteredStats.sent}</p>
                             </div>
                             <div className="p-3 bg-green-100 rounded-full">
                                 <Send className="w-6 h-6 text-green-600" />
@@ -874,8 +965,10 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                     <CardContent className="p-6">
                         <div className="flex items-center justify-between">
                             <div>
-                                <p className="text-sm font-medium text-gray-600">Received Requests</p>
-                                <p className="text-2xl font-bold text-gray-900">{stats.received}</p>
+                                <p className="text-sm font-medium text-gray-600">
+                                    Received Requests {searchQuery && <span className="text-xs text-blue-600">(filtered)</span>}
+                                </p>
+                                <p className="text-2xl font-bold text-gray-900">{filteredStats.received}</p>
                             </div>
                             <div className="p-3 bg-purple-100 rounded-full">
                                 <Inbox className="w-6 h-6 text-purple-600" />
@@ -904,11 +997,11 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                         </div>
                     )}
 
-                    {requests.length === 0 ? (
+                    {filteredRequests.length === 0 ? (
                         <EmptyState
                             icon={File}
-                            title="No signature requests found"
-                            description={`No requests found for ${getTimeRangeLabel(timeRange).toLowerCase()}`}
+                            title={searchQuery ? "No matching requests found" : "No signature requests found"}
+                            description={searchQuery ? `No requests match "${searchQuery}"` : `No requests found for ${getTimeRangeLabel(timeRange).toLowerCase()}`}
                         />
                     ) : (
                         <Table>
@@ -916,6 +1009,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                 <TableRow>
                                     <TableHead>Type</TableHead>
                                     <TableHead>Document Title</TableHead>
+                                    <TableHead>Sign ID</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>From/To</TableHead>
                                     <TableHead>Date</TableHead>
@@ -924,7 +1018,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {requests.map((request) => (
+                                {filteredRequests.map((request) => (
                                     <TableRow key={`${request.type}-${request.id}`}>
                                         <TableCell>
                                             <div className="flex items-center space-x-2">
@@ -943,6 +1037,15 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                                 <File className="w-4 h-4 text-gray-400" />
                                                 <span className="font-medium">{request.title}</span>
                                             </div>
+                                        </TableCell>
+                                        <TableCell>
+                                            {request.document_sign_id ? (
+                                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                                                    🆔 {request.document_sign_id}
+                                                </span>
+                                            ) : (
+                                                <span className="text-xs text-gray-400">No ID</span>
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             {getStatusBadge(request)}
@@ -1167,6 +1270,29 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                     <div>
                                         <p className="font-medium text-gray-900">Send Reminder</p>
                                         <p className="text-sm text-gray-600">Notify signers about pending signatures</p>
+                                    </div>
+                                </button>
+
+                                {/* Verify Document Action */}
+                                <button
+                                    onClick={() => {
+                                        const verifyUrl = showActionsSheet.document_sign_id
+                                            ? `/verify?documentSignId=${encodeURIComponent(showActionsSheet.document_sign_id)}`
+                                            : `/verify?requestId=${showActionsSheet.id}`
+                                        window.open(verifyUrl, '_blank')
+                                        setShowActionsSheet(null)
+                                    }}
+                                    className="w-full flex items-center p-3 text-left hover:bg-green-50 rounded-lg transition-colors"
+                                >
+                                    <Shield className="w-5 h-5 text-green-600 mr-3" />
+                                    <div>
+                                        <p className="font-medium text-green-900">Verify Document</p>
+                                        <p className="text-sm text-green-600">
+                                            {showActionsSheet.document_sign_id
+                                                ? `Verify using ID: ${showActionsSheet.document_sign_id}`
+                                                : 'Verify document authenticity'
+                                            }
+                                        </p>
                                     </div>
                                 </button>
 

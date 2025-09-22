@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,8 +33,25 @@ export default function VerifyPage() {
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null)
   const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isVerifying, setIsVerifying] = useState(false)
+  const [documentId, setDocumentId] = useState('') // NEW: Document ID input
+  const [showInputForm, setShowInputForm] = useState(false) // NEW: Show input form
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const searchParams = useSearchParams()
   const toast = useToast()
+
+  // Handle URL parameters for pre-filling Document Sign ID or Request ID
+  useEffect(() => {
+    const documentSignId = searchParams.get('documentSignId')
+    const requestId = searchParams.get('requestId')
+
+    if (documentSignId) {
+      setDocumentId(documentSignId)
+      setShowInputForm(true)
+    } else if (requestId) {
+      setDocumentId(requestId)
+      setShowInputForm(true)
+    }
+  }, [searchParams])
 
   const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
@@ -68,40 +86,74 @@ export default function VerifyPage() {
   }
 
   const handleDirectVerification = async () => {
+    if (!showInputForm) {
+      setShowInputForm(true)
+      return
+    }
+
+    if (!documentId.trim()) {
+      toast.error('Please enter a Document Sign ID or Request ID')
+      return
+    }
+
     setIsVerifying(true)
     try {
       console.log('🔄 Starting document verification...')
 
-      // Prompt user for request ID
-      const requestId = prompt('Please enter the document request ID for verification:')
+      let cleanDocumentId = documentId.trim()
 
-      if (!requestId) {
-        toast.info('Verification cancelled')
-        setIsVerifying(false)
-        return
-      }
-
-      // Clean the request ID if it's a URL
-      let cleanRequestId = requestId.trim()
-      const urlMatch = requestId.match(/\/verify\/([a-f0-9-]{36})/i)
+      // Check if it's a URL and extract the request ID
+      const urlMatch = documentId.match(/\/verify\/([a-f0-9-]{36})/i)
       if (urlMatch) {
-        cleanRequestId = urlMatch[1]
-      }
-
-      // Validate UUID format
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-      if (!uuidRegex.test(cleanRequestId)) {
-        toast.error('Invalid request ID format. Please enter a valid UUID.')
-        setIsVerifying(false)
+        cleanDocumentId = urlMatch[1]
+        await verifyDocument(cleanDocumentId)
         return
       }
 
-      await verifyDocument(cleanRequestId)
+      // Check if it's a UUID (Request ID)
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+      if (uuidRegex.test(cleanDocumentId)) {
+        await verifyDocument(cleanDocumentId)
+        return
+      }
+
+      // If it's not a UUID, treat it as a Document Sign ID
+      if (cleanDocumentId.length >= 3 && cleanDocumentId.length <= 50) {
+        await verifyByDocumentSignId(cleanDocumentId)
+        return
+      }
+
+      toast.error('Invalid format. Please enter a valid Document Sign ID or Request ID.')
+      setIsVerifying(false)
 
     } catch (error) {
       console.error('Verification error:', error)
       toast.error('Verification failed')
       setVerificationResult({ success: false, error: 'Network error' })
+      setIsVerifying(false)
+    }
+  }
+
+  const verifyByDocumentSignId = async (documentSignId: string) => {
+    try {
+      console.log('🔍 Looking up Request ID by Document Sign ID:', documentSignId)
+
+      // First, lookup the Request ID using the Document Sign ID
+      const response = await fetch(`/api/verify/lookup?documentSignId=${encodeURIComponent(documentSignId)}`)
+      const result = await response.json()
+
+      if (!response.ok || !result.success) {
+        toast.error(result.error || 'Document not found with that Sign ID')
+        setIsVerifying(false)
+        return
+      }
+
+      // Use the found Request ID to verify the document
+      await verifyDocument(result.requestId)
+
+    } catch (error) {
+      console.error('Document Sign ID lookup error:', error)
+      toast.error('Failed to lookup document by Sign ID')
       setIsVerifying(false)
     }
   }
@@ -168,22 +220,72 @@ export default function VerifyPage() {
               Document Verification
             </CardTitle>
             <CardDescription>
-              Verify a signed document using its request ID
+              Verify a signed document using its Document Sign ID or Request ID
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-sm text-gray-600">
-              Enter the document request ID to verify its authenticity and view signing details.
+              Enter either the <strong>Document Sign ID</strong> (e.g., DOC-ABCD123456) or <strong>Request ID</strong> to verify the document's authenticity and view signing details.
             </div>
 
-            <Button
-              onClick={handleDirectVerification}
-              disabled={isVerifying}
-              className="w-full flex items-center gap-2"
-            >
-              <Shield className="w-4 h-4" />
-              {isVerifying ? 'Verifying...' : 'Verify Document'}
-            </Button>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <div className="text-sm text-blue-800">
+                <strong>💡 Tip:</strong> You can find the Document Sign ID:
+                <ul className="mt-1 ml-4 list-disc text-xs">
+                  <li>In the Sign ID column of your signature requests</li>
+                  <li>In the signature area of generated PDFs</li>
+                  <li>In document info popups</li>
+                </ul>
+              </div>
+            </div>
+
+            {/* Document ID Input Form */}
+            {showInputForm && (
+              <div className="space-y-3 border-t pt-4">
+                <Label htmlFor="document-id">Document Sign ID or Request ID</Label>
+                <Input
+                  id="document-id"
+                  type="text"
+                  value={documentId}
+                  onChange={(e) => setDocumentId(e.target.value)}
+                  placeholder="Enter DOC-ABCD123456 or 12345678-1234-1234-1234-123456789012"
+                  className="w-full"
+                  maxLength={50}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    onClick={handleDirectVerification}
+                    disabled={isVerifying || !documentId.trim()}
+                    className="flex-1 flex items-center gap-2"
+                  >
+                    <Shield className="w-4 h-4" />
+                    {isVerifying ? 'Verifying...' : 'Verify Document'}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowInputForm(false)
+                      setDocumentId('')
+                    }}
+                    disabled={isVerifying}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Show Input Form Button */}
+            {!showInputForm && (
+              <Button
+                onClick={handleDirectVerification}
+                disabled={isVerifying}
+                className="w-full flex items-center gap-2"
+              >
+                <Shield className="w-4 h-4" />
+                Verify Document
+              </Button>
+            )}
           </CardContent>
         </Card>
 

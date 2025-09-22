@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { DocumentIdService, DocumentIdSettings } from '@/lib/document-id-service'
 
 interface RequestSignatureModalProps {
     isOpen: boolean
@@ -36,6 +37,11 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [isSending, setIsSending] = useState(false)
+    const [documentSignId, setDocumentSignId] = useState('') // NEW: Document sign ID
+    const [idGenerationSettings, setIdGenerationSettings] = useState<DocumentIdSettings | null>(null) // NEW: User's ID settings
+    const [showCustomIdField, setShowCustomIdField] = useState(false) // NEW: Show custom ID field
+    const [idValidationError, setIdValidationError] = useState('') // NEW: Real-time ID validation error
+    const [isValidatingId, setIsValidatingId] = useState(false) // NEW: ID validation loading state
     const { user } = useAuth()
 
     const fetchReadyDocuments = useCallback(async () => {
@@ -60,12 +66,75 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
         }
     }, [user])
 
+    // Load user's ID generation settings
+    const loadIdSettings = useCallback(async () => {
+        if (!user) return
+
+        try {
+            const settings = await DocumentIdService.getUserSettings(user.id)
+            setIdGenerationSettings(settings)
+            setShowCustomIdField(settings?.generation_type === 'custom')
+            console.log('🔍 ID SETTINGS LOADED:', settings) // Debug log
+        } catch (error) {
+            console.error('Error loading ID settings:', error)
+        }
+    }, [user])
+
+    // Real-time validation for custom document ID
+    const validateDocumentId = useCallback(async (id: string) => {
+        if (!id.trim() || !user) {
+            setIdValidationError('')
+            return
+        }
+
+        setIsValidatingId(true)
+        setIdValidationError('')
+
+        try {
+            const response = await fetch('/api/document-id-settings/validate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ documentSignId: id.trim() })
+            })
+
+            const result = await response.json()
+
+            if (!response.ok) {
+                setIdValidationError(result.error || 'Invalid document ID')
+            } else {
+                setIdValidationError('')
+            }
+        } catch (error) {
+            console.error('Error validating document ID:', error)
+            setIdValidationError('Unable to validate ID. Please try again.')
+        } finally {
+            setIsValidatingId(false)
+        }
+    }, [user])
+
+    // Debounced validation
+    useEffect(() => {
+        if (!showCustomIdField || !documentSignId.trim()) {
+            setIdValidationError('')
+            return
+        }
+
+        const timeoutId = setTimeout(() => {
+            validateDocumentId(documentSignId)
+        }, 500) // 500ms debounce
+
+        return () => clearTimeout(timeoutId)
+    }, [documentSignId, showCustomIdField, validateDocumentId])
+
     // Fetch ready documents when modal opens
     useEffect(() => {
         if (isOpen && user) {
             fetchReadyDocuments()
+            loadIdSettings()
         }
-    }, [isOpen, user, fetchReadyDocuments])
+    }, [isOpen, user, fetchReadyDocuments, loadIdSettings])
 
     // Reset state when modal closes
     useEffect(() => {
@@ -77,6 +146,11 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
             setError('')
             setMessage('Please review and sign this document.')
             setDueDate('')
+            setDocumentSignId('') // NEW: Reset document sign ID
+            // Don't reset idGenerationSettings - it will be loaded by loadIdSettings()
+            setShowCustomIdField(false) // NEW: Reset custom ID field visibility
+            setIdValidationError('') // NEW: Reset validation error
+            setIsValidatingId(false) // NEW: Reset validation loading state
         }
     }, [isOpen])
 
@@ -138,6 +212,18 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
             return
         }
 
+        // Validate custom document ID if required
+        if (showCustomIdField && idGenerationSettings?.generation_type === 'custom' && !documentSignId.trim()) {
+            setError('Document Sign ID is required when using custom entry mode.')
+            return
+        }
+
+        // Check for real-time validation errors
+        if (showCustomIdField && idValidationError) {
+            setError(`Document Sign ID Error: ${idValidationError}`)
+            return
+        }
+
         setIsSending(true)
         setError('')
 
@@ -158,6 +244,11 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
                 requestData.signingOrder = signingOrder
             }
 
+            // NEW: Include documentSignId if custom mode or if user provided it
+            if (showCustomIdField || documentSignId.trim()) {
+                requestData.documentSignId = documentSignId.trim()
+            }
+
             console.log('Sending signature request:', requestData)
 
             // Call the API to create signature request and send emails
@@ -172,7 +263,14 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
             const result = await response.json()
 
             if (!response.ok) {
-                throw new Error(result.error || 'Failed to send signature request')
+                // Enhanced error handling with field-specific errors
+                if (result.field === 'documentSignId') {
+                    setError(`Document Sign ID Error: ${result.error}`)
+                } else {
+                    setError(result.error || 'Failed to send signature request')
+                }
+                setIsSending(false)
+                return
             }
 
             console.log('Signature request created successfully:', result.data)
@@ -307,6 +405,45 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
                                             'No signatures configured'}
                                 </p>
                             </div>
+
+                            {/* NEW: Document Sign ID Field (only show if custom mode) */}
+                            {showCustomIdField && (
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-gray-700">
+                                        Document Sign ID
+                                        <span className="text-red-500 ml-1">*</span>
+                                    </label>
+                                    <div className="relative">
+                                        <Input
+                                            type="text"
+                                            value={documentSignId}
+                                            onChange={(e) => setDocumentSignId(e.target.value)}
+                                            placeholder="Enter a unique document ID (e.g., CONTRACT-2024-001)"
+                                            className={`w-full ${idValidationError ? 'border-red-500' : ''}`}
+                                            maxLength={idGenerationSettings?.total_length || 50}
+                                        />
+                                        {isValidatingId && (
+                                            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-500"></div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {idValidationError && (
+                                        <p className="text-sm text-red-600 mt-1">
+                                            {idValidationError}
+                                        </p>
+                                    )}
+                                    <p className="text-sm text-gray-500">
+                                        This ID will be used to identify and track this signature request.
+                                        {idGenerationSettings && (
+                                            <span className="block mt-1">
+                                                Maximum length: {idGenerationSettings.total_length} characters.
+                                                {idGenerationSettings.generation_type === 'auto' && ' Leave blank to auto-generate based on your settings.'}
+                                            </span>
+                                        )}
+                                    </p>
+                                </div>
+                            )}
 
                             {/* Signing Order Configuration - Only for multi-signature documents */}
                             {selectedDocument.signature_type === 'multi' && (
