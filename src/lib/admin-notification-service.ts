@@ -83,8 +83,8 @@ export async function getNotificationLogs(): Promise<AdminNotificationLog[]> {
     // Transform to admin format
     const adminLogs: AdminNotificationLog[] = logs.map(log => {
       const request = requests?.find(r => r.id === log.signing_request_id)
-      const signer = signers?.find(s => 
-        s.signing_request_id === log.signing_request_id && 
+      const signer = signers?.find(s =>
+        s.signing_request_id === log.signing_request_id &&
         s.signer_email === log.recipient_email
       )
 
@@ -142,11 +142,11 @@ export async function getNotificationStats(): Promise<NotificationStats> {
 
     // Calculate today's stats
     const today = new Date().toISOString().split('T')[0]
-    const todayDelivered = logs?.filter(l => 
+    const todayDelivered = logs?.filter(l =>
       l.status === 'delivered' && l.sent_at?.startsWith(today)
     ).length || 0
-    
-    const todayFailed = logs?.filter(l => 
+
+    const todayFailed = logs?.filter(l =>
       l.status === 'failed' && l.sent_at?.startsWith(today)
     ).length || 0
 
@@ -198,16 +198,16 @@ export async function searchNotificationLogs(
 ): Promise<AdminNotificationLog[]> {
   try {
     const allLogs = await getNotificationLogs()
-    
+
     return allLogs.filter(log => {
-      const matchesSearch = !searchTerm || 
+      const matchesSearch = !searchTerm ||
         log.recipientEmail.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.requestTitle?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         log.signerName?.toLowerCase().includes(searchTerm.toLowerCase())
-      
+
       const matchesStatus = !statusFilter || statusFilter === 'all' || log.status === statusFilter
       const matchesType = !typeFilter || typeFilter === 'all' || log.notificationType === typeFilter
-      
+
       return matchesSearch && matchesStatus && matchesType
     })
   } catch (error) {
@@ -223,11 +223,11 @@ export async function getEmailTemplates(): Promise<EmailTemplate[]> {
   try {
     console.log('📧 Fetching email templates...')
 
-    // Try to get templates from system_config
+    // Try to get templates from system_settings (system_config table doesn't exist)
     const { data: configs, error } = await supabaseAdmin
-      .from('system_config')
+      .from('system_settings')
       .select('*')
-      .like('config_key', 'email_template_%')
+      .like('key', 'email_template_%')
 
     if (error) {
       console.error('❌ Error fetching email templates:', error)
@@ -285,11 +285,11 @@ export async function getEmailTemplates(): Promise<EmailTemplate[]> {
     // If we have database templates, merge with defaults
     if (configs && configs.length > 0) {
       const dbTemplates = configs.map(config => ({
-        id: config.config_key.replace('email_template_', ''),
-        name: config.config_value.name || 'Unknown Template',
-        type: config.config_value.type || 'unknown',
-        subject: config.config_value.subject || 'No Subject',
-        isActive: config.config_value.isActive !== false,
+        id: config.key.replace('email_template_', ''),
+        name: config.value?.name || 'Unknown Template',
+        type: config.value?.type || 'unknown',
+        subject: config.value?.subject || 'No Subject',
+        isActive: config.value?.isActive !== false,
         lastModified: config.updated_at || config.created_at,
         content: config.config_value.content
       }))

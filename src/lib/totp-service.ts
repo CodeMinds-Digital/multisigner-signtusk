@@ -39,9 +39,10 @@ export class TOTPService {
       // Generate secret
       const secret = authenticator.generateSecret()
 
-      // Generate service name for QR code
-      const serviceName = process.env.NEXT_PUBLIC_APP_NAME || 'SignTusk'
-      const otpAuthUrl = authenticator.keyuri(userEmail, serviceName, secret)
+      // Generate service name for QR code (Zoho OneAuth compatible)
+      const serviceName = process.env.TOTP_SERVICE_NAME || process.env.NEXT_PUBLIC_APP_NAME || 'SignTusk'
+      const issuer = process.env.TOTP_ISSUER || 'CodeMinds Digital'
+      const otpAuthUrl = authenticator.keyuri(userEmail, serviceName, secret, issuer)
 
       // Generate QR code
       const qrCodeUrl = await QRCode.toDataURL(otpAuthUrl)
@@ -123,6 +124,62 @@ export class TOTPService {
     } catch (error) {
       console.error('Error verifying TOTP:', error)
       return { success: false, error: 'Verification failed' }
+    }
+  }
+
+  /**
+   * Check if TOTP is required for user based on personal settings and organization policies
+   */
+  static async checkTOTPRequirements(
+    userId: string,
+    context: 'login' | 'signing' = 'login'
+  ): Promise<{
+    required: boolean
+    reason: string
+    organizationEnforced: boolean
+    userEnabled: boolean
+    exemptionActive: boolean
+  }> {
+    try {
+      // Use the database function to check requirements
+      const { data, error } = await supabaseAdmin
+        .rpc('check_user_totp_requirements', {
+          p_user_id: userId,
+          p_context: context
+        })
+
+      if (error) {
+        console.error('Error checking TOTP requirements:', error)
+        return {
+          required: false,
+          reason: 'Error checking requirements',
+          organizationEnforced: false,
+          userEnabled: false,
+          exemptionActive: false
+        }
+      }
+
+      const result = data as any
+      return {
+        required: result.totp_required || false,
+        reason: result.organization_enforces_login_mfa || result.organization_enforces_signing_mfa
+          ? 'Organization policy requires TOTP'
+          : result.user_login_mfa_enabled || result.user_signing_mfa_enabled
+            ? 'User has enabled TOTP'
+            : 'TOTP not required',
+        organizationEnforced: result.organization_enforces_login_mfa || result.organization_enforces_signing_mfa || false,
+        userEnabled: result.user_has_totp || false,
+        exemptionActive: result.exemption_active || false
+      }
+    } catch (error) {
+      console.error('Error checking TOTP requirements:', error)
+      return {
+        required: false,
+        reason: 'Error checking requirements',
+        organizationEnforced: false,
+        userEnabled: false,
+        exemptionActive: false
+      }
     }
   }
 

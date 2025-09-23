@@ -11,6 +11,9 @@ interface SessionData {
   lastUsedAt: number
   userAgent?: string
   ipAddress?: string
+  totpVerified?: boolean
+  totpVerifiedAt?: number
+  totpContext?: 'login' | 'signing' | 'both'
 }
 
 // In-memory store for development fallback
@@ -289,13 +292,71 @@ export async function cleanupExpiredSessions(): Promise<void> {
 }
 
 /**
+ * Update TOTP verification status for a session
+ */
+export async function updateSessionTOTPStatus(
+  sessionId: string,
+  totpVerified: boolean,
+  context: 'login' | 'signing' | 'both' = 'login'
+): Promise<void> {
+  const now = Date.now()
+
+  if (USE_DATABASE_SESSIONS) {
+    try {
+      const { error } = await supabaseAdmin
+        .from('user_sessions')
+        .update({
+          totp_verified: totpVerified,
+          totp_verified_at: totpVerified ? new Date(now).toISOString() : null,
+          totp_context: context,
+          last_used_at: new Date(now).toISOString()
+        })
+        .eq('session_id', sessionId)
+
+      if (error) {
+        console.error('Failed to update TOTP status in database:', error)
+        // Fallback to in-memory store
+        const session = sessionStore.get(sessionId)
+        if (session) {
+          session.totpVerified = totpVerified
+          session.totpVerifiedAt = totpVerified ? now : undefined
+          session.totpContext = context
+          session.lastUsedAt = now
+          sessionStore.set(sessionId, session)
+        }
+      }
+    } catch (error) {
+      console.error('Database TOTP status update error:', error)
+      // Fallback to in-memory store
+      const session = sessionStore.get(sessionId)
+      if (session) {
+        session.totpVerified = totpVerified
+        session.totpVerifiedAt = totpVerified ? now : undefined
+        session.totpContext = context
+        session.lastUsedAt = now
+        sessionStore.set(sessionId, session)
+      }
+    }
+  } else {
+    const session = sessionStore.get(sessionId)
+    if (session) {
+      session.totpVerified = totpVerified
+      session.totpVerifiedAt = totpVerified ? now : undefined
+      session.totpContext = context
+      session.lastUsedAt = now
+      sessionStore.set(sessionId, session)
+    }
+  }
+}
+
+/**
  * Get all active sessions for a user
  */
-export async function getUserSessions(_userId: string): Promise<SessionData[]> {
+export async function getUserSessions(userId: string): Promise<SessionData[]> {
   const userSessions: SessionData[] = []
 
-  for (const [_sessionId, session] of sessionStore.entries()) {
-    if (session.userId === _userId) {
+  for (const [, session] of sessionStore.entries()) {
+    if (session.userId === userId) {
       userSessions.push(session)
     }
   }

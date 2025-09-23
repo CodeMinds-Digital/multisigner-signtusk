@@ -34,9 +34,12 @@ export function MultiSignatureManagement() {
     try {
       console.log('🔄 Loading multi-signature requests from API...')
 
-      // Load data from API endpoint instead of direct database access
+      // Load data from API endpoint with admin authentication
       const response = await fetch('/api/admin/multi-signature-requests?includeStats=true', {
-        credentials: 'include' // Include cookies for authentication
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_session_token')}`,
+          'Content-Type': 'application/json'
+        }
       })
       const data = await response.json()
 

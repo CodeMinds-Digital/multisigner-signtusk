@@ -35,9 +35,12 @@ export function NotificationManagement() {
     try {
       console.log('🔄 Loading notification data from API...')
 
-      // Load data from API endpoint instead of direct database access
+      // Load data from API endpoint with admin authentication
       const response = await fetch('/api/admin/notification-logs?includeStats=true&includeTemplates=true', {
-        credentials: 'include' // Include cookies for authentication
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_session_token')}`,
+          'Content-Type': 'application/json'
+        }
       })
       const data = await response.json()
 

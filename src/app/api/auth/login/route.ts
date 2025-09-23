@@ -34,21 +34,18 @@ export async function POST(request: NextRequest) {
     const user = data.user
     const sessionId = generateSessionId()
 
-    // Check if user has TOTP enabled for login
-    const { data: totpConfig } = await supabaseAdmin
-      .from('user_totp_configs')
-      .select('enabled, login_mfa_enabled')
-      .eq('user_id', user.id)
-      .single()
+    // Check if TOTP is required (considering both user settings and organization policies)
+    const totpRequirements = await TOTPService.checkTOTPRequirements(user.id, 'login')
 
-    // If TOTP is enabled for login, verify the code
-    if (totpConfig?.enabled && totpConfig?.login_mfa_enabled) {
+    if (totpRequirements.required) {
       if (!totpCode) {
         return new Response(
           JSON.stringify({
             error: 'TOTP verification required',
             requiresTOTP: true,
-            userId: user.id
+            userId: user.id,
+            reason: totpRequirements.reason,
+            organizationEnforced: totpRequirements.organizationEnforced
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } }
         )

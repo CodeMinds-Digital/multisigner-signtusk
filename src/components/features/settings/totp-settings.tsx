@@ -316,7 +316,7 @@ export function TOTPSettings() {
             <div className="flex-1">
               <h3 className="text-lg font-medium text-blue-900">Enable Two-Factor Authentication</h3>
               <p className="text-blue-700 mt-1">
-                Secure your account with TOTP authentication using apps like Zoho OneAuth, Google Authenticator, or any compatible authenticator app.
+                Secure your account with TOTP authentication using <strong>Zoho OneAuth</strong> (recommended), Google Authenticator, Microsoft Authenticator, or any RFC 6238 compatible authenticator app.
               </p>
               <div className="mt-4">
                 <Button onClick={startSetup} className="bg-blue-600 hover:bg-blue-700">

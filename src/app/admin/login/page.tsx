@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Shield, Eye, EyeOff, AlertCircle } from 'lucide-react'
-import { adminLogin } from '@/lib/admin-auth'
+import { loginAdmin } from '@/lib/client-admin-auth'
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -24,9 +24,9 @@ export default function AdminLoginPage() {
     setError('')
 
     try {
-      const result = await adminLogin(formData.email, formData.password)
-      
-      if (result.success) {
+      const result = await loginAdmin(formData.email, formData.password)
+
+      if (result.success && result.session) {
         router.push('/admin/dashboard')
       } else {
         setError(result.error || 'Login failed')

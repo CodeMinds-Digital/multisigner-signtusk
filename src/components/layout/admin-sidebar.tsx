@@ -2,8 +2,8 @@
 
 import { useRouter } from 'next/navigation'
 import {
-  Activity, Users, FileText, Mail, Settings, Database, 
-  Shield, CreditCard, Key, TrendingUp, AlertTriangle, 
+  Activity, Users, FileText, Mail, Settings, Database,
+  Shield, CreditCard, Key, TrendingUp, AlertTriangle,
   Server, LogOut, Eye, BarChart3
 } from 'lucide-react'
 import { adminLogout } from '@/lib/admin-auth'
@@ -63,6 +63,18 @@ export function AdminSidebar({ activeTab, setActiveTab }: AdminSidebarProps) {
       label: 'Feature Toggles',
       icon: Shield,
       description: 'Feature flags and toggles'
+    },
+    {
+      id: 'org-totp',
+      label: 'Organization TOTP',
+      icon: Shield,
+      description: 'Organization-wide TOTP policies and enforcement'
+    },
+    {
+      id: 'security',
+      label: 'Security Dashboard',
+      icon: Shield,
+      description: 'Security metrics, compliance, and audit trails'
     },
     {
       id: 'billing',
@@ -129,11 +141,10 @@ export function AdminSidebar({ activeTab, setActiveTab }: AdminSidebarProps) {
               <button
                 key={item.id}
                 onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center px-3 py-2 rounded-md text-left transition-colors ${
-                  isActive(item.id)
-                    ? 'text-red-600 bg-red-50 font-medium'
-                    : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
-                }`}
+                className={`w-full flex items-center px-3 py-2 rounded-md text-left transition-colors ${isActive(item.id)
+                  ? 'text-red-600 bg-red-50 font-medium'
+                  : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
+                  }`}
                 title={item.description}
               >
                 <Icon className="w-5 h-5 mr-3 flex-shrink-0" />

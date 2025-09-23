@@ -408,8 +408,8 @@ export function PDFSigningScreen({
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[90vh] flex flex-col">
+    <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[95vh] sm:h-[90vh] flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-gray-200">
           <div>
@@ -422,9 +422,9 @@ export function PDFSigningScreen({
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex">
+        <div className="flex-1 flex flex-col lg:flex-row">
           {/* PDF Viewer */}
-          <div className="flex-1 bg-gray-100 p-4">
+          <div className="flex-1 bg-gray-100 p-2 sm:p-4">
             <div className="bg-white rounded-lg shadow h-full">
               {pdfLoading ? (
                 <div className="h-full flex items-center justify-center">
@@ -461,299 +461,303 @@ export function PDFSigningScreen({
           </div>
 
           {/* Sidebar */}
-          <div className="w-80 border-l border-gray-200 p-6 overflow-y-auto">
-            {/* Location Status */}
-            <Card className="mb-4">
-              <CardHeader>
-                <CardTitle className="text-sm flex items-center">
-                  <MapPin className="w-4 h-4 mr-2" />
-                  Location Status
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {isCapturingLocation && (
-                  <div className="flex items-center text-sm text-blue-600">
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
-                    Detecting location...
-                  </div>
-                )}
-                {currentLocation && (
-                  <div className="text-sm text-green-600">
-                    ✅ Location detected automatically
-                    <p className="text-xs text-gray-500 mt-1">
-                      {currentLocation.address}
-                    </p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Signer Info */}
-            <Card className="mb-6">
-              <CardHeader>
-                <CardTitle className="text-sm">Your Signing Details</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  <div className="flex items-center">
-                    <User className="w-4 h-4 text-gray-400 mr-2" />
-                    <span className="text-sm">{currentSigner?.name}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <Clock className="w-4 h-4 text-gray-400 mr-2" />
-                    <span className="text-sm">Order: {currentSigner?.signing_order}</span>
-                  </div>
-                  <div className="flex items-center">
-                    <MapPin className="w-4 h-4 text-gray-400 mr-2" />
-                    <span className="text-sm">
-                      {profileForm.state && profileForm.district
-                        ? `${profileForm.district}, ${profileForm.state}`
-                        : 'Location not set'
-                      }
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Profile Validation Alert */}
-            {userProfile && !userProfile.hasRequiredData?.full_name && (
-              <Alert className="mb-4">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  Please complete your profile before signing
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Signing Mode Alert */}
-            {sequentialValidation && (
-              <Alert className={`mb-4 ${sequentialValidation.signingMode === 'single' ? 'border-green-200 bg-green-50' :
-                sequentialValidation.signingMode === 'sequential'
-                  ? (sequentialValidation.canSign ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50')
-                  : 'border-blue-200 bg-blue-50'
-                }`}>
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <div className="space-y-2">
-                    <div className="font-medium">
-                      {sequentialValidation.signingMode === 'single' ? 'Single Signature Mode' :
-                        sequentialValidation.signingMode === 'sequential' ? 'Sequential Signing Mode' :
-                          'Parallel Signing Mode'}
-                      {sequentialValidation.currentSignerOrder && sequentialValidation.signingMode !== 'single' && (
-                        <span className="ml-2 text-sm">
-                          (You are signer #{sequentialValidation.currentSignerOrder})
-                        </span>
-                      )}
-                    </div>
-                    {sequentialValidation.signingMode === 'single' ? (
-                      <div className="text-green-700">
-                        ✅ You are the only signer for this document.
-                      </div>
-                    ) : sequentialValidation.signingMode === 'sequential' ? (
-                      sequentialValidation.canSign ? (
-                        <div className="text-green-700">
-                          ✅ It's your turn to sign this document.
-                        </div>
-                      ) : (
-                        <div className="text-yellow-700">
-                          ⏳ Sequential signing: Please wait for previous signers to complete first.
-                          {sequentialValidation.pendingSigners && sequentialValidation.pendingSigners.length > 0 && (
-                            <div className="mt-1 text-sm">
-                              Waiting for: {sequentialValidation.pendingSigners.map(s => s.name).join(', ')}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    ) : (
-                      <div className="text-blue-700">
-                        🔄 Parallel signing: You can sign at any time, regardless of other signers.
-                      </div>
-                    )}
-                  </div>
-                </AlertDescription>
-              </Alert>
-            )}
-
-            {/* Actions */}
-            <div className="space-y-3">
-              <Button
-                className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-                onClick={handleAcceptAndSign}
-                disabled={sequentialValidation?.signingMode === 'sequential' && !sequentialValidation?.canSign}
-              >
-                <CheckCircle className="w-4 h-4 mr-2" />
-                {sequentialValidation?.signingMode === 'sequential' && !sequentialValidation?.canSign
-                  ? 'Waiting for Previous Signers'
-                  : 'Accept & Sign'
-                }
-              </Button>
-
-              <Button
-                variant="outline"
-                className="w-full border-red-200 text-red-600 hover:bg-red-50"
-                onClick={() => setShowDeclineModal(true)}
-              >
-                <XCircle className="w-4 h-4 mr-2" />
-                Decline
-              </Button>
-            </div>
-
-            {/* Other Signers - Only show for multi-signer documents */}
-            {request.signers.filter(s => s.email !== currentUserEmail).length > 0 && (
-              <Card className="mt-6">
+          <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col lg:max-h-full">
+            {/* Scrollable Content */}
+            <div className="flex-1 overflow-y-auto p-6 pb-4">
+              {/* Location Status */}
+              <Card className="mb-4">
                 <CardHeader>
-                  <CardTitle className="text-sm">Other Signers</CardTitle>
+                  <CardTitle className="text-sm flex items-center">
+                    <MapPin className="w-4 h-4 mr-2" />
+                    Location Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isCapturingLocation && (
+                    <div className="flex items-center text-sm text-blue-600">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+                      Detecting location...
+                    </div>
+                  )}
+                  {currentLocation && (
+                    <div className="text-sm text-green-600">
+                      ✅ Location detected automatically
+                      <p className="text-xs text-gray-500 mt-1">
+                        {currentLocation.address}
+                      </p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Signer Info */}
+              <Card className="mb-6">
+                <CardHeader>
+                  <CardTitle className="text-sm">Your Signing Details</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {request.signers
-                      .filter(s => s.email !== currentUserEmail)
-                      .map((signer) => (
-                        <div key={signer.id} className="flex items-center justify-between">
-                          <span className="text-sm">{signer.name}</span>
-                          <Badge variant="outline" className="text-xs">
-                            {signer.status}
-                          </Badge>
-                        </div>
-                      ))}
+                    <div className="flex items-center">
+                      <User className="w-4 h-4 text-gray-400 mr-2" />
+                      <span className="text-sm">{currentSigner?.name}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <Clock className="w-4 h-4 text-gray-400 mr-2" />
+                      <span className="text-sm">Order: {currentSigner?.signing_order}</span>
+                    </div>
+                    <div className="flex items-center">
+                      <MapPin className="w-4 h-4 text-gray-400 mr-2" />
+                      <span className="text-sm">
+                        {profileForm.state && profileForm.district
+                          ? `${profileForm.district}, ${profileForm.state}`
+                          : 'Location not set'
+                        }
+                      </span>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
-            )}
-          </div>
-        </div>
-      </div>
 
-      {/* Decline Modal */}
-      {showDeclineModal && (
-        <div className="fixed inset-0 flex items-center justify-center z-60">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold mb-4">Decline Document</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Please provide a reason for declining this document:
-            </p>
-            <Textarea
-              value={declineReason}
-              onChange={(e) => setDeclineReason(e.target.value)}
-              placeholder="Enter your reason for declining..."
-              className="mb-4"
-              rows={4}
-            />
-            <div className="flex justify-end space-x-3">
-              <Button variant="outline" onClick={() => setShowDeclineModal(false)}>
-                Cancel
-              </Button>
-              <Button
-                className="bg-red-600 hover:bg-red-700"
-                onClick={handleDecline}
-              >
-                Decline Document
-              </Button>
+              {/* Profile Validation Alert */}
+              {userProfile && !userProfile.hasRequiredData?.full_name && (
+                <Alert className="mb-4">
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    Please complete your profile before signing
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Signing Mode Alert */}
+              {sequentialValidation && (
+                <Alert className={`mb-4 ${sequentialValidation.signingMode === 'single' ? 'border-green-200 bg-green-50' :
+                  sequentialValidation.signingMode === 'sequential'
+                    ? (sequentialValidation.canSign ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50')
+                    : 'border-blue-200 bg-blue-50'
+                  }`}>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <div className="font-medium">
+                        {sequentialValidation.signingMode === 'single' ? 'Single Signature Mode' :
+                          sequentialValidation.signingMode === 'sequential' ? 'Sequential Signing Mode' :
+                            'Parallel Signing Mode'}
+                        {sequentialValidation.currentSignerOrder && sequentialValidation.signingMode !== 'single' && (
+                          <span className="ml-2 text-sm">
+                            (You are signer #{sequentialValidation.currentSignerOrder})
+                          </span>
+                        )}
+                      </div>
+                      {sequentialValidation.signingMode === 'single' ? (
+                        <div className="text-green-700">
+                          ✅ You are the only signer for this document.
+                        </div>
+                      ) : sequentialValidation.signingMode === 'sequential' ? (
+                        sequentialValidation.canSign ? (
+                          <div className="text-green-700">
+                            ✅ It's your turn to sign this document.
+                          </div>
+                        ) : (
+                          <div className="text-yellow-700">
+                            ⏳ Sequential signing: Please wait for previous signers to complete first.
+                            {sequentialValidation.pendingSigners && sequentialValidation.pendingSigners.length > 0 && (
+                              <div className="mt-1 text-sm">
+                                Waiting for: {sequentialValidation.pendingSigners.map(s => s.name).join(', ')}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      ) : (
+                        <div className="text-blue-700">
+                          🔄 Parallel signing: You can sign at any time, regardless of other signers.
+                        </div>
+                      )}
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Other Signers - Only show for multi-signer documents */}
+              {request.signers.filter(s => s.email !== currentUserEmail).length > 0 && (
+                <Card className="mt-6">
+                  <CardHeader>
+                    <CardTitle className="text-sm">Other Signers</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {request.signers
+                        .filter(s => s.email !== currentUserEmail)
+                        .map((signer) => (
+                          <div key={signer.id} className="flex items-center justify-between">
+                            <span className="text-sm">{signer.name}</span>
+                            <Badge variant="outline" className="text-xs">
+                              {signer.status}
+                            </Badge>
+                          </div>
+                        ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Sticky Action Buttons Footer */}
+            <div className="border-t border-gray-200 p-6 bg-white">
+              <div className="space-y-3">
+                <Button
+                  className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  onClick={handleAcceptAndSign}
+                  disabled={sequentialValidation?.signingMode === 'sequential' && !sequentialValidation?.canSign}
+                >
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  {sequentialValidation?.signingMode === 'sequential' && !sequentialValidation?.canSign
+                    ? 'Waiting for Previous Signers'
+                    : 'Accept & Sign'
+                  }
+                </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full border-red-200 text-red-600 hover:bg-red-50"
+                  onClick={() => setShowDeclineModal(true)}
+                >
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Decline
+                </Button>
+              </div>
             </div>
           </div>
         </div>
-      )}
 
-      {/* Profile Validation Modal */}
-      {showProfileValidation && (
-        <div className="fixed inset-0 flex items-center justify-center z-60">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-4">Complete Your Profile</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Please complete your profile information before signing:
-            </p>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="full_name">Full Name *</Label>
-                <Input
-                  id="full_name"
-                  value={profileForm.full_name}
-                  onChange={(e) => setProfileForm(prev => ({ ...prev, full_name: e.target.value }))}
-                  placeholder="Enter your full name"
-                />
+        {/* Decline Modal */}
+        {showDeclineModal && (
+          <div className="fixed inset-0 flex items-center justify-center z-60">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+              <h3 className="text-lg font-semibold mb-4">Decline Document</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Please provide a reason for declining this document:
+              </p>
+              <Textarea
+                value={declineReason}
+                onChange={(e) => setDeclineReason(e.target.value)}
+                placeholder="Enter your reason for declining..."
+                className="mb-4"
+                rows={4}
+              />
+              <div className="flex justify-end space-x-3">
+                <Button variant="outline" onClick={() => setShowDeclineModal(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="bg-red-600 hover:bg-red-700"
+                  onClick={handleDecline}
+                >
+                  Decline Document
+                </Button>
               </div>
-              <div>
-                <Label htmlFor="signature">Signature *</Label>
-                <div className="mt-2">
+            </div>
+          </div>
+        )}
+
+        {/* Profile Validation Modal */}
+        {showProfileValidation && (
+          <div className="fixed inset-0 flex items-center justify-center z-60">
+            <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
+              <h3 className="text-lg font-semibold mb-4">Complete Your Profile</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Please complete your profile information before signing:
+              </p>
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="full_name">Full Name *</Label>
                   <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) {
-                        const reader = new FileReader()
-                        reader.onload = (e) => {
-                          setProfileForm(prev => ({
-                            ...prev,
-                            signature_image: e.target?.result as string
-                          }))
-                        }
-                        reader.readAsDataURL(file)
-                      }
-                    }}
+                    id="full_name"
+                    value={profileForm.full_name}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, full_name: e.target.value }))}
+                    placeholder="Enter your full name"
                   />
-                  {profileForm.signature_image && (
-                    <Image
-                      src={profileForm.signature_image}
-                      alt="Signature"
-                      width={200}
-                      height={80}
-                      className="mt-2 max-h-20 border rounded"
+                </div>
+                <div>
+                  <Label htmlFor="signature">Signature *</Label>
+                  <div className="mt-2">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) {
+                          const reader = new FileReader()
+                          reader.onload = (e) => {
+                            setProfileForm(prev => ({
+                              ...prev,
+                              signature_image: e.target?.result as string
+                            }))
+                          }
+                          reader.readAsDataURL(file)
+                        }
+                      }}
                     />
-                  )}
+                    {profileForm.signature_image && (
+                      <Image
+                        src={profileForm.signature_image}
+                        alt="Signature"
+                        width={200}
+                        height={80}
+                        className="mt-2 max-h-20 border rounded"
+                      />
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <Label htmlFor="state">State</Label>
+                  <Input
+                    id="state"
+                    value={profileForm.state}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, state: e.target.value }))}
+                    placeholder="Enter your state"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="district">District</Label>
+                  <Input
+                    id="district"
+                    value={profileForm.district}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, district: e.target.value }))}
+                    placeholder="Enter your district"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="taluk">Taluk</Label>
+                  <Input
+                    id="taluk"
+                    value={profileForm.taluk}
+                    onChange={(e) => setProfileForm(prev => ({ ...prev, taluk: e.target.value }))}
+                    placeholder="Enter your taluk (optional)"
+                  />
                 </div>
               </div>
-              <div>
-                <Label htmlFor="state">State</Label>
-                <Input
-                  id="state"
-                  value={profileForm.state}
-                  onChange={(e) => setProfileForm(prev => ({ ...prev, state: e.target.value }))}
-                  placeholder="Enter your state"
-                />
+              <div className="flex justify-end space-x-3 mt-6">
+                <Button variant="outline" onClick={() => setShowProfileValidation(false)}>
+                  Cancel
+                </Button>
+                <Button onClick={handleUpdateProfile}>
+                  Save & Continue
+                </Button>
               </div>
-              <div>
-                <Label htmlFor="district">District</Label>
-                <Input
-                  id="district"
-                  value={profileForm.district}
-                  onChange={(e) => setProfileForm(prev => ({ ...prev, district: e.target.value }))}
-                  placeholder="Enter your district"
-                />
-              </div>
-              <div>
-                <Label htmlFor="taluk">Taluk</Label>
-                <Input
-                  id="taluk"
-                  value={profileForm.taluk}
-                  onChange={(e) => setProfileForm(prev => ({ ...prev, taluk: e.target.value }))}
-                  placeholder="Enter your taluk (optional)"
-                />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-3 mt-6">
-              <Button variant="outline" onClick={() => setShowProfileValidation(false)}>
-                Cancel
-              </Button>
-              <Button onClick={handleUpdateProfile}>
-                Save & Continue
-              </Button>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* TOTP Verification Popup */}
-      <TOTPVerificationPopup
-        isOpen={showTOTPPopup}
-        onClose={handleTOTPCancel}
-        onVerified={handleTOTPVerified}
-        context="signing"
-        requestId={request.id}
-        title="Signing Verification Required"
-        description="Enter your TOTP code to complete document signing"
-      />
-    </div>
-  )
+        {/* TOTP Verification Popup */}
+        <TOTPVerificationPopup
+          isOpen={showTOTPPopup}
+          onClose={handleTOTPCancel}
+          onVerified={handleTOTPVerified}
+          context="signing"
+          requestId={request.id}
+          title="Signing Verification Required"
+          description="Enter your TOTP code to complete document signing"
+        />
+      </div>
+      )
 }
