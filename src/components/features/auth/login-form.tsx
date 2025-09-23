@@ -4,9 +4,11 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { FcGoogle } from 'react-icons/fc'
+import { SiZoho } from 'react-icons/si'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { TOTPVerificationPopup } from './totp-verification-popup'
 
 export function LoginForm() {
   const searchParams = useSearchParams()
@@ -20,7 +22,9 @@ export function LoginForm() {
   const [localError, setLocalError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
-  const { user, signIn, error, clearError } = useAuth()
+  const [showTOTPPopup, setShowTOTPPopup] = useState(false)
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null)
+  const { user, error, clearError } = useAuth()
 
   // Handle already authenticated users
   useEffect(() => {
@@ -84,18 +88,42 @@ export function LoginForm() {
       return
     }
 
+    await attemptLogin()
+  }
+
+  const attemptLogin = async (totpCode?: string) => {
     setIsLoading(true)
     setLocalError('')
     clearError()
 
     try {
-      console.log('🔄 Login attempt started:', { email: formData.email, redirectTo })
-      console.log('🔄 Current user state:', user)
+      console.log('🔄 Login attempt started:', { email: formData.email, redirectTo, hasTOTP: !!totpCode })
 
-      console.log('🔄 Proceeding with authentication...')
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          totpCode
+        }),
+        credentials: 'include',
+      })
 
-      // Use the auth hook for consistent authentication
-      await signIn(formData.email, formData.password)
+      const data = await response.json()
+
+      if (!response.ok) {
+        if (data.requiresTOTP && !totpCode) {
+          // Show TOTP popup
+          setPendingUserId(data.userId)
+          setShowTOTPPopup(true)
+          setIsLoading(false)
+          return
+        }
+        throw new Error(data.error || 'Login failed')
+      }
 
       console.log('✅ Login successful!')
 
@@ -106,12 +134,12 @@ export function LoginForm() {
         localStorage.removeItem('rememberMe')
       }
 
-      // Success - redirect will be handled by auth hook
+      // Redirect to dashboard or intended page
+      const destination = redirectTo || '/dashboard'
+      router.push(destination)
+
     } catch (error) {
       console.error('❌ Login error details:', error)
-      console.error('❌ Error type:', typeof error)
-      console.error('❌ Error message:', error instanceof Error ? error.message : String(error))
-
       const errorMessage = error instanceof Error ? error.message : 'Login failed. Please try again.'
 
       // Provide helpful guidance for common issues
@@ -124,12 +152,26 @@ export function LoginForm() {
       } else {
         setLocalError(errorMessage)
       }
-
-      console.log('🔴 Error set to user:', errorMessage)
     } finally {
-      console.log('🔄 Login form: finally block - setting isLoading to false')
       setIsLoading(false)
     }
+  }
+
+  const handleTOTPVerified = async () => {
+    // Re-attempt login with TOTP verification already completed
+    setShowTOTPPopup(false)
+    setPendingUserId(null)
+
+    // Since TOTP was verified via the popup, we need to complete the login
+    // The TOTP verification popup should have handled the login completion
+    const destination = redirectTo || '/dashboard'
+    router.push(destination)
+  }
+
+  const handleTOTPCancel = () => {
+    setShowTOTPPopup(false)
+    setPendingUserId(null)
+    setIsLoading(false)
   }
 
   return (
@@ -242,6 +284,31 @@ export function LoginForm() {
               </div>
             </form>
 
+            {/* OAuth Login Options */}
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-300" />
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
+                </div>
+              </div>
+
+              <div className="mt-6 grid grid-cols-1 gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.href = '/api/auth/zoho?action=login'
+                  }}
+                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors duration-200"
+                >
+                  <SiZoho className="h-5 w-5 text-red-600" />
+                  <span className="ml-2">Sign in with Zoho</span>
+                </button>
+              </div>
+            </div>
+
             {/* Development Test Credentials */}
             {process.env.NODE_ENV === 'development' && (
               <div className="mt-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
@@ -317,6 +384,18 @@ export function LoginForm() {
           </div>
         </div>
       </div>
+
+      {/* TOTP Verification Popup */}
+      <TOTPVerificationPopup
+        isOpen={showTOTPPopup}
+        onClose={handleTOTPCancel}
+        onVerified={handleTOTPVerified}
+        context="login"
+        title="Login Verification Required"
+        description="Enter your TOTP code to complete login"
+        email={formData.email}
+        password={formData.password}
+      />
     </div>
   )
 }

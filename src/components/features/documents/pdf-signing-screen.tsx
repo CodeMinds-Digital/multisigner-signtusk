@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { TOTPVerificationPopup } from '../auth/totp-verification-popup'
 
 import Image from 'next/image'
 
@@ -87,6 +88,8 @@ export function PDFSigningScreen({
   const [isCapturingLocation, setIsCapturingLocation] = useState(false)
   const [profileLoading, setProfileLoading] = useState(true)
   const [pdfUrl, setPdfUrl] = useState<string | null>(null)
+  const [showTOTPPopup, setShowTOTPPopup] = useState(false)
+  const [pendingSignatureData, setPendingSignatureData] = useState<any>(null)
   const [pdfLoading, setPdfLoading] = useState(true)
 
   const checkSequentialSigningPermissions = useCallback(async () => {
@@ -293,8 +296,57 @@ export function PDFSigningScreen({
       }
     }
 
-    console.log('🖊️ Signing with data:', signatureData)
-    onSign(signatureData)
+    console.log('🖊️ Attempting to sign with data:', signatureData)
+
+    // First, try to sign without TOTP to check if it's required
+    try {
+      const response = await fetch('/api/signature-requests/sign', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requestId: request.id,
+          signatureData
+        })
+      })
+
+      const result = await response.json()
+
+      if (!response.ok) {
+        if (result.requiresTOTP) {
+          // TOTP verification required
+          console.log('🔐 TOTP verification required for signing')
+          setPendingSignatureData(signatureData)
+          setShowTOTPPopup(true)
+          return
+        }
+        throw new Error(result.error || 'Failed to sign document')
+      }
+
+      // Success - signing completed without TOTP
+      console.log('✅ Document signed successfully:', result)
+      onSign(signatureData)
+
+    } catch (error) {
+      console.error('❌ Error during signing:', error)
+      alert(`Error signing document: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    }
+  }
+
+  const handleTOTPVerified = () => {
+    setShowTOTPPopup(false)
+    if (pendingSignatureData) {
+      console.log('✅ TOTP verified, completing signature')
+      onSign(pendingSignatureData)
+      setPendingSignatureData(null)
+    }
+  }
+
+  const handleTOTPCancel = () => {
+    setShowTOTPPopup(false)
+    setPendingSignatureData(null)
   }
 
   const handleDecline = () => {
@@ -477,9 +529,9 @@ export function PDFSigningScreen({
             {/* Signing Mode Alert */}
             {sequentialValidation && (
               <Alert className={`mb-4 ${sequentialValidation.signingMode === 'single' ? 'border-green-200 bg-green-50' :
-                  sequentialValidation.signingMode === 'sequential'
-                    ? (sequentialValidation.canSign ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50')
-                    : 'border-blue-200 bg-blue-50'
+                sequentialValidation.signingMode === 'sequential'
+                  ? (sequentialValidation.canSign ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50')
+                  : 'border-blue-200 bg-blue-50'
                 }`}>
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>
@@ -691,6 +743,17 @@ export function PDFSigningScreen({
           </div>
         </div>
       )}
+
+      {/* TOTP Verification Popup */}
+      <TOTPVerificationPopup
+        isOpen={showTOTPPopup}
+        onClose={handleTOTPCancel}
+        onVerified={handleTOTPVerified}
+        context="signing"
+        requestId={request.id}
+        title="Signing Verification Required"
+        description="Enter your TOTP code to complete document signing"
+      />
     </div>
   )
 }

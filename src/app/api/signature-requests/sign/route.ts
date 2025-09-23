@@ -140,6 +140,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Check if TOTP verification is required and has been completed
+    if (signer.require_totp && !signer.totp_verified) {
+      return new Response(
+        JSON.stringify({
+          error: 'TOTP verification required before signing',
+          requiresTOTP: true,
+          requestId: requestId
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Get signing request with document info to check signing mode
     const { data: signingRequest, error: requestError } = await supabaseAdmin
       .from('signing_requests')

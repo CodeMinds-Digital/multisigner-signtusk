@@ -315,7 +315,8 @@ export async function POST(request: NextRequest) {
       signingOrder = 'sequential',
       message = 'Please review and sign this document.',
       dueDate,
-      documentSignId // NEW: Optional document sign ID
+      documentSignId, // NEW: Optional document sign ID
+      requireTOTP = false // NEW: TOTP requirement flag
     } = body
 
     console.log('🔍 SIGNATURE REQUEST CREATION DEBUG:', {
@@ -463,6 +464,7 @@ export async function POST(request: NextRequest) {
       total_signers: signers.length,
       completed_signers: 0,
       viewed_signers: 0,
+      require_totp: requireTOTP, // NEW: Add TOTP requirement
       // Store signing mode in metadata field as JSON
       metadata: {
         signing_mode: signingOrder || 'sequential',

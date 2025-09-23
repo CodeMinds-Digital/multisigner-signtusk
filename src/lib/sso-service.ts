@@ -56,6 +56,29 @@ export interface SSOSession {
 
 export class SSOService {
   /**
+   * Create Zoho OAuth provider configuration
+   */
+  static async createZohoProvider(): Promise<SSOProvider | null> {
+    const zohoConfig: SSOConfig = {
+      client_id: process.env.ZOHO_CLIENT_ID!,
+      client_secret: process.env.ZOHO_CLIENT_SECRET!,
+      authorization_url: process.env.ZOHO_AUTH_URL || 'https://accounts.zoho.com/oauth/v2/auth',
+      token_url: process.env.ZOHO_TOKEN_URL || 'https://accounts.zoho.com/oauth/v2/token',
+      userinfo_url: process.env.ZOHO_USER_INFO_URL || 'https://accounts.zoho.com/oauth/user/info',
+      redirect_uri: process.env.ZOHO_REDIRECT_URI!,
+      scope: ['ZohoProfile.userinfo.read', 'ZohoProfile.userphoto.read'],
+      attribute_mapping: {
+        email: 'email_id',
+        first_name: 'first_name',
+        last_name: 'last_name',
+        display_name: 'display_name'
+      }
+    }
+
+    return this.createProvider('Zoho', 'oauth', zohoConfig)
+  }
+
+  /**
    * Create SSO provider configuration
    */
   static async createProvider(

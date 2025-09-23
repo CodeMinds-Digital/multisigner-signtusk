@@ -7,18 +7,18 @@ import { createAuthResponse } from '@/lib/auth-cookies'
 import { TOTPService } from '@/lib/totp-service'
 
 export async function POST(request: NextRequest) {
-  console.log('🚀 Login endpoint called - v3 with TOTP support')
+  console.log('🚀 Login TOTP verification endpoint called')
   try {
     const { email, password, totpCode } = await request.json()
 
-    if (!email || !password) {
+    if (!email || !password || !totpCode) {
       return new Response(
-        JSON.stringify({ error: 'Email and password are required' }),
+        JSON.stringify({ error: 'Email, password, and TOTP code are required' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
 
-    // Authenticate with Supabase
+    // Authenticate with Supabase first
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
@@ -32,43 +32,21 @@ export async function POST(request: NextRequest) {
     }
 
     const user = data.user
-    const sessionId = generateSessionId()
 
-    // Check if user has TOTP enabled for login
-    const { data: totpConfig } = await supabaseAdmin
-      .from('user_totp_configs')
-      .select('enabled, login_mfa_enabled')
-      .eq('user_id', user.id)
-      .single()
-
-    // If TOTP is enabled for login, verify the code
-    if (totpConfig?.enabled && totpConfig?.login_mfa_enabled) {
-      if (!totpCode) {
-        return new Response(
-          JSON.stringify({
-            error: 'TOTP verification required',
-            requiresTOTP: true,
-            userId: user.id
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
-
-      // Verify TOTP code
-      const totpResult = await TOTPService.verifyTOTP(user.id, totpCode, 'login')
-      if (!totpResult.success) {
-        return new Response(
-          JSON.stringify({
-            error: totpResult.error || 'Invalid TOTP code',
-            requiresTOTP: true,
-            userId: user.id
-          }),
-          { status: 400, headers: { 'Content-Type': 'application/json' } }
-        )
-      }
-
-      console.log('✅ TOTP verification successful for login')
+    // Verify TOTP code
+    const totpResult = await TOTPService.verifyTOTP(user.id, totpCode, 'login')
+    if (!totpResult.success) {
+      return new Response(
+        JSON.stringify({ 
+          error: totpResult.error || 'Invalid TOTP code'
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
     }
+
+    console.log('✅ TOTP verification successful for login')
+
+    const sessionId = generateSessionId()
 
     // Fetch full user profile from user_profiles table using admin client
     const profileResult = await supabaseAdmin
@@ -203,7 +181,7 @@ export async function POST(request: NextRequest) {
       tokens
     )
   } catch (error) {
-    console.error('Login error:', error)
+    console.error('Login TOTP verification error:', error)
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
