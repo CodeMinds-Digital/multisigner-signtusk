@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
 
     // Exchange code for tokens and user info
     const result = await SSOService.handleOAuthCallback('zoho', code, state)
-    
+
     if (!result) {
       return NextResponse.redirect(
         `${process.env.NEXT_PUBLIC_APP_URL}/login?error=oauth_callback_failed`
@@ -117,9 +117,13 @@ export async function GET(request: NextRequest) {
     const response = NextResponse.redirect(
       `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
     )
-    
-    setAuthCookies(response, tokens.accessToken, tokens.refreshToken)
-    
+
+    setAuthCookies(response, {
+      accessToken: tokens.accessToken,
+      refreshToken: tokens.refreshToken,
+      expiresAt: Date.now() + (15 * 60 * 1000) // 15 minutes from now
+    })
+
     // Clear OAuth state cookie
     response.cookies.delete('oauth_state')
 

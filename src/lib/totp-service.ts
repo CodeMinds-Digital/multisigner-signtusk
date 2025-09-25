@@ -3,6 +3,23 @@ import QRCode from 'qrcode'
 import { supabaseAdmin } from './supabase-admin'
 import crypto from 'crypto'
 
+// TOTP Configuration - don't set globally to avoid dev mode issues
+const TOTP_OPTIONS = {
+  step: 30,        // 30-second time window
+  window: 2,       // Allow 2 time steps tolerance (±60 seconds)
+  digits: 6,       // 6-digit codes
+  algorithm: 'sha1' as const, // SHA1 algorithm (standard)
+  encoding: 'base32' as const  // Base32 encoding (correct for TOTP)
+}
+
+// Helper function to get configured authenticator
+function getAuthenticator() {
+  // Create a fresh instance with proper options
+  const auth = { ...authenticator } as any
+  auth.options = { ...TOTP_OPTIONS }
+  return auth
+}
+
 export interface TOTPSetup {
   secret: string
   qrCodeUrl: string
@@ -36,13 +53,22 @@ export class TOTPService {
    */
   static async setupTOTP(userId: string, userEmail: string): Promise<TOTPSetup> {
     try {
-      // Generate secret
-      const secret = authenticator.generateSecret()
+      // Get configured authenticator
+      const auth = getAuthenticator()
+
+      // Generate secret (base32 encoded)
+      const secret = auth.generateSecret()
+
+      console.log('🔑 Generated TOTP secret:', {
+        secretLength: secret.length,
+        secretPreview: secret.substring(0, 4) + '***',
+        isBase32: /^[A-Z2-7]+$/.test(secret)
+      })
 
       // Generate service name for QR code (Zoho OneAuth compatible)
       const serviceName = process.env.TOTP_SERVICE_NAME || process.env.NEXT_PUBLIC_APP_NAME || 'SignTusk'
       const issuer = process.env.TOTP_ISSUER || 'CodeMinds Digital'
-      const otpAuthUrl = authenticator.keyuri(userEmail, serviceName, secret, issuer)
+      const otpAuthUrl = auth.keyuri(userEmail, serviceName, secret, issuer)
 
       // Generate QR code
       const qrCodeUrl = await QRCode.toDataURL(otpAuthUrl)
@@ -87,6 +113,8 @@ export class TOTPService {
     enableSigning: boolean = false
   ): Promise<TOTPVerificationResult> {
     try {
+      console.log('🔍 TOTP Verification Debug:', { userId, token: token.substring(0, 3) + '***', enableLogin, enableSigning })
+
       // Get user's TOTP config
       const { data: config, error } = await supabaseAdmin
         .from('user_totp_configs')
@@ -94,19 +122,88 @@ export class TOTPService {
         .eq('user_id', userId)
         .single()
 
+      console.log('📋 TOTP Config Query Result:', {
+        hasConfig: !!config,
+        error: error?.message,
+        configEnabled: config?.enabled,
+        secretLength: config?.secret?.length
+      })
+
       if (error || !config) {
+        console.log('❌ TOTP config not found:', error?.message)
         return { success: false, error: 'TOTP configuration not found' }
       }
 
-      // Verify token
-      const isValid = authenticator.verify({
-        token,
-        secret: config.secret
+      console.log('🔐 Attempting TOTP verification with authenticator...')
+
+      // Get configured authenticator
+      const auth = getAuthenticator()
+
+      // Validate secret format
+      const isValidSecret = /^[A-Z2-7]+$/.test(config.secret)
+      console.log('🔍 Secret validation:', {
+        secretLength: config.secret.length,
+        isBase32: isValidSecret,
+        secretPreview: config.secret.substring(0, 4) + '***'
       })
 
+      if (!isValidSecret) {
+        console.log('❌ Invalid secret format - not base32')
+        return { success: false, error: 'Invalid TOTP secret format' }
+      }
+
+      // Generate expected tokens for debugging
+      const now = Date.now()
+      const expectedTokens = []
+      for (let i = -2; i <= 2; i++) {
+        const timeOffset = now + (i * 30 * 1000)
+        try {
+          const expectedToken = auth.generate(config.secret, timeOffset)
+          expectedTokens.push({
+            offset: i,
+            token: expectedToken,
+            time: new Date(timeOffset).toISOString()
+          })
+        } catch (error) {
+          console.error(`Error generating token for offset ${i}:`, error)
+        }
+      }
+
+      console.log('🕐 Expected TOTP tokens for time windows:', expectedTokens)
+      console.log('📱 Received token from user:', token)
+
+      // Verify token with timeout protection
+      const verificationPromise = new Promise<boolean>((resolve) => {
+        try {
+          const isValid = auth.verify({
+            token,
+            secret: config.secret
+          })
+          console.log('🔍 Direct verification result:', isValid)
+          resolve(isValid)
+        } catch (error) {
+          console.error('Authenticator verification error:', error)
+          resolve(false)
+        }
+      })
+
+      // Add timeout protection (5 seconds max)
+      const timeoutPromise = new Promise<boolean>((resolve) => {
+        setTimeout(() => {
+          console.log('⏰ TOTP verification timeout after 5 seconds')
+          resolve(false)
+        }, 5000)
+      })
+
+      const isValid = await Promise.race([verificationPromise, timeoutPromise])
+
+      console.log('🔍 TOTP Verification Result:', { isValid, tokenLength: token.length, userToken: token })
+
       if (isValid) {
+        console.log('✅ TOTP token valid, updating config...')
+
         // Enable TOTP with specified options
-        await supabaseAdmin
+        const { error: updateError } = await supabaseAdmin
           .from('user_totp_configs')
           .update({
             enabled: true,
@@ -117,12 +214,19 @@ export class TOTPService {
           })
           .eq('user_id', userId)
 
+        if (updateError) {
+          console.log('❌ Error updating TOTP config:', updateError.message)
+          return { success: false, error: 'Failed to enable TOTP' }
+        }
+
+        console.log('✅ TOTP enabled successfully')
         return { success: true }
       }
 
+      console.log('❌ TOTP token invalid')
       return { success: false, error: 'Invalid verification code' }
     } catch (error) {
-      console.error('Error verifying TOTP:', error)
+      console.error('❌ Error verifying TOTP:', error)
       return { success: false, error: 'Verification failed' }
     }
   }
@@ -215,7 +319,7 @@ export class TOTPService {
       // Check if it's a backup code
       if (config.backup_codes && config.backup_codes.includes(token)) {
         // Remove used backup code
-        const updatedBackupCodes = config.backup_codes.filter(code => code !== token)
+        const updatedBackupCodes = config.backup_codes.filter((code: any) => code !== token)
         await supabaseAdmin
           .from('user_totp_configs')
           .update({

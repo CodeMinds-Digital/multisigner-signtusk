@@ -95,59 +95,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// GET /api/admin/analytics/export - Export analytics data
-export async function PUT(request: NextRequest) {
-  try {
-    // Verify admin authentication
-    const session = await getAdminSession()
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
 
-    const { searchParams } = new URL(request.url)
-    const format = searchParams.get('format') || 'json'
-    const timeRange = searchParams.get('timeRange') || '30d'
-    const metrics = searchParams.get('metrics')?.split(',') || ['overview', 'users', 'documents', 'revenue']
-
-    // Get analytics data
-    const analyticsData = await getAnalyticsData(timeRange, metrics)
-
-    // Log admin action
-    await logAdminAction(
-      session.user.id,
-      'export_analytics',
-      'analytics',
-      undefined,
-      undefined,
-      { format, timeRange, metrics }
-    )
-
-    if (format === 'csv') {
-      // Convert to CSV format
-      const csvData = convertAnalyticsToCSV(analyticsData)
-      return new NextResponse(csvData, {
-        headers: {
-          'Content-Type': 'text/csv',
-          'Content-Disposition': `attachment; filename="analytics-${timeRange}-${Date.now()}.csv"`
-        }
-      })
-    }
-
-    return NextResponse.json({
-      analytics: analyticsData,
-      exported_at: new Date().toISOString(),
-      format,
-      time_range: timeRange
-    })
-
-  } catch (error) {
-    console.error('Error in admin analytics export API:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
-  }
-}
 
 /**
  * POST /api/admin/analytics - Record custom analytics event
@@ -172,13 +120,16 @@ export async function POST(request: NextRequest) {
 
     // Record analytics event
     const adminSupabase = getAdminSupabaseInstance()
-    const { error } = await adminSupabase
-      .from('system_analytics')
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
+    const { error } = await (adminSupabase as any)
+      .from('system_metrics')
       .insert({
         metric_name,
         metric_value,
         metric_type,
-        dimensions: dimensions || {}
+        tags: dimensions || {}
       })
 
     if (error) {
@@ -253,30 +204,33 @@ async function getAnalyticsData(timeRange: string, metrics: string[]): Promise<A
 async function getOverviewMetrics(startDate: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
 
     // Get total users from Supabase Auth
     const { data: authData } = await adminSupabase.auth.admin.listUsers()
     const totalUsers = authData?.users?.length || 0
 
     // Get total documents
-    const { count: totalDocuments } = await adminSupabase
+    const { count: totalDocuments } = await (adminSupabase as any)
       .from('documents')
       .select('*', { count: 'exact', head: true })
 
     // Get total signatures
-    const { count: totalSignatures } = await adminSupabase
+    const { count: totalSignatures } = await (adminSupabase as any)
       .from('signing_request_signers')
       .select('*', { count: 'exact', head: true })
 
     // Get revenue from subscriptions
-    const { data: subscriptions } = await adminSupabase
+    const { data: subscriptions } = await (adminSupabase as any)
       .from('user_subscriptions')
       .select(`
         billing_plans(price)
       `)
       .eq('status', 'active')
 
-    const monthlyRevenue = subscriptions?.reduce((total, sub) => {
+    const monthlyRevenue = (subscriptions as any)?.reduce((total: number, sub: any) => {
       return total + (sub.billing_plans?.price || 0)
     }, 0) || 0
 
@@ -309,6 +263,9 @@ async function getOverviewMetrics(startDate: string) {
 async function getUserMetrics(startDate: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
     const { data: authData } = await adminSupabase.auth.admin.listUsers()
     const users = authData?.users || []
 
@@ -325,7 +282,7 @@ async function getUserMetrics(startDate: string) {
     ).length
 
     // Get documents per user
-    const { data: documentCounts } = await adminSupabase
+    const { data: documentCounts } = await (adminSupabase as any)
       .from('documents')
       .select('user_id')
 
@@ -356,28 +313,31 @@ async function getUserMetrics(startDate: string) {
 async function getDocumentMetrics(startDate: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
     const today = new Date().toISOString().split('T')[0]
 
     // Documents created today
-    const { count: documentsCreatedToday } = await adminSupabase
+    const { count: documentsCreatedToday } = await (adminSupabase as any)
       .from('documents')
       .select('*', { count: 'exact', head: true })
       .gte('created_at', today)
 
     // Documents completed today
-    const { count: documentsCompletedToday } = await adminSupabase
+    const { count: documentsCompletedToday } = await (adminSupabase as any)
       .from('signing_requests')
       .select('*', { count: 'exact', head: true })
       .eq('status', 'completed')
       .gte('updated_at', today)
 
     // Get completion rates
-    const { data: allRequests } = await adminSupabase
+    const { data: allRequests } = await (adminSupabase as any)
       .from('signing_requests')
       .select('status')
 
-    const completedRequests = allRequests?.filter(req => req.status === 'completed').length || 0
-    const totalRequests = allRequests?.length || 1
+    const completedRequests = (allRequests as any)?.filter((req: any) => req.status === 'completed').length || 0
+    const totalRequests = (allRequests as any)?.length || 1
     const successRate = (completedRequests / totalRequests) * 100
 
     return {
@@ -404,9 +364,12 @@ async function getDocumentMetrics(startDate: string) {
 async function getRevenueMetrics(startDate: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
 
     // Get active subscriptions
-    const { data: subscriptions } = await adminSupabase
+    const { data: subscriptions } = await (adminSupabase as any)
       .from('user_subscriptions')
       .select(`
         billing_plans(price, billing_cycle),
@@ -415,7 +378,7 @@ async function getRevenueMetrics(startDate: string) {
       `)
       .eq('status', 'active')
 
-    const mrr = subscriptions?.reduce((total, sub) => {
+    const mrr = (subscriptions as any)?.reduce((total: number, sub: any) => {
       const price = sub.billing_plans?.price || 0
       const cycle = sub.billing_plans?.billing_cycle
       return total + (cycle === 'yearly' ? price / 12 : price)

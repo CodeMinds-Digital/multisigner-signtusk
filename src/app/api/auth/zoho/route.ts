@@ -11,9 +11,25 @@ export async function GET(request: NextRequest) {
     const action = searchParams.get('action')
 
     if (action === 'login') {
+      // Check if Zoho OAuth is properly configured
+      const zohoClientId = process.env.ZOHO_CLIENT_ID
+      const zohoClientSecret = process.env.ZOHO_CLIENT_SECRET
+
+      if (!zohoClientId || !zohoClientSecret ||
+        zohoClientId === 'your_zoho_client_id_here' ||
+        zohoClientSecret === 'your_zoho_client_secret_here') {
+        return NextResponse.json(
+          {
+            error: 'Zoho OAuth not configured. Please use email/password + TOTP authentication instead.',
+            message: 'This application uses TOTP-based authentication. Zoho OAuth is optional and not currently configured.'
+          },
+          { status: 400 }
+        )
+      }
+
       // Initiate Zoho OAuth flow
       const provider = await SSOService.createZohoProvider()
-      
+
       if (!provider) {
         return NextResponse.json(
           { error: 'Zoho OAuth provider not configured' },
@@ -23,12 +39,12 @@ export async function GET(request: NextRequest) {
 
       // Generate state for CSRF protection
       const state = crypto.randomBytes(32).toString('hex')
-      
+
       // Store state in session or database for verification
       const response = NextResponse.redirect(
         SSOService.generateOAuthURL(provider, state)
       )
-      
+
       // Set state cookie for verification
       response.cookies.set('oauth_state', state, {
         httpOnly: true,

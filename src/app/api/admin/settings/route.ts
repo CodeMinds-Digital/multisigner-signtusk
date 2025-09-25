@@ -50,6 +50,9 @@ export async function GET(request: NextRequest) {
 
     // Build query
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      return NextResponse.json({ error: 'Failed to get admin Supabase instance' }, { status: 500 })
+    }
     let query = adminSupabase
       .from('system_settings')
       .select('*')
@@ -69,7 +72,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Process settings (hide sensitive values for non-super-admins)
-    const processedSettings = settings?.map(setting => {
+    const processedSettings = (settings as any)?.map((setting: any) => {
       if (setting.is_sensitive && session.user.role !== 'super_admin') {
         return {
           ...setting,
@@ -182,9 +185,12 @@ export async function POST(request: NextRequest) {
 async function updateSetting(settingId: string, value: any, updatedBy: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
 
     // Get current setting for logging
-    const { data: currentSetting } = await adminSupabase
+    const { data: currentSetting } = await (adminSupabase as any)
       .from('system_settings')
       .select('*')
       .eq('id', settingId)
@@ -195,13 +201,13 @@ async function updateSetting(settingId: string, value: any, updatedBy: string) {
     }
 
     // Validate value based on type
-    const validationResult = validateSettingValue(value, currentSetting.type, currentSetting.validation_rules)
+    const validationResult = validateSettingValue(value, (currentSetting as any).type, (currentSetting as any).validation_rules)
     if (!validationResult.valid) {
       return { success: false, error: validationResult.error }
     }
 
     // Update setting
-    const { data: updatedSetting, error } = await adminSupabase
+    const { data: updatedSetting, error } = await (adminSupabase as any)
       .from('system_settings')
       .update({
         value: validationResult.processedValue,
@@ -218,7 +224,7 @@ async function updateSetting(settingId: string, value: any, updatedBy: string) {
     }
 
     // Apply setting change to application (if needed)
-    await applySettingChange(currentSetting.key, validationResult.processedValue)
+    await applySettingChange((currentSetting as any).key, validationResult.processedValue)
 
     return {
       success: true,
@@ -238,7 +244,10 @@ async function updateSetting(settingId: string, value: any, updatedBy: string) {
 async function createSetting(settingData: any, createdBy: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
-    const { data: newSetting, error } = await adminSupabase
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
+    const { data: newSetting, error } = await (adminSupabase as any)
       .from('system_settings')
       .insert({
         ...settingData,
@@ -271,9 +280,12 @@ async function createSetting(settingData: any, createdBy: string) {
 async function toggleSettingActive(settingId: string, updatedBy: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
 
     // Get current setting
-    const { data: currentSetting } = await adminSupabase
+    const { data: currentSetting } = await (adminSupabase as any)
       .from('system_settings')
       .select('*')
       .eq('id', settingId)
@@ -284,10 +296,10 @@ async function toggleSettingActive(settingId: string, updatedBy: string) {
     }
 
     // Toggle active status
-    const { data: updatedSetting, error } = await adminSupabase
+    const { data: updatedSetting, error } = await (adminSupabase as any)
       .from('system_settings')
       .update({
-        is_active: !currentSetting.is_active,
+        is_active: !(currentSetting as any).is_active,
         updated_by: updatedBy,
         updated_at: new Date().toISOString()
       })
@@ -318,7 +330,10 @@ async function toggleSettingActive(settingId: string, updatedBy: string) {
 async function deleteSetting(settingId: string, deletedBy: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
-    const { error } = await adminSupabase
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
+    const { error } = await (adminSupabase as any)
       .from('system_settings')
       .delete()
       .eq('id', settingId)

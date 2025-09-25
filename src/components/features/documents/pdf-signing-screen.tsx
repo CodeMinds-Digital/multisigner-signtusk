@@ -91,6 +91,7 @@ export function PDFSigningScreen({
   const [showTOTPPopup, setShowTOTPPopup] = useState(false)
   const [pendingSignatureData, setPendingSignatureData] = useState<any>(null)
   const [pdfLoading, setPdfLoading] = useState(true)
+  const [isSigning, setIsSigning] = useState(false)
 
   const checkSequentialSigningPermissions = useCallback(async () => {
     try {
@@ -274,9 +275,22 @@ export function PDFSigningScreen({
   }
 
   const handleAcceptAndSign = async () => {
+    const callId = Math.random().toString(36).substring(2, 15)
+    console.log(`🎯 [${callId}] handleAcceptAndSign called, isSigning: ${isSigning}`)
+
     if (!validateProfile()) {
+      console.log(`🎯 [${callId}] Profile validation failed`)
       return
     }
+
+    // Prevent double-clicks
+    if (isSigning) {
+      console.log(`🚫 [${callId}] Signing already in progress, ignoring duplicate click`)
+      return
+    }
+
+    console.log(`🎯 [${callId}] Setting isSigning to true`)
+    setIsSigning(true)
 
     // Location is now automatically captured, no need to wait for user permission
 
@@ -326,27 +340,70 @@ export function PDFSigningScreen({
       }
 
       // Success - signing completed without TOTP
-      console.log('✅ Document signed successfully:', result)
+      console.log(`✅ [${callId}] Document signed successfully:`, result)
       onSign(signatureData)
+      console.log(`🎯 [${callId}] Resetting isSigning to false (success case)`)
+      setIsSigning(false)
 
     } catch (error) {
-      console.error('❌ Error during signing:', error)
+      console.error(`❌ [${callId}] Error during signing:`, error)
       alert(`Error signing document: ${error instanceof Error ? error.message : 'Unknown error'}`)
+      console.log(`🎯 [${callId}] Resetting isSigning to false (error case)`)
+      setIsSigning(false)
     }
   }
 
-  const handleTOTPVerified = () => {
+  const handleTOTPVerified = async () => {
+    const callId = Math.random().toString(36).substring(2, 15)
+    console.log(`🔐 [${callId}] handleTOTPVerified called, isSigning: ${isSigning}`)
+
     setShowTOTPPopup(false)
     if (pendingSignatureData) {
-      console.log('✅ TOTP verified, completing signature')
-      onSign(pendingSignatureData)
-      setPendingSignatureData(null)
+      console.log(`✅ [${callId}] TOTP verified, now completing signature`)
+
+      // Now that TOTP is verified, try signing again
+      try {
+        const response = await fetch('/api/signature-requests/sign', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            requestId: request.id,
+            signatureData: pendingSignatureData
+          })
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          throw new Error(result.error || 'Failed to sign document after TOTP verification')
+        }
+
+        // Success - signing completed with TOTP
+        console.log(`✅ [${callId}] Document signed successfully after TOTP:`, result)
+        onSign(pendingSignatureData)
+        setPendingSignatureData(null)
+        console.log(`🎯 [${callId}] Resetting isSigning to false (TOTP success case)`)
+        setIsSigning(false)
+
+      } catch (error) {
+        console.error(`❌ [${callId}] Error during signing after TOTP:`, error)
+        alert(`Error signing document: ${error instanceof Error ? error.message : 'Unknown error'}`)
+        setPendingSignatureData(null)
+        console.log(`🎯 [${callId}] Resetting isSigning to false (TOTP error case)`)
+        setIsSigning(false)
+      }
     }
   }
 
   const handleTOTPCancel = () => {
+    const callId = Math.random().toString(36).substring(2, 15)
+    console.log(`🚫 [${callId}] handleTOTPCancel called, resetting isSigning to false`)
     setShowTOTPPopup(false)
     setPendingSignatureData(null)
+    setIsSigning(false) // Reset signing state when TOTP is cancelled
   }
 
   const handleDecline = () => {
@@ -408,10 +465,10 @@ export function PDFSigningScreen({
   }
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center z-50 p-2 sm:p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-6xl h-[95vh] sm:h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl h-[98vh] sm:h-[95vh] flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">{request.title}</h2>
             <p className="text-sm text-gray-600">Review and sign the document</p>
@@ -422,10 +479,10 @@ export function PDFSigningScreen({
         </div>
 
         {/* Content */}
-        <div className="flex-1 flex flex-col lg:flex-row">
+        <div className="flex-1 flex flex-col lg:flex-row min-h-0">
           {/* PDF Viewer */}
-          <div className="flex-1 bg-gray-100 p-2 sm:p-4">
-            <div className="bg-white rounded-lg shadow h-full">
+          <div className="flex-1 bg-gray-100 p-2 sm:p-4 min-h-0">
+            <div className="bg-white rounded-lg shadow h-full min-h-0">
               {pdfLoading ? (
                 <div className="h-full flex items-center justify-center">
                   <div className="text-center">
@@ -436,8 +493,9 @@ export function PDFSigningScreen({
               ) : pdfUrl ? (
                 <iframe
                   src={pdfUrl}
-                  className="w-full h-full rounded-lg"
+                  className="w-full h-full rounded-lg border-0"
                   title={`PDF Preview - ${request.title}`}
+                  style={{ minHeight: '500px' }}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
@@ -461,9 +519,9 @@ export function PDFSigningScreen({
           </div>
 
           {/* Sidebar */}
-          <div className="w-full lg:w-80 border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col lg:max-h-full">
+          <div className="w-full lg:w-96 border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col min-h-0">
             {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto p-6 pb-4">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 pb-4">
               {/* Location Status */}
               <Card className="mb-4">
                 <CardHeader>
@@ -607,12 +665,14 @@ export function PDFSigningScreen({
                 <Button
                   className="w-full bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                   onClick={handleAcceptAndSign}
-                  disabled={sequentialValidation?.signingMode === 'sequential' && !sequentialValidation?.canSign}
+                  disabled={isSigning || (sequentialValidation?.signingMode === 'sequential' && !sequentialValidation?.canSign)}
                 >
                   <CheckCircle className="w-4 h-4 mr-2" />
-                  {sequentialValidation?.signingMode === 'sequential' && !sequentialValidation?.canSign
-                    ? 'Waiting for Previous Signers'
-                    : 'Accept & Sign'
+                  {isSigning
+                    ? 'Signing Document...'
+                    : sequentialValidation?.signingMode === 'sequential' && !sequentialValidation?.canSign
+                      ? 'Waiting for Previous Signers'
+                      : 'Accept & Sign'
                   }
                 </Button>
 
@@ -747,17 +807,18 @@ export function PDFSigningScreen({
             </div>
           </div>
         )}
-
-        {/* TOTP Verification Popup */}
-        <TOTPVerificationPopup
-          isOpen={showTOTPPopup}
-          onClose={handleTOTPCancel}
-          onVerified={handleTOTPVerified}
-          context="signing"
-          requestId={request.id}
-          title="Signing Verification Required"
-          description="Enter your TOTP code to complete document signing"
-        />
       </div>
-      )
+
+      {/* TOTP Verification Popup */}
+      <TOTPVerificationPopup
+        isOpen={showTOTPPopup}
+        onClose={handleTOTPCancel}
+        onVerified={handleTOTPVerified}
+        context="signing"
+        requestId={request.id}
+        title="Signing Verification Required"
+        description="Enter your TOTP code to complete document signing"
+      />
+    </div>
+  )
 }

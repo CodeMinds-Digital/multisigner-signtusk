@@ -100,7 +100,7 @@ export async function getMultiSignatureRequests(): Promise<AdminMultiSignatureRe
       let nextSignerEmail: string | undefined
       const documentData = Array.isArray(request.document) ? request.document[0] : request.document
       // Note: signing_mode column doesn't exist in documents table, defaulting to parallel
-      const signingMode = 'parallel' // Default since column doesn't exist
+      const signingMode = 'parallel' as any // Default since column doesn't exist
       if (signingMode === 'sequential' && signedCount < requestSigners.length) {
         const nextSigner = requestSigners.find(s =>
           s.status !== 'signed' &&

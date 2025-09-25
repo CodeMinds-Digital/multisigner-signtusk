@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -8,10 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import {
-  Upload,
   CheckCircle,
   AlertTriangle,
-  FileText,
   Users,
   Calendar,
   Shield
@@ -31,15 +29,13 @@ interface VerificationResult {
 
 export default function VerifyPage() {
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null)
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null)
   const [isVerifying, setIsVerifying] = useState(false)
   const [documentId, setDocumentId] = useState('') // NEW: Document ID input
   const [showInputForm, setShowInputForm] = useState(false) // NEW: Show input form
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const searchParams = useSearchParams()
   const toast = useToast()
 
-  // Handle URL parameters for pre-filling Document Sign ID or Request ID
+  // Handle URL parameters for pre-filling Document Sign ID
   useEffect(() => {
     const documentSignId = searchParams.get('documentSignId')
     const requestId = searchParams.get('requestId')
@@ -53,15 +49,7 @@ export default function VerifyPage() {
     }
   }, [searchParams])
 
-  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
-    if (file && file.type === 'application/pdf') {
-      setUploadedFile(file)
-      toast.success('PDF uploaded successfully')
-    } else {
-      toast.error('Please upload a valid PDF file')
-    }
-  }
+
 
   const verifyDocument = async (requestId: string) => {
     setIsVerifying(true)
@@ -92,7 +80,7 @@ export default function VerifyPage() {
     }
 
     if (!documentId.trim()) {
-      toast.error('Please enter a Document Sign ID or Request ID')
+      toast.error('Please enter a Document Sign ID')
       return
     }
 
@@ -123,7 +111,7 @@ export default function VerifyPage() {
         return
       }
 
-      toast.error('Invalid format. Please enter a valid Document Sign ID or Request ID.')
+      toast.error('Invalid format. Please enter a valid Document Sign ID.')
       setIsVerifying(false)
 
     } catch (error) {
@@ -158,15 +146,7 @@ export default function VerifyPage() {
     }
   }
 
-  const handlePDFVerification = async () => {
-    if (!uploadedFile) {
-      toast.error('Please upload a PDF file first')
-      return
-    }
 
-    // For now, just use the direct verification method
-    await handleDirectVerification()
-  }
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -220,12 +200,12 @@ export default function VerifyPage() {
               Document Verification
             </CardTitle>
             <CardDescription>
-              Verify a signed document using its Document Sign ID or Request ID
+              Verify a signed document using its Document Sign ID
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="text-sm text-gray-600">
-              Enter either the <strong>Document Sign ID</strong> (e.g., DOC-ABCD123456) or <strong>Request ID</strong> to verify the document's authenticity and view signing details.
+              Enter the <strong>Document Sign ID</strong> (e.g., DOC-ABCD123456) to verify the document's authenticity and view signing details.
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
@@ -242,13 +222,13 @@ export default function VerifyPage() {
             {/* Document ID Input Form */}
             {showInputForm && (
               <div className="space-y-3 border-t pt-4">
-                <Label htmlFor="document-id">Document Sign ID or Request ID</Label>
+                <Label htmlFor="document-id">Document Sign ID</Label>
                 <Input
                   id="document-id"
                   type="text"
                   value={documentId}
                   onChange={(e) => setDocumentId(e.target.value)}
-                  placeholder="Enter DOC-ABCD123456 or 12345678-1234-1234-1234-123456789012"
+                  placeholder="Enter DOC-ABCD123456"
                   className="w-full"
                   maxLength={50}
                 />
@@ -289,46 +269,7 @@ export default function VerifyPage() {
           </CardContent>
         </Card>
 
-        {/* PDF Upload (Optional) */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Upload className="w-5 h-5" />
-              PDF Upload (Optional)
-            </CardTitle>
-            <CardDescription>
-              Upload a signed PDF document for additional verification
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="pdf-upload">Select PDF File</Label>
-              <Input
-                id="pdf-upload"
-                type="file"
-                accept=".pdf"
-                onChange={handleFileUpload}
-                ref={fileInputRef}
-              />
-            </div>
 
-            {uploadedFile && (
-              <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
-                <FileText className="w-4 h-4 text-green-600" />
-                <span className="text-green-700 text-sm">{uploadedFile.name}</span>
-              </div>
-            )}
-
-            <Button
-              onClick={handlePDFVerification}
-              disabled={!uploadedFile || isVerifying}
-              className="w-full flex items-center gap-2"
-            >
-              <Shield className="w-4 h-4" />
-              {isVerifying ? 'Verifying...' : 'Verify with PDF'}
-            </Button>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Verification Results */}
@@ -421,6 +362,17 @@ export default function VerifyPage() {
                           {verificationResult.data.signing_request.signers?.filter((s: any) => s.status === 'signed').length || 0}
                         </span>
                       </div>
+                      {verificationResult.data.signing_request.require_totp && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">TOTP Authentication:</span>
+                          <Badge
+                            variant="outline"
+                            className="bg-blue-50 text-blue-700 border-blue-200 text-xs"
+                          >
+                            🔐 Required
+                          </Badge>
+                        </div>
+                      )}
                       <div className="flex justify-between">
                         <span className="text-gray-500">Document Hash:</span>
                         <span className="font-mono text-xs">
@@ -445,16 +397,28 @@ export default function VerifyPage() {
                             <div className="font-medium">{signer.signer_name || signer.signer_email}</div>
                             <div className="text-sm text-gray-500">{signer.signer_email}</div>
                           </div>
-                          <div className="flex items-center gap-2">
-                            <Badge
-                              variant={signer.status === 'signed' ? 'default' : 'secondary'}
-                              className={signer.status === 'signed' ? 'bg-green-100 text-green-800' : ''}
-                            >
-                              {signer.status === 'signed' ? '✓ Signed' : signer.status}
-                            </Badge>
+                          <div className="flex flex-col items-end gap-1">
+                            <div className="flex items-center gap-2">
+                              <Badge
+                                variant={signer.status === 'signed' ? 'default' : 'secondary'}
+                                className={signer.status === 'signed' ? 'bg-green-100 text-green-800' : ''}
+                              >
+                                {signer.status === 'signed' ? '✓ Signed' : signer.status}
+                              </Badge>
+                              {verificationResult.data?.signing_request.require_totp && signer.totp_verified && (
+                                <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                  🔐 TOTP Verified
+                                </Badge>
+                              )}
+                            </div>
                             {signer.signed_at && (
                               <span className="text-xs text-gray-500">
                                 {formatDate(signer.signed_at)}
+                              </span>
+                            )}
+                            {verificationResult.data?.signing_request.require_totp && signer.totp_verified_at && (
+                              <span className="text-xs text-blue-500">
+                                TOTP: {formatDate(signer.totp_verified_at)}
                               </span>
                             )}
                           </div>

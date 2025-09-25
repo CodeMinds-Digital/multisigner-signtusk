@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
-import { TOTPService } from '@/lib/totp-service'
+import { TOTPServiceSpeakeasy } from '@/lib/totp-service-speakeasy'
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,9 +20,9 @@ export async function POST(request: NextRequest) {
     const userId = payload.userId
 
     // Get request body
-    const { 
-      token, 
-      enableLogin = false, 
+    const {
+      token,
+      enableLogin = false,
       enableSigning = false,
       context = 'setup'
     } = await request.json()
@@ -35,29 +35,37 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('🔐 Verifying TOTP for user:', userId, 'context:', context)
+    console.log('🔍 TOTP API Debug:', { token: token.substring(0, 3) + '***', enableLogin, enableSigning, context })
 
     let result
 
     if (context === 'setup') {
+      console.log('🔧 Calling verifyAndEnableTOTP...')
       // Initial setup verification
-      result = await TOTPService.verifyAndEnableTOTP(
-        userId, 
-        token, 
-        enableLogin, 
+      result = await TOTPServiceSpeakeasy.verifyAndEnableTOTP(
+        userId,
+        token,
+        enableLogin,
         enableSigning
       )
+      console.log('🔍 verifyAndEnableTOTP result:', result)
     } else {
+      console.log('🔧 Calling verifyTOTP...')
       // Regular verification for login/signing
-      result = await TOTPService.verifyTOTP(userId, token, context)
+      const isValid = await TOTPServiceSpeakeasy.verifyTOTP(userId, token)
+      result = { success: isValid, error: isValid ? undefined : 'Invalid TOTP code' }
+      console.log('🔍 verifyTOTP result:', result)
     }
 
     if (result.success) {
+      console.log('✅ TOTP verification successful')
       return NextResponse.json({
         success: true,
         message: 'TOTP verified successfully',
-        usedBackupCode: result.usedBackupCode || false
+        usedBackupCode: (result as any).usedBackupCode || false
       })
     } else {
+      console.log('❌ TOTP verification failed:', result.error)
       return NextResponse.json(
         { error: result.error || 'Invalid verification code' },
         { status: 400 }

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
-import { TOTPService } from '@/lib/totp-service'
+import { TOTPServiceSpeakeasy } from '@/lib/totp-service-speakeasy'
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
 
     console.log('🔐 Setting up TOTP for user:', userEmail)
 
-    // Setup TOTP for the user
-    const totpSetup = await TOTPService.setupTOTP(userId, userEmail)
+    // Setup TOTP for the user using Speakeasy
+    const totpSetup = await TOTPServiceSpeakeasy.setupTOTP(userId, userEmail)
 
     return NextResponse.json({
       success: true,

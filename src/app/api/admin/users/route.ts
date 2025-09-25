@@ -70,6 +70,9 @@ export async function GET(request: NextRequest) {
 
     // Get users from Supabase Auth
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      return NextResponse.json({ error: 'Failed to get admin Supabase instance' }, { status: 500 })
+    }
     const { data: authData, error: authError } = await adminSupabase.auth.admin.listUsers({
       page,
       perPage: limit
@@ -106,10 +109,10 @@ export async function GET(request: NextRequest) {
       .in('user_id', userIds)
 
     // Combine data
-    const users: RealUserData[] = authData.users.map(user => {
-      const userSubscription = subscriptions?.find(sub => sub.user_id === user.id)
-      const userDocuments = documentCounts?.filter(doc => doc.user_id === user.id) || []
-      const userSignatures = signatureCounts?.filter(sig => sig.user_id === user.id) || []
+    const users: RealUserData[] = (authData.users as any).map((user: any) => {
+      const userSubscription = (subscriptions as any)?.find((sub: any) => sub.user_id === user.id)
+      const userDocuments = (documentCounts as any)?.filter((doc: any) => doc.user_id === user.id) || []
+      const userSignatures = (signatureCounts as any)?.filter((sig: any) => sig.user_id === user.id) || []
 
       return {
         id: user.id,
@@ -265,17 +268,20 @@ export async function POST(request: NextRequest) {
 async function getUserStats(): Promise<UserStats> {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
 
     // Get total users
-    const { count: totalUsers } = await adminSupabase.auth.admin.listUsers({
+    const { count: totalUsers } = await (adminSupabase.auth.admin.listUsers({
       page: 1,
       perPage: 1
-    })
+    }) as any)
 
     // Get users active in last 24h
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const { data: activeUsers } = await adminSupabase.auth.admin.listUsers()
-    const activeUsers24h = activeUsers?.users.filter(user =>
+    const activeUsers24h = (activeUsers as any)?.users.filter((user: any) =>
       user.last_sign_in_at && user.last_sign_in_at > yesterday
     ).length || 0
 
@@ -300,10 +306,10 @@ async function getUserStats(): Promise<UserStats> {
       .eq('status', 'active')
 
     const subscriptionBreakdown = {
-      free: (totalUsers || 0) - (subscriptions?.length || 0),
-      basic: subscriptions?.filter(sub => sub.billing_plans?.name === 'Basic').length || 0,
-      pro: subscriptions?.filter(sub => sub.billing_plans?.name === 'Pro').length || 0,
-      enterprise: subscriptions?.filter(sub => sub.billing_plans?.name === 'Enterprise').length || 0
+      free: (totalUsers || 0) - ((subscriptions as any)?.length || 0),
+      basic: (subscriptions as any)?.filter((sub: any) => sub.billing_plans?.name === 'Basic').length || 0,
+      pro: (subscriptions as any)?.filter((sub: any) => sub.billing_plans?.name === 'Pro').length || 0,
+      enterprise: (subscriptions as any)?.filter((sub: any) => sub.billing_plans?.name === 'Enterprise').length || 0
     }
 
     return {
@@ -332,6 +338,9 @@ async function getUserStats(): Promise<UserStats> {
 async function updateUserMetadata(userId: string, metadata: any) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
     const { data, error } = await adminSupabase.auth.admin.updateUserById(userId, {
       user_metadata: metadata
     })
@@ -354,6 +363,9 @@ async function updateUserMetadata(userId: string, metadata: any) {
 async function banUser(userId: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
     const { data, error } = await adminSupabase.auth.admin.updateUserById(userId, {
       ban_duration: 'indefinite'
     })
@@ -376,6 +388,9 @@ async function banUser(userId: string) {
 async function unbanUser(userId: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
     const { data, error } = await adminSupabase.auth.admin.updateUserById(userId, {
       ban_duration: 'none'
     })
@@ -398,6 +413,9 @@ async function unbanUser(userId: string) {
 async function deleteUser(userId: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
     const { error } = await adminSupabase.auth.admin.deleteUser(userId)
 
     if (error) {

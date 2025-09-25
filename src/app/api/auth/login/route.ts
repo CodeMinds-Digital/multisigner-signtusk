@@ -35,10 +35,14 @@ export async function POST(request: NextRequest) {
     const sessionId = generateSessionId()
 
     // Check if TOTP is required (considering both user settings and organization policies)
+    console.log('🔍 Checking TOTP requirements for user:', user.id, user.email)
     const totpRequirements = await TOTPService.checkTOTPRequirements(user.id, 'login')
+    console.log('📋 TOTP Requirements Result:', totpRequirements)
 
     if (totpRequirements.required) {
+      console.log('🔐 TOTP is required for this user')
       if (!totpCode) {
+        console.log('❌ No TOTP code provided, returning requiresTOTP response')
         return new Response(
           JSON.stringify({
             error: 'TOTP verification required',
@@ -65,6 +69,8 @@ export async function POST(request: NextRequest) {
       }
 
       console.log('✅ TOTP verification successful for login')
+    } else {
+      console.log('ℹ️ TOTP not required for this user, proceeding with normal login')
     }
 
     // Fetch full user profile from user_profiles table using admin client

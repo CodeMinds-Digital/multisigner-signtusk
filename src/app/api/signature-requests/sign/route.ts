@@ -11,7 +11,8 @@ export async function POST(request: NextRequest) {
 
   try {
     // Environment validation for production debugging
-    console.log('🔧 Environment check:', {
+    const requestTrackingId = Math.random().toString(36).substring(2, 15)
+    console.log(`🚀 [${requestTrackingId}] SIGNING REQUEST STARTED - Environment check:`, {
       hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
       hasServiceKey: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
       hasJwtSecret: !!process.env.JWT_SECRET,
@@ -133,24 +134,82 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if already signed (check both status and signer_status fields)
-    if (signer.status === 'signed' || signer.signer_status === 'signed') {
-      return new Response(
-        JSON.stringify({ error: 'Document already signed by this user' }),
-        { status: 400, headers: { 'Content-Type': 'application/json' } }
-      )
-    }
+    console.log(`🔍 [${requestTrackingId}] Checking signer status:`, {
+      status: signer.status,
+      signer_status: signer.signer_status,
+      totp_verified: signer.totp_verified,
+      signerId: signer.id,
+      signerEmail: signer.signer_email,
+      requestId: requestId,
+      timestamp: new Date().toISOString()
+    })
 
-    // Check if TOTP verification is required and has been completed
-    if (signer.require_totp && !signer.totp_verified) {
+    if (signer.status === 'signed' || signer.signer_status === 'signed') {
+      console.log(`❌ [${requestTrackingId}] Document already signed by this user`)
       return new Response(
         JSON.stringify({
-          error: 'TOTP verification required before signing',
-          requiresTOTP: true,
-          requestId: requestId
+          error: 'Document already signed by this user',
+          debugInfo: {
+            status: signer.status,
+            signer_status: signer.signer_status,
+            requestId: requestId,
+            userEmail: userEmail
+          }
         }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
+
+    // EARLY TOTP CHECK - Do this BEFORE any signature processing
+    console.log(`🔍 [${requestTrackingId}] Performing early TOTP check before signature processing...`)
+
+    // First, get the signing request to check if it requires TOTP
+    const { data: signingRequestForTotp, error: requestErrorForTotp } = await supabaseAdmin
+      .from('signing_requests')
+      .select('require_totp')
+      .eq('id', requestId)
+      .single()
+
+    if (requestErrorForTotp) {
+      console.error('❌ Error fetching signing request for TOTP check:', requestErrorForTotp)
+      return new Response(
+        JSON.stringify({ error: 'Signing request not found' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Check TOTP requirements early
+    const requestRequiresTotp = signingRequestForTotp?.require_totp || false
+
+    // FIXED LOGIC: Document-level TOTP setting completely controls TOTP requirement
+    // If "Require TOTP Authentication for Signing" checkbox is checked → TOTP required
+    // If "Require TOTP Authentication for Signing" checkbox is unchecked → NO TOTP required (ignores user settings)
+    // This ensures the checkbox in Request Signature Step 2 is the authoritative control
+    const totpRequired = requestRequiresTotp
+
+    console.log(`🔐 [${requestTrackingId}] Early TOTP Requirements Analysis (FIXED):`, {
+      requestRequiresTotp,
+      finalTotpRequired: totpRequired,
+      totpVerified: signer.totp_verified,
+      userEmail,
+      requestId,
+      logic: requestRequiresTotp ? 'Document checkbox requires TOTP' : 'Document checkbox allows signing without TOTP'
+    })
+
+    if (totpRequired && !signer.totp_verified) {
+      console.log(`❌ [${requestTrackingId}] EARLY TOTP CHECK (FIXED): TOTP verification required but not completed`)
+      return new Response(
+        JSON.stringify({
+          error: 'TOTP verification required before signing',
+          requiresTOTP: true,
+          requestId: requestId,
+          reason: 'Document requires TOTP authentication for signing'
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log(`✅ [${requestTrackingId}] Early TOTP check passed - proceeding with signature processing`)
 
     // Get signing request with document info to check signing mode
     const { data: signingRequest, error: requestError } = await supabaseAdmin
@@ -169,6 +228,8 @@ export async function POST(request: NextRequest) {
         { status: 404, headers: { 'Content-Type': 'application/json' } }
       )
     }
+
+    // TOTP check was already performed earlier - proceeding with signature processing
 
     // Get signing mode from signature request metadata (better approach)
     let signingMode = 'sequential' // default to sequential

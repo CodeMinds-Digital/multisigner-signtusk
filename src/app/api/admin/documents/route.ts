@@ -73,6 +73,9 @@ export async function GET(request: NextRequest) {
 
     // Get documents from database
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      return NextResponse.json({ error: 'Failed to get admin Supabase instance' }, { status: 500 })
+    }
     let query = adminSupabase
       .from('documents')
       .select(`
@@ -113,7 +116,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Process documents data
-    const processedDocuments: RealDocumentData[] = (documents || []).map(doc => {
+    const processedDocuments: RealDocumentData[] = ((documents as any) || []).map((doc: any) => {
       const signingRequest = doc.signing_requests
       const signers = signingRequest?.signing_request_signers || []
       const completedSigners = signers.filter((s: any) => s.status === 'completed').length
@@ -254,6 +257,9 @@ export async function POST(request: NextRequest) {
 async function getDocumentStats(): Promise<DocumentStats> {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
 
     // Get total documents
     const { count: totalDocuments } = await adminSupabase
@@ -300,16 +306,16 @@ async function getDocumentStats(): Promise<DocumentStats> {
       .slice(0, 5)
 
     // Calculate storage usage
-    const { data: fileSizes } = await adminSupabase
+    const { data: fileSizes } = await (adminSupabase as any)
       .from('documents')
       .select('file_size')
 
-    const totalStorageMB = fileSizes?.reduce((total, doc) => {
+    const totalStorageMB = (fileSizes as any)?.reduce((total: number, doc: any) => {
       return total + (doc.file_size || 0)
     }, 0) || 0
 
     // Get signature count
-    const { count: totalSignatures } = await adminSupabase
+    const { count: totalSignatures } = await (adminSupabase as any)
       .from('signing_request_signers')
       .select('*', { count: 'exact', head: true })
 
@@ -351,6 +357,9 @@ async function getDocumentStats(): Promise<DocumentStats> {
 async function deleteDocument(documentId: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
 
     // Delete related signing requests first
     await adminSupabase
@@ -382,6 +391,9 @@ async function deleteDocument(documentId: string) {
 async function bulkDeleteDocuments(documentIds: string[]) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
 
     // Delete related signing requests first
     await adminSupabase
@@ -416,7 +428,10 @@ async function bulkDeleteDocuments(documentIds: string[]) {
 async function updateDocumentStatus(documentId: string, status: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
-    const { error } = await adminSupabase
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
+    const { error } = await (adminSupabase as any)
       .from('signing_requests')
       .update({ status })
       .eq('document_id', documentId)
@@ -439,7 +454,10 @@ async function updateDocumentStatus(documentId: string, status: string) {
 async function extendDeadline(documentId: string, expires_at: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
-    const { error } = await adminSupabase
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
+    const { error } = await (adminSupabase as any)
       .from('signing_requests')
       .update({ expires_at })
       .eq('document_id', documentId)

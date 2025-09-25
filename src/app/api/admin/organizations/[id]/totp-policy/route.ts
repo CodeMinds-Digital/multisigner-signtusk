@@ -4,10 +4,11 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 // GET /api/admin/organizations/[id]/totp-policy - Get organization TOTP policy
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const organizationId = params.id
+    const { id } = await params
+    const organizationId = id
 
     if (!organizationId) {
       return NextResponse.json(
@@ -35,7 +36,7 @@ export async function GET(
 
     // If no policy exists, create a default one
     let policy = organization.organization_totp_policies?.[0]
-    
+
     if (!policy) {
       const { data: newPolicy, error: policyError } = await supabaseAdmin
         .from('organization_totp_policies')
@@ -88,10 +89,11 @@ export async function GET(
 // PUT /api/admin/organizations/[id]/totp-policy - Update organization TOTP policy
 export async function PUT(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const organizationId = params.id
+    const { id } = await params
+    const organizationId = id
     const body = await request.json()
 
     if (!organizationId) {
@@ -154,18 +156,23 @@ export async function PUT(
 
     // If enforcing MFA, update user TOTP configs to mark them as organization-enforced
     if (enforce_login_mfa || enforce_signing_mfa) {
-      await supabaseAdmin
-        .from('user_totp_configs')
-        .update({
-          organization_enforced: true,
-          policy_compliance_date: new Date().toISOString()
-        })
-        .in('user_id', 
-          supabaseAdmin
-            .from('user_profiles')
-            .select('id')
-            .eq('organization_id', organizationId)
-        )
+      // First get the user IDs for this organization
+      const { data: userProfiles } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id')
+        .eq('organization_id', organizationId)
+
+      const userIds = (userProfiles || []).map((profile: any) => profile.id)
+
+      if (userIds.length > 0) {
+        await supabaseAdmin
+          .from('user_totp_configs')
+          .update({
+            organization_enforced: true,
+            policy_compliance_date: new Date().toISOString()
+          })
+          .in('user_id', userIds)
+      }
     }
 
     // Log the policy change for audit purposes
@@ -197,10 +204,11 @@ export async function PUT(
 // POST /api/admin/organizations/[id]/totp-policy/enforce - Enforce policy for all users
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const organizationId = params.id
+    const { id } = await params
+    const organizationId = id
     const body = await request.json()
     const { gracePeriodDays = 7, notifyUsers = true } = body
 

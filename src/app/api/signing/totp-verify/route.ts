@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
-import { TOTPService } from '@/lib/totp-service'
+import { TOTPServiceSpeakeasy } from '@/lib/totp-service-speakeasy'
 
 export async function POST(request: NextRequest) {
   try {
@@ -38,11 +38,11 @@ export async function POST(request: NextRequest) {
       '127.0.0.1'
     const clientIP = rawClientIP.split(',')[0].trim()
 
-    // Verify TOTP for signing
-    const result = await TOTPService.verifySigningTOTP(
-      userId, 
-      requestId, 
-      token, 
+    // Verify TOTP for signing using Speakeasy
+    const result = await TOTPServiceSpeakeasy.verifySigningTOTP(
+      userId,
+      requestId,
+      token,
       clientIP
     )
 
@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         message: 'TOTP verified successfully for signing',
-        usedBackupCode: result.usedBackupCode || false
+        usedBackupCode: (result as any).usedBackupCode || false
       })
     } else {
       return NextResponse.json(

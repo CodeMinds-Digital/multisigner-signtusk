@@ -62,7 +62,7 @@ export function AdvancedAnalyticsDashboard() {
   useEffect(() => {
     loadAnalytics()
     loadLiveMetrics()
-    
+
     // Set up real-time updates
     const unsubscribe = AdminRealTimeService.subscribeToAdminUpdates(
       'admin_user_id', // In real app, get from session
@@ -335,9 +335,9 @@ export function AdvancedAnalyticsDashboard() {
                   realTimeUpdates.map((update, index) => (
                     <div key={index} className="flex items-center space-x-2 p-2 bg-gray-50 rounded">
                       <Badge variant={
-                        update.type === 'user_created' ? 'default' :
-                        update.type === 'document_uploaded' ? 'secondary' :
-                        update.type === 'signature_completed' ? 'success' : 'destructive'
+                        (update.type === 'user_created' ? 'default' :
+                          update.type === 'document_uploaded' ? 'secondary' :
+                            update.type === 'signature_completed' ? 'secondary' : 'destructive') as any
                       }>
                         {update.type.replace('_', ' ')}
                       </Badge>

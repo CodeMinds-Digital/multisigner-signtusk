@@ -44,6 +44,7 @@ interface AuthContextType {
   signOut: () => Promise<void>
   clearError: () => void
   refreshAuth: () => Promise<void>
+  setUser: (user: User | null) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -236,6 +237,7 @@ export function SecureAuthProvider({ children }: AuthProviderProps) {
     signOut,
     clearError,
     refreshAuth,
+    setUser, // Expose setUser for manual user state updates
   }
 
   return (

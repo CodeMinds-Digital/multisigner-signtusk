@@ -3,8 +3,8 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { FcGoogle } from 'react-icons/fc'
-import { SiZoho } from 'react-icons/si'
+
+
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
@@ -24,7 +24,7 @@ export function LoginForm() {
   const [rememberMe, setRememberMe] = useState(false)
   const [showTOTPPopup, setShowTOTPPopup] = useState(false)
   const [pendingUserId, setPendingUserId] = useState<string | null>(null)
-  const { user, error, clearError } = useAuth()
+  const { user, error, clearError, setUser, refreshAuth } = useAuth()
 
   // Handle already authenticated users
   useEffect(() => {
@@ -57,10 +57,7 @@ export function LoginForm() {
     }
   }, [user])
 
-  const handleGoogleLogin = async () => {
-    // Google OAuth not implemented in secure auth system yet
-    setLocalError('Google login not available. Please use email/password.')
-  }
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -114,14 +111,16 @@ export function LoginForm() {
 
       const data = await response.json()
 
+      // Check for TOTP requirement first (can come with status 200)
+      if (data.requiresTOTP && !totpCode) {
+        console.log('🔐 TOTP required, showing popup')
+        setPendingUserId(data.userId)
+        setShowTOTPPopup(true)
+        setIsLoading(false)
+        return
+      }
+
       if (!response.ok) {
-        if (data.requiresTOTP && !totpCode) {
-          // Show TOTP popup
-          setPendingUserId(data.userId)
-          setShowTOTPPopup(true)
-          setIsLoading(false)
-          return
-        }
         throw new Error(data.error || 'Login failed')
       }
 
@@ -134,9 +133,19 @@ export function LoginForm() {
         localStorage.removeItem('rememberMe')
       }
 
-      // Redirect to dashboard or intended page
-      const destination = redirectTo || '/dashboard'
-      router.push(destination)
+      // Update auth provider with user data and refresh state
+      setUser(data.user)
+
+      // Also refresh auth to ensure everything is in sync
+      try {
+        await refreshAuth()
+        console.log('✅ Auth state refreshed after login')
+      } catch (refreshError) {
+        console.warn('⚠️ Auth refresh failed, but login was successful:', refreshError)
+      }
+
+      // The useEffect hook will handle the redirect once user state is updated
+      console.log('🔄 User state updated, useEffect should handle redirect')
 
     } catch (error) {
       console.error('❌ Login error details:', error)
@@ -158,14 +167,23 @@ export function LoginForm() {
   }
 
   const handleTOTPVerified = async () => {
-    // Re-attempt login with TOTP verification already completed
+    // TOTP verification completed, now refresh auth state
     setShowTOTPPopup(false)
     setPendingUserId(null)
 
-    // Since TOTP was verified via the popup, we need to complete the login
-    // The TOTP verification popup should have handled the login completion
-    const destination = redirectTo || '/dashboard'
-    router.push(destination)
+    try {
+      console.log('🔄 TOTP verified, refreshing auth state...')
+
+      // Use the auth provider's refresh method to get current user data
+      await refreshAuth()
+      console.log('✅ Auth state refreshed after TOTP verification')
+
+      // The useEffect hook will handle the redirect once user state is updated
+
+    } catch (error) {
+      console.error('❌ Error refreshing auth after TOTP verification:', error)
+      setLocalError('Login completed but failed to load user data. Please try again.')
+    }
   }
 
   const handleTOTPCancel = () => {
@@ -199,23 +217,7 @@ export function LoginForm() {
               <h3 className="text-xl sm:text-2xl font-bold">Login to your account</h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 items-center ml-7">
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={isLoading}
-                className="flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-lg transition-colors duration-200 w-96 h-10"
-              >
-                <FcGoogle className="mr-2 text-xl" />
-                Google
-              </button>
-            </div>
 
-            <div className="flex items-center mb-8">
-              <hr className="flex-grow border-gray-300" />
-              <p className="px-4 text-gray-500 text-sm">Or Login Using</p>
-              <hr className="flex-grow border-gray-300" />
-            </div>
 
             {(error || localError) && (
               <div className="mb-4 p-3 bg-red-100 text-red-600 rounded-lg text-sm">
@@ -284,30 +286,7 @@ export function LoginForm() {
               </div>
             </form>
 
-            {/* OAuth Login Options */}
-            <div className="mt-6">
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-300" />
-                </div>
-                <div className="relative flex justify-center text-sm">
-                  <span className="px-2 bg-white text-gray-500">Or continue with</span>
-                </div>
-              </div>
 
-              <div className="mt-6 grid grid-cols-1 gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.location.href = '/api/auth/zoho?action=login'
-                  }}
-                  className="w-full inline-flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 transition-colors duration-200"
-                >
-                  <SiZoho className="h-5 w-5 text-red-600" />
-                  <span className="ml-2">Sign in with Zoho</span>
-                </button>
-              </div>
-            </div>
 
             {/* Development Test Credentials */}
             {process.env.NODE_ENV === 'development' && (

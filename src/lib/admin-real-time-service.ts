@@ -24,7 +24,7 @@ export interface AdminNotification {
 
 export class AdminRealTimeService {
   private static subscriptions: Map<string, any> = new Map()
-  private static callbacks: Map<string, Function[]> = new Map()
+  private static callbacks: Map<string, ((...args: any[]) => void)[]> = new Map()
 
   /**
    * Subscribe to real-time admin updates
@@ -34,7 +34,7 @@ export class AdminRealTimeService {
     callback: (update: RealTimeUpdate) => void
   ): () => void {
     const subscriptionKey = `admin_updates_${adminUserId}`
-    
+
     // Store callback
     if (!this.callbacks.has(subscriptionKey)) {
       this.callbacks.set(subscriptionKey, [])
@@ -131,7 +131,7 @@ export class AdminRealTimeService {
     callback: (notification: AdminNotification) => void
   ): () => void {
     const subscriptionKey = `admin_notifications_${adminUserId}`
-    
+
     const subscription = supabaseAdmin
       .channel('admin_notifications')
       .on(

@@ -5,7 +5,7 @@ const nextConfig = {
   },
   experimental: {
     serverActions: {
-      allowedOrigins: ['localhost:3000'],
+      allowedOrigins: ['localhost:3001', 'localhost:3000'],
     },
   },
 
@@ -20,6 +20,29 @@ const nextConfig = {
   },
   // Improve stability
   reactStrictMode: true,
+
+  // Add headers to reduce extension interference
+  async headers() {
+    return [
+      {
+        source: '/(.*)',
+        headers: [
+          {
+            key: 'X-Content-Type-Options',
+            value: 'nosniff',
+          },
+          {
+            key: 'X-Frame-Options',
+            value: 'DENY',
+          },
+          {
+            key: 'X-XSS-Protection',
+            value: '1; mode=block',
+          },
+        ],
+      },
+    ]
+  },
   webpack: (config, { isServer }) => {
     // Handle canvas package issues
     config.resolve.alias.canvas = false;

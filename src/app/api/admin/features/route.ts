@@ -54,6 +54,9 @@ export async function GET(request: NextRequest) {
 
     // Build query
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      return NextResponse.json({ error: 'Failed to get admin Supabase instance' }, { status: 500 })
+    }
     let query = adminSupabase
       .from('feature_flags')
       .select('*')
@@ -177,9 +180,12 @@ export async function POST(request: NextRequest) {
 async function toggleFeature(featureId: string, updatedBy: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
 
     // Get current feature
-    const { data: currentFeature } = await adminSupabase
+    const { data: currentFeature } = await (adminSupabase as any)
       .from('feature_flags')
       .select('*')
       .eq('id', featureId)
@@ -190,10 +196,10 @@ async function toggleFeature(featureId: string, updatedBy: string) {
     }
 
     // Toggle the feature
-    const { data: updatedFeature, error } = await adminSupabase
+    const { data: updatedFeature, error } = await (adminSupabase as any)
       .from('feature_flags')
       .update({
-        is_enabled: !currentFeature.is_enabled,
+        is_enabled: !(currentFeature as any).is_enabled,
         updated_by: updatedBy,
         updated_at: new Date().toISOString()
       })
@@ -231,7 +237,10 @@ async function updateRolloutPercentage(featureId: string, percentage: number, up
     }
 
     const adminSupabase = getAdminSupabaseInstance()
-    const { data: updatedFeature, error } = await adminSupabase
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
+    const { data: updatedFeature, error } = await (adminSupabase as any)
       .from('feature_flags')
       .update({
         rollout_percentage: percentage,
@@ -265,7 +274,10 @@ async function updateRolloutPercentage(featureId: string, percentage: number, up
 async function updateRestrictions(featureId: string, restrictions: any, updatedBy: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
-    const { data: updatedFeature, error } = await adminSupabase
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
+    const { data: updatedFeature, error } = await (adminSupabase as any)
       .from('feature_flags')
       .update({
         user_restrictions: restrictions.user_restrictions || [],
@@ -300,7 +312,10 @@ async function updateRestrictions(featureId: string, restrictions: any, updatedB
 async function createFeature(featureData: any, createdBy: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
-    const { data: newFeature, error } = await adminSupabase
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
+    const { data: newFeature, error } = await (adminSupabase as any)
       .from('feature_flags')
       .insert({
         name: featureData.name,
@@ -342,7 +357,10 @@ async function createFeature(featureData: any, createdBy: string) {
 async function deleteFeature(featureId: string, deletedBy: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
-    const { error } = await adminSupabase
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
+    const { error } = await (adminSupabase as any)
       .from('feature_flags')
       .delete()
       .eq('id', featureId)
@@ -369,7 +387,10 @@ async function deleteFeature(featureId: string, deletedBy: string) {
 async function bulkToggleFeatures(featureIds: string[], enabled: boolean, updatedBy: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
-    const { data: updatedFeatures, error } = await adminSupabase
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
+    const { data: updatedFeatures, error } = await (adminSupabase as any)
       .from('feature_flags')
       .update({
         is_enabled: enabled,
@@ -435,38 +456,41 @@ async function applyFeatureChange(key: string, enabled: boolean) {
 /**
  * Check if feature is enabled for user
  */
-export async function checkFeatureEnabled(featureKey: string, userId?: string, userPlan?: string): Promise<boolean> {
+async function checkFeatureEnabled(featureKey: string, userId?: string, userPlan?: string): Promise<boolean> {
   try {
     const adminSupabase = getAdminSupabaseInstance()
-    const { data: feature } = await adminSupabase
+    if (!adminSupabase) {
+      throw new Error('Failed to get admin Supabase instance')
+    }
+    const { data: feature } = await (adminSupabase as any)
       .from('feature_flags')
       .select('*')
       .eq('key', featureKey)
       .single()
 
-    if (!feature || !feature.is_enabled) {
+    if (!feature || !(feature as any).is_enabled) {
       return false
     }
 
     // Check user restrictions
-    if (userId && feature.user_restrictions.length > 0) {
-      if (!feature.user_restrictions.includes(userId)) {
+    if (userId && (feature as any).user_restrictions.length > 0) {
+      if (!(feature as any).user_restrictions.includes(userId)) {
         return false
       }
     }
 
     // Check plan restrictions
-    if (userPlan && feature.plan_restrictions.length > 0) {
-      if (!feature.plan_restrictions.includes(userPlan)) {
+    if (userPlan && (feature as any).plan_restrictions.length > 0) {
+      if (!(feature as any).plan_restrictions.includes(userPlan)) {
         return false
       }
     }
 
     // Check rollout percentage
-    if (feature.rollout_percentage < 100) {
+    if ((feature as any).rollout_percentage < 100) {
       const hash = userId ? hashString(userId) : Math.random()
       const userPercentile = (hash % 100) + 1
-      if (userPercentile > feature.rollout_percentage) {
+      if (userPercentile > (feature as any).rollout_percentage) {
         return false
       }
     }

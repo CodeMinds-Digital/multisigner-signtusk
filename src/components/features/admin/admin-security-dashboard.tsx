@@ -151,7 +151,7 @@ export function AdminSecurityDashboard() {
         },
         {
           id: '2',
-          type: 'system_health',
+          type: 'system_health' as any,
           user_email: 'system@signtusk.com',
           organization: 'SignTusk Platform',
           timestamp: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString(),

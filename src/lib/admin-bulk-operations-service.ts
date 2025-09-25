@@ -85,11 +85,11 @@ export class AdminBulkOperationsService {
         case 'archive':
           return await this.bulkArchiveDocuments(operation.documentIds, adminUserId)
         case 'extend_deadline':
-          return await this.bulkExtendDeadlines(operation.documentIds, operation.data.expires_at, adminUserId)
+          return await (this as any).bulkExtendDeadlines(operation.documentIds, operation.data.expires_at, adminUserId)
         case 'resend_notifications':
-          return await this.bulkResendNotifications(operation.documentIds, adminUserId)
+          return await (this as any).bulkResendNotifications(operation.documentIds, adminUserId)
         case 'change_status':
-          return await this.bulkChangeDocumentStatus(operation.documentIds, operation.data.status, adminUserId)
+          return await (this as any).bulkChangeDocumentStatus(operation.documentIds, operation.data.status, adminUserId)
         default:
           result.errors.push('Invalid operation type')
           return result
