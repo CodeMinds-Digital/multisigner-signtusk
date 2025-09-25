@@ -54,7 +54,6 @@ export async function getMultiSignatureRequests(): Promise<AdminMultiSignatureRe
         final_pdf_url,
         error_message,
         document:documents!document_template_id(
-          signing_mode,
           created_by
         )
       `)
@@ -97,10 +96,12 @@ export async function getMultiSignatureRequests(): Promise<AdminMultiSignatureRe
 
       const viewedCount = requestSigners.filter(s => s.viewed_at).length
 
-      // Find next signer for sequential mode
+      // Find next signer for sequential mode (default to parallel since signing_mode doesn't exist)
       let nextSignerEmail: string | undefined
       const documentData = Array.isArray(request.document) ? request.document[0] : request.document
-      if (documentData?.signing_mode === 'sequential' && signedCount < requestSigners.length) {
+      // Note: signing_mode column doesn't exist in documents table, defaulting to parallel
+      const signingMode = 'parallel' as any // Default since column doesn't exist
+      if (signingMode === 'sequential' && signedCount < requestSigners.length) {
         const nextSigner = requestSigners.find(s =>
           s.status !== 'signed' &&
           s.signer_status !== 'signed' &&
@@ -113,7 +114,7 @@ export async function getMultiSignatureRequests(): Promise<AdminMultiSignatureRe
         id: request.id,
         title: request.title,
         status: request.status as any,
-        signingMode: documentData?.signing_mode || 'parallel',
+        signingMode: 'parallel', // Default since signing_mode column doesn't exist
         totalSigners: requestSigners.length,
         signedCount,
         viewedCount,

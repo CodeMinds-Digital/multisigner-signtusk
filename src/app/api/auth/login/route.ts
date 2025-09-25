@@ -4,11 +4,12 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { generateTokenPair, generateSessionId } from '@/lib/jwt-utils'
 import { storeSession } from '@/lib/session-store'
 import { createAuthResponse } from '@/lib/auth-cookies'
+import { TOTPService } from '@/lib/totp-service'
 
 export async function POST(request: NextRequest) {
-  console.log('🚀 Login endpoint called - v2')
+  console.log('🚀 Login endpoint called - v3 with TOTP support')
   try {
-    const { email, password } = await request.json()
+    const { email, password, totpCode } = await request.json()
 
     if (!email || !password) {
       return new Response(
@@ -32,6 +33,45 @@ export async function POST(request: NextRequest) {
 
     const user = data.user
     const sessionId = generateSessionId()
+
+    // Check if TOTP is required (considering both user settings and organization policies)
+    console.log('🔍 Checking TOTP requirements for user:', user.id, user.email)
+    const totpRequirements = await TOTPService.checkTOTPRequirements(user.id, 'login')
+    console.log('📋 TOTP Requirements Result:', totpRequirements)
+
+    if (totpRequirements.required) {
+      console.log('🔐 TOTP is required for this user')
+      if (!totpCode) {
+        console.log('❌ No TOTP code provided, returning requiresTOTP response')
+        return new Response(
+          JSON.stringify({
+            error: 'TOTP verification required',
+            requiresTOTP: true,
+            userId: user.id,
+            reason: totpRequirements.reason,
+            organizationEnforced: totpRequirements.organizationEnforced
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // Verify TOTP code
+      const totpResult = await TOTPService.verifyTOTP(user.id, totpCode, 'login')
+      if (!totpResult.success) {
+        return new Response(
+          JSON.stringify({
+            error: totpResult.error || 'Invalid TOTP code',
+            requiresTOTP: true,
+            userId: user.id
+          }),
+          { status: 400, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      console.log('✅ TOTP verification successful for login')
+    } else {
+      console.log('ℹ️ TOTP not required for this user, proceeding with normal login')
+    }
 
     // Fetch full user profile from user_profiles table using admin client
     const profileResult = await supabaseAdmin

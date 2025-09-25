@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { FcGoogle } from 'react-icons/fc'
+
+
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
+import { TOTPVerificationPopup } from './totp-verification-popup'
 
 export function LoginForm() {
   const searchParams = useSearchParams()
@@ -20,7 +22,9 @@ export function LoginForm() {
   const [localError, setLocalError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
-  const { user, signIn, error, clearError } = useAuth()
+  const [showTOTPPopup, setShowTOTPPopup] = useState(false)
+  const [pendingUserId, setPendingUserId] = useState<string | null>(null)
+  const { user, error, clearError, setUser, refreshAuth } = useAuth()
 
   // Handle already authenticated users
   useEffect(() => {
@@ -53,10 +57,7 @@ export function LoginForm() {
     }
   }, [user])
 
-  const handleGoogleLogin = async () => {
-    // Google OAuth not implemented in secure auth system yet
-    setLocalError('Google login not available. Please use email/password.')
-  }
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({
@@ -84,18 +85,44 @@ export function LoginForm() {
       return
     }
 
+    await attemptLogin()
+  }
+
+  const attemptLogin = async (totpCode?: string) => {
     setIsLoading(true)
     setLocalError('')
     clearError()
 
     try {
-      console.log('🔄 Login attempt started:', { email: formData.email, redirectTo })
-      console.log('🔄 Current user state:', user)
+      console.log('🔄 Login attempt started:', { email: formData.email, redirectTo, hasTOTP: !!totpCode })
 
-      console.log('🔄 Proceeding with authentication...')
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: formData.email,
+          password: formData.password,
+          totpCode
+        }),
+        credentials: 'include',
+      })
 
-      // Use the auth hook for consistent authentication
-      await signIn(formData.email, formData.password)
+      const data = await response.json()
+
+      // Check for TOTP requirement first (can come with status 200)
+      if (data.requiresTOTP && !totpCode) {
+        console.log('🔐 TOTP required, showing popup')
+        setPendingUserId(data.userId)
+        setShowTOTPPopup(true)
+        setIsLoading(false)
+        return
+      }
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Login failed')
+      }
 
       console.log('✅ Login successful!')
 
@@ -106,12 +133,22 @@ export function LoginForm() {
         localStorage.removeItem('rememberMe')
       }
 
-      // Success - redirect will be handled by auth hook
+      // Update auth provider with user data and refresh state
+      setUser(data.user)
+
+      // Also refresh auth to ensure everything is in sync
+      try {
+        await refreshAuth()
+        console.log('✅ Auth state refreshed after login')
+      } catch (refreshError) {
+        console.warn('⚠️ Auth refresh failed, but login was successful:', refreshError)
+      }
+
+      // The useEffect hook will handle the redirect once user state is updated
+      console.log('🔄 User state updated, useEffect should handle redirect')
+
     } catch (error) {
       console.error('❌ Login error details:', error)
-      console.error('❌ Error type:', typeof error)
-      console.error('❌ Error message:', error instanceof Error ? error.message : String(error))
-
       const errorMessage = error instanceof Error ? error.message : 'Login failed. Please try again.'
 
       // Provide helpful guidance for common issues
@@ -124,12 +161,35 @@ export function LoginForm() {
       } else {
         setLocalError(errorMessage)
       }
-
-      console.log('🔴 Error set to user:', errorMessage)
     } finally {
-      console.log('🔄 Login form: finally block - setting isLoading to false')
       setIsLoading(false)
     }
+  }
+
+  const handleTOTPVerified = async () => {
+    // TOTP verification completed, now refresh auth state
+    setShowTOTPPopup(false)
+    setPendingUserId(null)
+
+    try {
+      console.log('🔄 TOTP verified, refreshing auth state...')
+
+      // Use the auth provider's refresh method to get current user data
+      await refreshAuth()
+      console.log('✅ Auth state refreshed after TOTP verification')
+
+      // The useEffect hook will handle the redirect once user state is updated
+
+    } catch (error) {
+      console.error('❌ Error refreshing auth after TOTP verification:', error)
+      setLocalError('Login completed but failed to load user data. Please try again.')
+    }
+  }
+
+  const handleTOTPCancel = () => {
+    setShowTOTPPopup(false)
+    setPendingUserId(null)
+    setIsLoading(false)
   }
 
   return (
@@ -157,23 +217,7 @@ export function LoginForm() {
               <h3 className="text-xl sm:text-2xl font-bold">Login to your account</h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8 items-center ml-7">
-              <button
-                type="button"
-                onClick={handleGoogleLogin}
-                disabled={isLoading}
-                className="flex items-center justify-center bg-gray-100 hover:bg-gray-200 text-gray-800 font-semibold rounded-lg transition-colors duration-200 w-96 h-10"
-              >
-                <FcGoogle className="mr-2 text-xl" />
-                Google
-              </button>
-            </div>
 
-            <div className="flex items-center mb-8">
-              <hr className="flex-grow border-gray-300" />
-              <p className="px-4 text-gray-500 text-sm">Or Login Using</p>
-              <hr className="flex-grow border-gray-300" />
-            </div>
 
             {(error || localError) && (
               <div className="mb-4 p-3 bg-red-100 text-red-600 rounded-lg text-sm">
@@ -241,6 +285,8 @@ export function LoginForm() {
                 </Link>
               </div>
             </form>
+
+
 
             {/* Development Test Credentials */}
             {process.env.NODE_ENV === 'development' && (
@@ -317,6 +363,18 @@ export function LoginForm() {
           </div>
         </div>
       </div>
+
+      {/* TOTP Verification Popup */}
+      <TOTPVerificationPopup
+        isOpen={showTOTPPopup}
+        onClose={handleTOTPCancel}
+        onVerified={handleTOTPVerified}
+        context="login"
+        title="Login Verification Required"
+        description="Enter your TOTP code to complete login"
+        email={formData.email}
+        password={formData.password}
+      />
     </div>
   )
 }

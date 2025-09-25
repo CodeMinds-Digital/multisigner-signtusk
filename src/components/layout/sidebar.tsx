@@ -9,7 +9,9 @@ import {
   PenTool,
   Workflow,
   Settings,
-  QrCode
+  QrCode,
+  FileText,
+  Shield
 } from 'lucide-react'
 
 export function Sidebar() {
@@ -109,12 +111,22 @@ export function Sidebar() {
           <ul className="mt-2 space-y-1">
             <li>
               <Link
-                href="/settings"
-                className={`flex items-center px-3 py-2 rounded-md ${isActive('/settings') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
+                href="/settings/documents"
+                className={`flex items-center px-3 py-2 rounded-md ${isActive('/settings/documents') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
                   }`}
               >
-                <Settings className="w-5 h-5 mr-3" />
+                <FileText className="w-5 h-5 mr-3" />
                 Document Settings
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/settings/security"
+                className={`flex items-center px-3 py-2 rounded-md ${isActive('/settings/security') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+              >
+                <Shield className="w-5 h-5 mr-3" />
+                Security Settings
               </Link>
             </li>
           </ul>

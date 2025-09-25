@@ -52,143 +52,35 @@ export function SystemSettingsManagement() {
   const loadSystemSettings = async () => {
     setLoading(true)
     try {
-      // Mock data - in real implementation, fetch from system_config table
-      const mockSettings: SystemSetting[] = [
-        {
-          id: '1',
-          key: 'app_name',
-          value: 'SignTusk',
-          description: 'Application name displayed throughout the platform',
-          category: 'general',
-          type: 'string',
-          is_sensitive: false,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '2',
-          key: 'maintenance_mode',
-          value: false,
-          description: 'Enable maintenance mode to prevent user access',
-          category: 'general',
-          type: 'boolean',
-          is_sensitive: false,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '3',
-          key: 'multi_signature_enabled',
-          value: true,
-          description: 'Enable multi-signature document workflows',
-          category: 'features',
-          type: 'boolean',
-          is_sensitive: false,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '4',
-          key: 'document_templates_enabled',
-          value: true,
-          description: 'Allow users to create and use document templates',
-          category: 'features',
-          type: 'boolean',
-          is_sensitive: false,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '5',
-          key: 'max_file_size_mb',
-          value: 50,
-          description: 'Maximum file size for document uploads in MB',
-          category: 'uploads',
-          type: 'number',
-          is_sensitive: false,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '6',
-          key: 'allowed_file_types',
-          value: ['pdf', 'doc', 'docx'],
-          description: 'Allowed file types for document uploads',
-          category: 'uploads',
-          type: 'array',
-          is_sensitive: false,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '7',
-          key: 'email_notifications_enabled',
-          value: true,
-          description: 'Enable email notifications for signature requests',
-          category: 'email',
-          type: 'boolean',
-          is_sensitive: false,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '8',
-          key: 'email_from_name',
-          value: 'SignTusk',
-          description: 'Default sender name for outgoing emails',
-          category: 'email',
-          type: 'string',
-          is_sensitive: false,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '9',
-          key: 'resend_api_key',
-          value: 'sk_test_*********************',
-          description: 'Resend API key for email delivery',
-          category: 'email',
-          type: 'string',
-          is_sensitive: true,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '10',
-          key: 'require_email_verification',
-          value: true,
-          description: 'Require email verification for new user accounts',
-          category: 'security',
-          type: 'boolean',
-          is_sensitive: false,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '11',
-          key: 'session_timeout_minutes',
-          value: 480,
-          description: 'User session timeout in minutes (8 hours default)',
-          category: 'security',
-          type: 'number',
-          is_sensitive: false,
-          is_active: true,
-          updated_at: new Date().toISOString()
-        },
-        {
-          id: '12',
-          key: 'browser_notifications_enabled',
-          value: true,
-          description: 'Enable browser push notifications',
-          category: 'notifications',
-          type: 'boolean',
-          is_sensitive: false,
-          is_active: true,
-          updated_at: new Date().toISOString()
+      // Get real settings from admin API
+      const response = await fetch('/api/admin/settings', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_session_token')}`,
+          'Content-Type': 'application/json'
         }
-      ]
+      })
 
-      setSettings(mockSettings)
+      if (!response.ok) {
+        throw new Error('Failed to fetch system settings')
+      }
+
+      const data = await response.json()
+
+      // Transform API response to match component interface
+      const realSettings: SystemSetting[] = data.settings.map((setting: any) => ({
+        id: setting.id,
+        key: setting.key,
+        value: setting.value,
+        description: setting.description,
+        category: setting.category,
+        type: setting.type,
+        is_sensitive: setting.is_sensitive,
+        is_active: setting.is_active,
+        updated_at: setting.updated_at,
+        validation_rules: setting.validation_rules
+      }))
+
+      setSettings(realSettings)
     } catch (error) {
       console.error('Error loading system settings:', error)
     } finally {
@@ -219,19 +111,49 @@ export function SystemSettingsManagement() {
     try {
       const newValue = editValues[settingId]
 
-      // Update local state
-      setSettings(prev => prev.map(setting =>
-        setting.id === settingId
-          ? { ...setting, value: newValue, updated_at: new Date().toISOString() }
-          : setting
-      ))
+      // Call API to update setting
+      const response = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          action: 'update',
+          settingId,
+          value: newValue
+        })
+      })
 
-      // Remove from editing state
-      cancelEditing(settingId)
+      if (!response.ok) {
+        throw new Error('Failed to update setting')
+      }
 
-      console.log(`Saved setting ${settingId} with value:`, newValue)
+      const result = await response.json()
+
+      if (result.success) {
+        // Update local state with server response
+        setSettings(prev => prev.map(setting =>
+          setting.id === settingId
+            ? { ...setting, value: newValue, updated_at: new Date().toISOString() }
+            : setting
+        ))
+
+        // Remove from editing state
+        cancelEditing(settingId)
+
+        console.log(`✅ Saved setting ${settingId} with value:`, newValue)
+      } else {
+        throw new Error(result.error || 'Failed to update setting')
+      }
     } catch (error) {
-      console.error('Error saving setting:', error)
+      console.error('❌ Error saving setting:', error)
+      // Revert local changes on error
+      setEditValues(prev => {
+        const newValues = { ...prev }
+        delete newValues[settingId]
+        return newValues
+      })
     } finally {
       setSaving(false)
     }
@@ -239,15 +161,45 @@ export function SystemSettingsManagement() {
 
   const toggleSettingActive = async (settingId: string, isActive: boolean) => {
     try {
+      // Call API to toggle setting
+      const response = await fetch('/api/admin/settings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          action: 'toggle_active',
+          settingId
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to toggle setting')
+      }
+
+      const result = await response.json()
+
+      if (result.success) {
+        // Update local state
+        setSettings(prev => prev.map(setting =>
+          setting.id === settingId
+            ? { ...setting, is_active: isActive, updated_at: new Date().toISOString() }
+            : setting
+        ))
+
+        console.log(`✅ Toggled setting ${settingId} active state:`, isActive)
+      } else {
+        throw new Error(result.error || 'Failed to toggle setting')
+      }
+    } catch (error) {
+      console.error('❌ Error toggling setting:', error)
+      // Revert the toggle on error
       setSettings(prev => prev.map(setting =>
         setting.id === settingId
-          ? { ...setting, is_active: isActive, updated_at: new Date().toISOString() }
+          ? { ...setting, is_active: !isActive }
           : setting
       ))
-
-      console.log(`Toggled setting ${settingId} active state:`, isActive)
-    } catch (error) {
-      console.error('Error toggling setting:', error)
     }
   }
 

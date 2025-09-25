@@ -9,8 +9,8 @@ import {
   Users, FileText, Mail, Database, Download, RefreshCw, Eye, EyeOff,
   Shield, DollarSign, Key, TrendingUp, UserCheck, Edit
 } from 'lucide-react'
-import { getAdminSession } from '@/lib/admin-auth'
-import { getRealSystemStats, getRealUsers, getRealDocuments, getRealAPIKeys, RealSystemStats, RealUserRecord, RealDocumentRecord, RealAPIKeyRecord } from '@/lib/admin-data-service'
+import { getCurrentAdminSession } from '@/lib/client-admin-auth'
+import { getRealAPIKeys, RealSystemStats, RealUserRecord, RealDocumentRecord, RealAPIKeyRecord } from '@/lib/real-admin-data-service'
 import { MultiSignatureManagement } from './multi-signature-management'
 import { NotificationManagement } from './notification-management'
 import { EnvironmentManagement } from './environment-management'
@@ -19,6 +19,10 @@ import { ConfigurationDiagnostics } from './configuration-diagnostics'
 import { SystemSettingsManagement } from './system-settings-management'
 import { FeatureToggleManagement } from './feature-toggle-management'
 import { BillingPlansManagement } from './billing-plans-management'
+import { OrganizationTOTPPolicies } from './organization-totp-policies'
+import { AdminSecurityDashboard } from './admin-security-dashboard'
+import { TOTPTestingDashboard } from './totp-testing-dashboard'
+import { AdvancedAnalyticsDashboard } from './advanced-analytics-dashboard'
 import { AdminSidebar } from '@/components/layout/admin-sidebar'
 import { AdminHeader } from '@/components/layout/admin-header'
 
@@ -29,12 +33,15 @@ export function ComprehensiveAdminDashboard() {
 
   // Check admin authentication
   useEffect(() => {
-    const session = getAdminSession()
-    if (!session) {
-      router.push('/admin/login')
-      return
+    const checkAuth = async () => {
+      const session = await getCurrentAdminSession()
+      if (!session) {
+        router.push('/admin/login')
+        return
+      }
+      setAdminSession({ userId: session.user.id, email: session.user.email })
     }
-    setAdminSession(session as any)
+    checkAuth()
   }, [router])
 
 
@@ -85,6 +92,12 @@ export function ComprehensiveAdminDashboard() {
             {/* Feature Toggles Tab */}
             {activeTab === 'features' && <FeatureToggleManagement />}
 
+            {/* Organization TOTP Policies Tab */}
+            {activeTab === 'org-totp' && <OrganizationTOTPPolicies />}
+
+            {/* Security Dashboard Tab */}
+            {activeTab === 'security' && <AdminSecurityDashboard />}
+
             {/* Billing Tab */}
             {activeTab === 'billing' && <BillingPlansManagement />}
 
@@ -102,6 +115,9 @@ export function ComprehensiveAdminDashboard() {
 
             {/* System Health Tab */}
             {activeTab === 'system' && <SystemHealthTab />}
+
+            {/* Advanced Analytics Tab */}
+            {activeTab === 'advanced-analytics' && <AdvancedAnalyticsDashboard />}
 
           </div>
         </main>
@@ -133,7 +149,34 @@ function OverviewTab() {
   const loadRealStats = async () => {
     setLoading(true)
     try {
-      const realStats = await getRealSystemStats()
+      // Call admin analytics API directly with authentication
+      const response = await fetch('/api/admin/analytics?metrics=overview,users,documents', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_session_token')}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics')
+      }
+
+      const data = await response.json()
+
+      // Transform API response to match component interface
+      const realStats: RealSystemStats = {
+        totalUsers: data.analytics.overview.total_users,
+        freeUsers: data.analytics.overview.total_users - (data.analytics.user_metrics.active_users_24h || 0),
+        paidUsers: data.analytics.user_metrics.active_users_24h || 0,
+        activeUsers: data.analytics.user_metrics.active_users_24h,
+        totalDocuments: data.analytics.overview.total_documents,
+        emailsSent: 0, // Not available in current API
+        storageUsed: '0 MB', // Not available in current API
+        monthlyRevenue: data.analytics.overview.monthly_revenue || 0,
+        signatureSuccess: data.analytics.document_metrics?.signature_success_rate || 0,
+        resendAttempts: 0 // Not available in current API
+      }
+
       setStats(realStats)
     } catch (error) {
       console.error('Failed to load real stats:', error)
@@ -316,7 +359,34 @@ function UserManagementTab() {
   const loadRealUsers = async () => {
     setLoading(true)
     try {
-      const realUsers = await getRealUsers()
+      // Call admin users API directly with authentication
+      const response = await fetch('/api/admin/users?includeStats=true', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_session_token')}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch users')
+      }
+
+      const data = await response.json()
+
+      // Transform API response to match component interface
+      const realUsers: RealUserRecord[] = data.users.map((user: any) => ({
+        id: user.id,
+        email: user.email,
+        name: user.name || user.email.split('@')[0],
+        created_at: user.created_at,
+        last_sign_in: user.last_sign_in_at,
+        subscription_plan: user.subscription_plan || 'free',
+        document_count: user.document_count || 0,
+        signature_count: user.signature_count || 0,
+        is_active: user.is_active !== false,
+        totp_enabled: user.totp_enabled || false
+      }))
+
       setUsers(realUsers)
     } catch (error) {
       console.error('Failed to load real users:', error)
@@ -446,7 +516,41 @@ function DocumentsTab() {
   const loadRealDocuments = async () => {
     setLoading(true)
     try {
-      const realDocs = await getRealDocuments()
+      // Call admin API directly with authentication
+      const response = await fetch('/api/admin/documents?includeStats=true', {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('admin_session_token')}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch documents')
+      }
+
+      const data = await response.json()
+
+      // Transform API response to match component interface
+      const realDocs: RealDocumentRecord[] = data.documents.map((doc: any) => ({
+        id: doc.id,
+        title: doc.title,
+        status: doc.status,
+        created_at: doc.created_at,
+        updated_at: doc.updated_at,
+        user_id: doc.user_id,
+        user_email: doc.user_email,
+        file_size: doc.file_size,
+        file_type: doc.file_type,
+        signers_count: doc.signers_count,
+        completed_signatures: doc.completed_signatures,
+        pending_signatures: doc.pending_signatures,
+        completion_rate: doc.completion_rate,
+        last_activity: doc.last_activity,
+        signing_deadline: doc.signing_deadline,
+        is_template: doc.is_template,
+        template_category: doc.template_category
+      }))
+
       setDocuments(realDocs)
     } catch (error) {
       console.error('Failed to load real documents:', error)

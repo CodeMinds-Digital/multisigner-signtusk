@@ -34,6 +34,7 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
     const [signingOrder, setSigningOrder] = useState<'sequential' | 'parallel'>('sequential')
     const [message, setMessage] = useState('Please review and sign this document.')
     const [dueDate, setDueDate] = useState('')
+    const [requireTOTP, setRequireTOTP] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
     const [isSending, setIsSending] = useState(false)
@@ -236,7 +237,8 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
                     email: signer.email
                 })),
                 message,
-                dueDate
+                dueDate,
+                requireTOTP
             }
 
             // Only include signing order for multi-signature documents
@@ -567,6 +569,32 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
                                     onChange={(e) => setDueDate(e.target.value)}
                                     min={new Date().toISOString().split('T')[0]}
                                 />
+                            </div>
+
+                            {/* TOTP Requirement */}
+                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                                <div className="flex items-start space-x-3">
+                                    <input
+                                        type="checkbox"
+                                        id="require-totp"
+                                        checked={requireTOTP}
+                                        onChange={(e) => setRequireTOTP(e.target.checked)}
+                                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 mt-1"
+                                    />
+                                    <div className="flex-1">
+                                        <label htmlFor="require-totp" className="text-sm font-medium text-blue-900">
+                                            Require TOTP Authentication for Signing
+                                        </label>
+                                        <p className="text-xs text-blue-700 mt-1">
+                                            When enabled, all signers must verify their identity with a TOTP code (from apps like Zoho OneAuth, Google Authenticator) before signing. This provides enhanced security for sensitive documents.
+                                        </p>
+                                        {requireTOTP && (
+                                            <div className="mt-2 p-2 bg-yellow-50 border border-yellow-200 rounded text-xs text-yellow-800">
+                                                ⚠️ Signers without TOTP setup will be prompted to configure it before they can sign.
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Loading indicator */}

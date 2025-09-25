@@ -735,30 +735,13 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
     const handleSignatureAccept = async (signatureData: any) => {
         try {
-            console.log('✅ Signature accepted:', signatureData)
+            console.log('✅ Signature accepted (already processed by PDFSigningScreen):', signatureData)
 
-            const response = await fetch('/api/signature-requests/sign', {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    requestId: signingRequest?.id,
-                    signatureData
-                })
-            })
-
-            if (!response.ok) {
-                const errorData = await response.json()
-                throw new Error(errorData.error || 'Failed to save signature')
-            }
-
-            const result = await response.json()
-            console.log('✅ Signature saved successfully:', result)
+            // The signature has already been saved by PDFSigningScreen
+            // No need to make another API call here - just handle the UI updates
 
             // Show success message
-            alert(`Signature saved successfully! ${result.allSignersCompleted ? 'All signers have completed. Final PDF will be generated.' : `${result.signedCount}/${result.totalSigners} signers completed.`}`)
+            alert('Signature saved successfully!')
 
             setSigningRequest(null)
 
@@ -768,8 +751,8 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                 window.location.reload()
             }, 1000)
         } catch (error) {
-            console.error('❌ Error accepting signature:', error)
-            alert(`Error saving signature: ${error instanceof Error ? error.message : 'Unknown error'}`)
+            console.error('❌ Error in signature accept handler:', error)
+            alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
         }
     }
 

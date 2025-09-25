@@ -46,6 +46,9 @@ interface VerificationData {
       signing_order: number
       viewed_at?: string
       reminder_count?: number
+      totp_verified?: boolean
+      totp_verified_at?: string
+      totp_verification_ip?: string
     }>
     document: {
       title: string
@@ -256,6 +259,19 @@ export default function VerifyPage() {
                     <label className="text-sm font-medium text-gray-500">Signature Type:</label>
                     <p className="text-gray-900">{getSignatureType(verificationData.signing_request.total_signers, verificationData.signing_request.metadata)}</p>
                   </div>
+                  {(verificationData.signing_request as any).require_totp && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-500">TOTP Authentication:</label>
+                      <div className="flex items-center gap-2">
+                        <Badge
+                          variant="outline"
+                          className="bg-blue-50 text-blue-700 border-blue-200"
+                        >
+                          🔐 Required
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
                   <div>
                     <label className="text-sm font-medium text-gray-500">Signature Requester:</label>
                     <p className="text-gray-900">{(verificationData.signing_request.document as any).user_email || 'N/A'}</p>
@@ -307,7 +323,7 @@ export default function VerifyPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className={`grid grid-cols-1 gap-4 mb-6 ${(verificationData.signing_request as any).require_totp ? 'md:grid-cols-4' : 'md:grid-cols-3'}`}>
                 <div className="text-center p-4 bg-blue-50 rounded-lg">
                   <div className="text-2xl font-bold text-blue-600">
                     {verificationData.signing_request.total_signers || verificationData.signing_request.signers.length}
@@ -326,6 +342,14 @@ export default function VerifyPage() {
                   </div>
                   <div className="text-sm text-purple-700">Viewed:</div>
                 </div>
+                {(verificationData.signing_request as any).require_totp && (
+                  <div className="text-center p-4 bg-orange-50 rounded-lg">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {verificationData.signing_request.signers.filter(s => s.totp_verified).length}
+                    </div>
+                    <div className="text-sm text-orange-700">TOTP Verified:</div>
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3">
@@ -350,14 +374,26 @@ export default function VerifyPage() {
                           </div>
                         </div>
                         <div className="text-right">
-                          <Badge className={getStatusColor(signer.status)}>
-                            {signer.status === 'signed' ? '✓ Signed' : signer.status}
-                          </Badge>
-                          {signer.signed_at && (
-                            <div className="text-xs text-gray-500 mt-1">
-                              {formatDate(signer.signed_at)}
-                            </div>
-                          )}
+                          <div className="flex flex-col items-end gap-1">
+                            <Badge className={getStatusColor(signer.status)}>
+                              {signer.status === 'signed' ? '✓ Signed' : signer.status}
+                            </Badge>
+                            {(verificationData.signing_request as any).require_totp && signer.totp_verified && (
+                              <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                                🔐 TOTP Verified
+                              </Badge>
+                            )}
+                            {signer.signed_at && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {formatDate(signer.signed_at)}
+                              </div>
+                            )}
+                            {(verificationData.signing_request as any).require_totp && signer.totp_verified_at && (
+                              <div className="text-xs text-blue-500">
+                                TOTP: {formatDate(signer.totp_verified_at)}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     </div>
