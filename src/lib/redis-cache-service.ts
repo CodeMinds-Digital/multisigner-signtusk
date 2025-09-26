@@ -253,10 +253,11 @@ export class RedisCacheService {
   // Cache Statistics
   static async getCacheStats(): Promise<any> {
     try {
-      const info = await redis.info()
+      // Test connection with a simple ping
+      await redis.ping()
       return {
         connected: true,
-        info: info,
+        status: 'healthy',
         timestamp: Date.now()
       }
     } catch (error) {
@@ -275,19 +276,19 @@ export class RedisCacheService {
     notificationPrefs?: any
   }): Promise<void> {
     const promises = []
-    
+
     if (userData.profile) {
       promises.push(this.cacheUserProfile(userId, userData.profile))
     }
-    
+
     if (userData.totpConfig) {
       promises.push(this.cacheTOTPConfig(userId, userData.totpConfig))
     }
-    
+
     if (userData.notificationPrefs) {
       promises.push(this.cacheNotificationPrefs(userId, userData.notificationPrefs))
     }
-    
+
     await Promise.all(promises)
   }
 }

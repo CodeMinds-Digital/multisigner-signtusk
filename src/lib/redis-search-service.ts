@@ -49,7 +49,7 @@ export class RedisSearchService {
     try {
       // Generate cache key for search results
       const cacheKey = this.generateSearchCacheKey(query, filters, limit, userId)
-      
+
       // Try to get cached results first
       const cachedResults = await RedisUtils.get<SearchResult[]>(cacheKey)
       if (cachedResults) {
@@ -93,7 +93,7 @@ export class RedisSearchService {
   ): Promise<SearchResult[]> {
     try {
       // Check cache first
-      const cacheKey = `${this.SEARCH_INDEX.DOCUMENTS}:${this.hashQuery(query, filters, userId)}`
+      const cacheKey = `${this.SEARCH_INDEX.DOCUMENTS}:${this.hashQuery(query, JSON.stringify(filters), userId || '')}`
       const cached = await RedisUtils.get<SearchResult[]>(cacheKey)
       if (cached) return cached
 
@@ -176,13 +176,13 @@ export class RedisSearchService {
     try {
       if (!adminUserId) return [] // Only admins can search users
 
-      const cacheKey = `${this.SEARCH_INDEX.USERS}:${this.hashQuery(query, filters, adminUserId)}`
+      const cacheKey = `${this.SEARCH_INDEX.USERS}:${this.hashQuery(query, JSON.stringify(filters), adminUserId || '')}`
       const cached = await RedisUtils.get<SearchResult[]>(cacheKey)
       if (cached) return cached
 
       // Search in auth.users via admin API
       const { data: authUsers, error } = await supabaseAdmin.auth.admin.listUsers()
-      
+
       if (error) {
         console.error('❌ User search error:', error)
         return []
@@ -243,7 +243,7 @@ export class RedisSearchService {
     try {
       if (!userId) return []
 
-      const cacheKey = `${this.SEARCH_INDEX.NOTIFICATIONS}:${this.hashQuery(query, filters, userId)}`
+      const cacheKey = `${this.SEARCH_INDEX.NOTIFICATIONS}:${this.hashQuery(query, JSON.stringify(filters), userId || '')}`
       const cached = await RedisUtils.get<SearchResult[]>(cacheKey)
       if (cached) return cached
 
@@ -307,7 +307,7 @@ export class RedisSearchService {
     userId?: string
   ): Promise<SearchResult[]> {
     try {
-      const cacheKey = `${this.SEARCH_INDEX.SIGNING_REQUESTS}:${this.hashQuery(query, filters, userId)}`
+      const cacheKey = `${this.SEARCH_INDEX.SIGNING_REQUESTS}:${this.hashQuery(query, JSON.stringify(filters), userId || '')}`
       const cached = await RedisUtils.get<SearchResult[]>(cacheKey)
       if (cached) return cached
 
@@ -343,7 +343,7 @@ export class RedisSearchService {
       const results: SearchResult[] = (data || []).map(request => ({
         id: request.id,
         type: 'signing_request' as const,
-        title: `${request.documents?.title || 'Document'} - ${request.document_sign_id}`,
+        title: `${(request.documents as any)?.[0]?.title || 'Document'} - ${request.document_sign_id}`,
         description: `Status: ${request.status} - Signers: ${request.signing_request_signers?.length || 0}`,
         metadata: {
           document_sign_id: request.document_sign_id,
@@ -351,7 +351,7 @@ export class RedisSearchService {
           expires_at: request.expires_at,
           signers_count: request.signing_request_signers?.length || 0
         },
-        score: this.calculateRelevanceScore(query, request.document_sign_id, request.documents?.title || ''),
+        score: this.calculateRelevanceScore(query, request.document_sign_id, (request.documents as any)?.[0]?.title || ''),
         url: `/sign/${request.document_sign_id}`,
         created_at: request.created_at
       }))

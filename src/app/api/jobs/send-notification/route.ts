@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySignature } from '@upstash/qstash/nextjs'
+import { verifySignatureAppRouter } from '@upstash/qstash/nextjs'
 import { UpstashJobQueue } from '@/lib/upstash-job-queue'
 import { RedisCacheService } from '@/lib/redis-cache-service'
 import { UpstashRealTime } from '@/lib/upstash-real-time'
@@ -23,31 +23,31 @@ async function handler(request: NextRequest) {
       case 'signature_request':
         result = await sendSignatureRequestNotification(notificationData)
         break
-      
+
       case 'signature_completed':
         result = await sendSignatureCompletedNotification(notificationData)
         break
-      
+
       case 'document_expiry_warning':
         result = await sendDocumentExpiryNotification(notificationData)
         break
-      
+
       case 'sequential_signature_request':
         result = await sendSequentialSignatureNotification(notificationData)
         break
-      
+
       case 'reminder':
         result = await sendReminderNotification(notificationData)
         break
-      
+
       case 'system_notification':
         result = await sendSystemNotification(notificationData)
         break
-      
+
       case 'bulk_notification':
         result = await sendBulkNotifications(notificationData)
         break
-      
+
       default:
         // Generic notification
         result = await createGenericNotification(userId, title, message, data, actionUrl)
@@ -87,8 +87,8 @@ async function handler(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: Date.now()
       },
@@ -291,9 +291,9 @@ async function sendBulkNotifications(data: any) {
     }
 
     const successCount = results.filter(r => r.success).length
-    return { 
-      success: true, 
-      processed: results.length, 
+    return {
+      success: true,
+      processed: results.length,
       successful: successCount,
       failed: results.length - successCount
     }
@@ -327,7 +327,7 @@ async function createGenericNotification(userId: string, title: string, message:
 }
 
 // Verify QStash signature for security
-export const POST = verifySignature(handler)
+export const POST = verifySignatureAppRouter(handler)
 
 export async function GET() {
   return NextResponse.json({

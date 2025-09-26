@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySignature } from '@upstash/qstash/nextjs'
+import { verifySignatureAppRouter } from '@upstash/qstash/nextjs'
 import { sendSignatureRequestEmail, sendReminderEmail, sendBulkSignatureRequests } from '@/lib/email-service'
 import { UpstashJobQueue } from '@/lib/upstash-job-queue'
 
@@ -15,27 +15,36 @@ async function handler(request: NextRequest) {
       case 'signature-request':
         result = await sendSignatureRequestEmail(emailData)
         break
-      
+
       case 'reminder':
         result = await sendReminderEmail(emailData)
         break
-      
+
       case 'bulk':
-        result = await sendBulkSignatureRequests(emailData.emails)
+        result = await sendBulkSignatureRequests(
+          emailData.documentTitle || 'Document',
+          emailData.senderName || 'SignTusk',
+          emailData.emails || [],
+          {
+            message: emailData.message,
+            dueDate: emailData.dueDate,
+            documentId: emailData.documentId || ''
+          }
+        )
         break
-      
+
       case 'completion':
         result = await sendCompletionEmail(emailData)
         break
-      
+
       case 'expiry-warning':
         result = await sendExpiryWarningEmail(emailData)
         break
-      
+
       case 'sequential-notification':
         result = await sendSequentialNotificationEmail(emailData)
         break
-      
+
       default:
         throw new Error(`Unknown email type: ${type}`)
     }
@@ -47,7 +56,7 @@ async function handler(request: NextRequest) {
         jobId,
         result.success ? 'completed' : 'failed',
         result,
-        result.success ? undefined : result.error
+        result.success ? undefined : (result as any).error || (result as any).errors?.join(', ') || 'Unknown error'
       )
     }
 
@@ -74,8 +83,8 @@ async function handler(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: Date.now()
       },
@@ -104,7 +113,7 @@ async function sendSequentialNotificationEmail(emailData: any) {
 }
 
 // Verify QStash signature for security
-export const POST = verifySignature(handler)
+export const POST = verifySignatureAppRouter(handler)
 
 export async function GET() {
   return NextResponse.json({

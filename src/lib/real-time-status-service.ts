@@ -18,22 +18,22 @@ export interface StatusUpdate {
 export class RealTimeStatusService {
   private static readonly CHANNEL_PREFIX = 'status_updates'
   private static readonly SIGNING_REQUESTS_CHANNEL = 'signing_requests_updates'
-  
+
   /**
    * Publish a status update to all connected clients
    */
   static async publishStatusUpdate(update: StatusUpdate): Promise<void> {
     try {
       const channel = `${this.CHANNEL_PREFIX}:${update.requestId}`
-      
+
       // Publish to Redis for real-time updates
       await redis.publish(channel, JSON.stringify(update))
-      
+
       // Also publish to global signing requests channel
       await redis.publish(this.SIGNING_REQUESTS_CHANNEL, JSON.stringify(update))
-      
+
       console.log('✅ Status update published:', update)
-      
+
     } catch (error) {
       console.error('❌ Error publishing status update:', error)
     }
@@ -93,7 +93,7 @@ export class RealTimeStatusService {
     callback: (update: StatusUpdate) => void
   ): () => void {
     if (typeof window === 'undefined') {
-      return () => {} // Server-side, return no-op
+      return () => { } // Server-side, return no-op
     }
 
     // Use Supabase real-time for browser clients
@@ -107,7 +107,7 @@ export class RealTimeStatusService {
           table: 'signing_requests',
           filter: `id=eq.${requestId}`
         },
-        (payload) => {
+        (payload: any) => {
           const update: StatusUpdate = {
             type: 'signing_request_updated',
             requestId: payload.new.id,
@@ -126,7 +126,7 @@ export class RealTimeStatusService {
           table: 'signing_request_signers',
           filter: `signature_request_id=eq.${requestId}`
         },
-        (payload) => {
+        (payload: any) => {
           const update: StatusUpdate = {
             type: 'document_signed',
             requestId,
@@ -153,7 +153,7 @@ export class RealTimeStatusService {
     callback: (update: StatusUpdate) => void
   ): () => void {
     if (typeof window === 'undefined') {
-      return () => {} // Server-side, return no-op
+      return () => { } // Server-side, return no-op
     }
 
     const channel = supabase
@@ -165,7 +165,7 @@ export class RealTimeStatusService {
           schema: 'public',
           table: 'signing_requests'
         },
-        (payload) => {
+        (payload: any) => {
           const update: StatusUpdate = {
             type: 'signing_request_updated',
             requestId: payload.new?.id || payload.old?.id,
@@ -183,7 +183,7 @@ export class RealTimeStatusService {
           schema: 'public',
           table: 'signing_request_signers'
         },
-        (payload) => {
+        (payload: any) => {
           const update: StatusUpdate = {
             type: 'document_signed',
             requestId: payload.new.signature_request_id,
@@ -210,7 +210,7 @@ export class RealTimeStatusService {
       // Try cache first
       const cacheKey = `request_status:${requestId}`
       const cached = await redis.get(cacheKey)
-      
+
       if (cached) {
         return JSON.parse(cached as string)
       }

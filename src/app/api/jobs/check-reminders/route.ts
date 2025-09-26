@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySignature } from '@upstash/qstash/nextjs'
+import { verifySignatureAppRouter } from '@upstash/qstash/nextjs'
 import { UpstashJobQueue } from '@/lib/upstash-job-queue'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
@@ -66,8 +66,8 @@ async function handler(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: Date.now()
       },
@@ -126,7 +126,7 @@ async function checkAndSendReminders() {
             type: 'reminder',
             userId: signer.user_id,
             requestId: request.id,
-            documentTitle: request.documents.title,
+            documentTitle: (request.documents as any)?.[0]?.title || 'Unknown Document',
             signerEmail: signer.email,
             reminderCount: await getReminderCount(request.id, signer.id)
           })
@@ -136,7 +136,7 @@ async function checkAndSendReminders() {
             type: 'reminder',
             to: signer.email,
             requestId: request.id,
-            documentTitle: request.documents.title,
+            documentTitle: (request.documents as any)?.[0]?.title || 'Unknown Document',
             signUrl: `${process.env.NEXT_PUBLIC_APP_URL}/sign/${request.document_sign_id}`
           })
 
@@ -173,7 +173,7 @@ async function checkExpiringDocuments() {
 
     // Get documents expiring in the next 24 hours
     const expiryTime = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    
+
     const { data: expiringRequests, error } = await supabaseAdmin
       .from('signing_requests')
       .select(`
@@ -212,21 +212,21 @@ async function checkExpiringDocuments() {
         // Notify document owner
         await UpstashJobQueue.queueNotification({
           type: 'document_expiry_warning',
-          userId: request.documents.user_id,
+          userId: (request.documents as any)?.[0]?.user_id,
           requestId: request.id,
-          documentTitle: request.documents.title,
+          documentTitle: (request.documents as any)?.[0]?.title || 'Unknown Document',
           hoursUntilExpiry
         })
 
         // Notify pending signers
         const pendingSigners = request.signing_request_signers.filter(signer => signer.status === 'pending')
-        
+
         for (const signer of pendingSigners) {
           await UpstashJobQueue.queueNotification({
             type: 'document_expiry_warning',
             userId: signer.user_id,
             requestId: request.id,
-            documentTitle: request.documents.title,
+            documentTitle: (request.documents as any)?.[0]?.title || 'Unknown Document',
             hoursUntilExpiry
           })
 
@@ -234,7 +234,7 @@ async function checkExpiringDocuments() {
             type: 'expiry-warning',
             to: signer.email,
             requestId: request.id,
-            documentTitle: request.documents.title,
+            documentTitle: (request.documents as any)?.[0]?.title || 'Unknown Document',
             hoursUntilExpiry,
             signUrl: `${process.env.NEXT_PUBLIC_APP_URL}/sign/${request.document_sign_id}`
           })
@@ -300,9 +300,9 @@ async function checkOverdueDocuments() {
         // Notify document owner
         await UpstashJobQueue.queueNotification({
           type: 'document_expired',
-          userId: request.documents.user_id,
+          userId: (request.documents as any)?.[0]?.user_id,
           requestId: request.id,
-          documentTitle: request.documents.title
+          documentTitle: (request.documents as any)?.[0]?.title || 'Unknown Document'
         })
 
         sent++
@@ -342,7 +342,7 @@ async function getReminderCount(requestId: string, signerId: string): Promise<nu
 }
 
 // Verify QStash signature for security
-export const POST = verifySignature(handler)
+export const POST = verifySignatureAppRouter(handler)
 
 export async function GET() {
   return NextResponse.json({

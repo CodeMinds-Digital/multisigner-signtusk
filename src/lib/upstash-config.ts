@@ -22,7 +22,7 @@ export const rateLimiters = {
     analytics: true,
     prefix: 'rl:api',
   }),
-  
+
   // Authentication endpoints
   auth: new Ratelimit({
     redis,
@@ -30,7 +30,7 @@ export const rateLimiters = {
     analytics: true,
     prefix: 'rl:auth',
   }),
-  
+
   // Corporate admin actions
   corporateAdmin: new Ratelimit({
     redis,
@@ -38,7 +38,7 @@ export const rateLimiters = {
     analytics: true,
     prefix: 'rl:corp',
   }),
-  
+
   // Email sending
   email: new Ratelimit({
     redis,
@@ -46,7 +46,7 @@ export const rateLimiters = {
     analytics: true,
     prefix: 'rl:email',
   }),
-  
+
   // PDF generation
   pdfGeneration: new Ratelimit({
     redis,
@@ -54,7 +54,7 @@ export const rateLimiters = {
     analytics: true,
     prefix: 'rl:pdf',
   }),
-  
+
   // TOTP verification
   totp: new Ratelimit({
     redis,
@@ -62,7 +62,7 @@ export const rateLimiters = {
     analytics: true,
     prefix: 'rl:totp',
   }),
-  
+
   // Document verification
   verify: new Ratelimit({
     redis,
@@ -153,7 +153,7 @@ export class RedisUtils {
   }
 
   static async sadd(key: string, ...members: string[]): Promise<number> {
-    return await redis.sadd(key, ...members)
+    return await redis.sadd(key, members)
   }
 
   static async scard(key: string): Promise<number> {
@@ -200,7 +200,7 @@ export function validateUpstashConfig(): void {
   ]
 
   const missingVars = requiredEnvVars.filter(envVar => !process.env[envVar])
-  
+
   if (missingVars.length > 0) {
     throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`)
   }

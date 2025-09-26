@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySignature } from '@upstash/qstash/nextjs'
+import { verifySignatureAppRouter } from '@upstash/qstash/nextjs'
 import { UpstashJobQueue } from '@/lib/upstash-job-queue'
 import { cleanupExpiredSessions } from '@/lib/redis-session-store'
 import { RedisCacheService } from '@/lib/redis-cache-service'
@@ -76,8 +76,8 @@ async function handler(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: Date.now()
       },
@@ -99,11 +99,11 @@ async function cleanupExpiredCache() {
     ]
 
     let keysDeleted = 0
-    
+
     for (const pattern of patterns) {
       try {
         const keys = await redis.keys(pattern)
-        
+
         // Check TTL for each key and delete expired ones
         for (const key of keys as string[]) {
           const ttl = await redis.ttl(key)
@@ -187,10 +187,10 @@ async function cleanupExpiredDatabaseRecords() {
 
   } catch (error) {
     console.error('❌ Error in cleanupExpiredDatabaseRecords:', error)
-    return { 
-      recordsDeleted: 0, 
+    return {
+      recordsDeleted: 0,
       breakdown: {},
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
 }
@@ -216,10 +216,10 @@ async function cleanupTempFiles() {
 
   } catch (error) {
     console.error('❌ Error in cleanupTempFiles:', error)
-    return { 
-      filesDeleted: 0, 
+    return {
+      filesDeleted: 0,
       cleanupAge: '3 days',
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
 }
@@ -258,11 +258,11 @@ async function cleanupOldAnalytics() {
       // Extract date from key if possible and check if older than 7 days
       const keyParts = key.split(':')
       const dateMatch = keyParts.find(part => /^\d{4}-\d{2}-\d{2}$/.test(part))
-      
+
       if (dateMatch) {
         const keyDate = new Date(dateMatch)
         const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-        
+
         if (keyDate < sevenDaysAgo) {
           await redis.del(key)
           redisKeysDeleted++
@@ -281,16 +281,16 @@ async function cleanupOldAnalytics() {
 
   } catch (error) {
     console.error('❌ Error in cleanupOldAnalytics:', error)
-    return { 
-      recordsDeleted: 0, 
+    return {
+      recordsDeleted: 0,
       breakdown: {},
-      error: error instanceof Error ? error.message : 'Unknown error' 
+      error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
 }
 
 // Verify QStash signature for security
-export const POST = verifySignature(handler)
+export const POST = verifySignatureAppRouter(handler)
 
 export async function GET() {
   return NextResponse.json({

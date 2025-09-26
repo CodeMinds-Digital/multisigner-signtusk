@@ -6,8 +6,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 export async function GET(request: NextRequest) {
   try {
     // Only allow in development or with special debug header
-    const isDebugAllowed = process.env.NODE_ENV === 'development' || 
-                          request.headers.get('x-debug-totp') === process.env.DEBUG_SECRET
+    const isDebugAllowed = process.env.NODE_ENV === 'development' ||
+      request.headers.get('x-debug-totp') === process.env.DEBUG_SECRET
 
     if (!isDebugAllowed) {
       return NextResponse.json(
@@ -58,8 +58,8 @@ export async function GET(request: NextRequest) {
     let authCheck = {
       hasToken: false,
       tokenValid: false,
-      userId: null,
-      userEmail: null
+      userId: null as string | null,
+      userEmail: null as string | null
     }
 
     try {
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
     let dbCheck = {
       connected: false,
       tableExists: false,
-      error: null
+      error: null as string | null
     }
 
     try {
@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Debug endpoint error:', error)
-    
+
     return NextResponse.json({
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',

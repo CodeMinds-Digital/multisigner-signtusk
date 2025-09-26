@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySignature } from '@upstash/qstash/nextjs'
+import { verifySignatureAppRouter } from '@upstash/qstash/nextjs'
 import { PDFGenerationService } from '@/lib/pdf-generation-service'
 import { UpstashJobQueue } from '@/lib/upstash-job-queue'
 import { RedisCacheService } from '@/lib/redis-cache-service'
@@ -117,8 +117,8 @@ async function handler(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         requestId,
         timestamp: Date.now()
@@ -128,7 +128,7 @@ async function handler(request: NextRequest) {
   }
 }
 
-export const POST = verifySignature(handler)
+export const POST = verifySignatureAppRouter(handler)
 
 export async function GET() {
   return NextResponse.json({
