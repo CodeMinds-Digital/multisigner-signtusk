@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // Simple environment check that doesn't require authentication
     const envCheck = {
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Environment check error:', error)
-    
+
     return new Response(
       JSON.stringify({
         error: 'Environment check failed',

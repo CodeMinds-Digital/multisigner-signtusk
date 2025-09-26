@@ -7,7 +7,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 async function handler(request: NextRequest): Promise<NextResponse> {
   try {
     const body = await request.json()
-    const { domain, date, timestamp } = body
+    const { domain, date, timestamp: _timestamp } = body
 
     console.log('📊 Processing analytics aggregation job:', { domain, date })
 

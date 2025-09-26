@@ -170,7 +170,7 @@ export function SecureAuthProvider({ children }: AuthProviderProps) {
 
           try {
             await Promise.race([refreshAuth(), timeoutPromise])
-          } catch (timeoutError) {
+          } catch (_timeoutError) {
             console.warn('Auth refresh timed out, proceeding without auth')
             setUser(null)
           }

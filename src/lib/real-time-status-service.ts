@@ -309,7 +309,7 @@ export class RealTimeStatusService {
       await redis.del(testKey)
 
       // Test Supabase connection
-      const { data, error } = await supabase
+      const { data: _data, error } = await supabase
         .from('signing_requests')
         .select('id')
         .limit(1)

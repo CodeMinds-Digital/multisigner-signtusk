@@ -8,9 +8,9 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import {
-  Settings, Save, RefreshCw, AlertTriangle, CheckCircle,
-  XCircle, Edit, Trash2, Plus, Eye, EyeOff, Globe,
-  Mail, Shield, Upload, Database, Bell, Users
+  Settings, Save, RefreshCw,
+  Edit, Eye, EyeOff, Globe,
+  Mail, Shield, Upload, Bell
 } from 'lucide-react'
 
 export interface SystemSetting {

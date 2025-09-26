@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 export async function POST(request: NextRequest) {
   try {
     console.log('🧪 Starting signing API diagnostic test...')
-    
+
     // Environment check
     const envCheck = {
       hasSupabaseUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
@@ -16,17 +16,17 @@ export async function POST(request: NextRequest) {
       supabaseUrlPrefix: process.env.NEXT_PUBLIC_SUPABASE_URL?.substring(0, 30) + '...',
       timestamp: new Date().toISOString()
     }
-    
+
     console.log('🔧 Environment check:', envCheck)
 
     // Get request body
     const { requestId, testMode } = await request.json()
-    
+
     if (!requestId) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'Request ID is required',
-          envCheck 
+          envCheck
         }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
@@ -35,10 +35,10 @@ export async function POST(request: NextRequest) {
     // Authentication test
     console.log('🔐 Testing authentication...')
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'No access token found',
           envCheck,
           authTest: 'failed - no token'
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       console.log('✅ Token verified for user:', payload.email)
     } catch (authError) {
       return new Response(
-        JSON.stringify({ 
+        JSON.stringify({
           error: 'Token verification failed',
           envCheck,
           authTest: 'failed - invalid token',
@@ -67,11 +67,11 @@ export async function POST(request: NextRequest) {
     console.log('🗄️ Testing database connection...')
     let dbTest = 'unknown'
     try {
-      const { data: testQuery, error: testError } = await supabaseAdmin
+      const { data: _testQuery, error: testError } = await supabaseAdmin
         .from('signing_requests')
         .select('id')
         .limit(1)
-      
+
       if (testError) {
         dbTest = `failed - ${testError.message}`
       } else {
@@ -85,19 +85,19 @@ export async function POST(request: NextRequest) {
     console.log('🔍 Testing signing request lookup...')
     let requestTest = 'unknown'
     let signerTest = 'unknown'
-    
+
     try {
       const { data: signingRequest, error: requestError } = await supabaseAdmin
         .from('signing_requests')
         .select('*')
         .eq('id', requestId)
         .single()
-      
+
       if (requestError) {
         requestTest = `failed - ${requestError.message}`
       } else if (signingRequest) {
         requestTest = 'success'
-        
+
         // Test signer lookup
         const { data: signer, error: signerError } = await supabaseAdmin
           .from('signing_request_signers')
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
           .eq('signing_request_id', requestId)
           .eq('signer_email', payload.email)
           .single()
-        
+
         if (signerError) {
           signerTest = `failed - ${signerError.message}`
         } else if (signer) {
@@ -141,7 +141,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Diagnostic test error:', error)
-    
+
     return new Response(
       JSON.stringify({
         error: 'Diagnostic test failed',

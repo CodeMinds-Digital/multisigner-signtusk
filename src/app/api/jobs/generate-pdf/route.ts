@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifySignatureAppRouter } from '@upstash/qstash/nextjs'
 import { PDFGenerationService } from '@/lib/pdf-generation-service'
 import { UpstashJobQueue } from '@/lib/upstash-job-queue'
-import { RedisCacheService } from '@/lib/redis-cache-service'
+
 import { UpstashRealTime } from '@/lib/upstash-real-time'
 import { redis, RedisUtils, CACHE_KEYS } from '@/lib/upstash-config'
 

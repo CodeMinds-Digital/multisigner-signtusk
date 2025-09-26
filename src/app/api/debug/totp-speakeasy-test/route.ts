@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as speakeasy from 'speakeasy'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     console.log('🧪 Testing Speakeasy TOTP implementation...')
 
@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     // Test 3: Test with database secret if it exists
     const dbSecret = 'MB6UMORNAY4DOOSO'
     let dbTest = null
-    
+
     try {
       const dbToken = speakeasy.totp({
         secret: dbSecret,
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     // Test 4: Generate multiple time windows for current time
     const timeWindows = []
     const now = Math.floor(Date.now() / 1000)
-    
+
     for (let i = -2; i <= 2; i++) {
       const timeStep = now + (i * 30)
       try {
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
           encoding: 'base32',
           time: timeStep
         })
-        
+
         const windowVerified = speakeasy.totp.verify({
           secret: secret.base32,
           encoding: 'base32',
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const { token, secret } = await request.json()
-    
+
     console.log('🧪 Manual Speakeasy verification:', { token, secret })
 
     // Verify the provided token
@@ -143,7 +143,7 @@ export async function POST(request: NextRequest) {
     // Test multiple time windows
     const timeTests = []
     const now = Math.floor(Date.now() / 1000)
-    
+
     for (let i = -2; i <= 2; i++) {
       const timeStep = now + (i * 30)
       const windowToken = speakeasy.totp({
@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
         encoding: 'base32',
         time: timeStep
       })
-      
+
       timeTests.push({
         offset: i,
         token: windowToken,

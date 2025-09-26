@@ -483,7 +483,7 @@ export class APIDocumentationService {
    * Generate HTML documentation
    */
   static generateHTMLDocs(): string {
-    const spec = this.generateOpenAPISpec()
+    const _spec = this.generateOpenAPISpec()
 
     return `
 <!DOCTYPE html>

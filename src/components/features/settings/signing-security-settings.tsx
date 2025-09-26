@@ -1,13 +1,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { 
-  Key, 
-  Shield, 
-  FileText, 
-  Clock, 
-  Users, 
-  CheckCircle, 
+import {
+  Key,
+  Shield,
+  FileText,
+  Users,
+  CheckCircle,
   AlertCircle,
   Info
 } from 'lucide-react'
@@ -22,7 +21,7 @@ interface SigningSecurityConfig {
 }
 
 export function SigningSecuritySettings() {
-  const { user } = useAuth()
+  const { user: _user } = useAuth()
   const [config, setConfig] = useState<SigningSecurityConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -38,7 +37,7 @@ export function SigningSecuritySettings() {
       const response = await fetch('/api/auth/totp/config', {
         credentials: 'include'
       })
-      
+
       if (response.ok) {
         const result = await response.json()
         setConfig({
@@ -61,7 +60,7 @@ export function SigningSecuritySettings() {
   const updateSigningSettings = async (settings: Partial<SigningSecurityConfig>) => {
     try {
       setError('')
-      
+
       const response = await fetch('/api/auth/totp/config', {
         method: 'PUT',
         headers: {
@@ -73,7 +72,7 @@ export function SigningSecuritySettings() {
           defaultRequireTOTP: settings.defaultRequireTOTP
         })
       })
-      
+
       if (response.ok) {
         setSuccess('Signing security settings updated successfully!')
         await loadSigningConfig()
@@ -169,7 +168,7 @@ export function SigningSecuritySettings() {
               <p className="text-blue-700 mt-1 mb-4">
                 To enable signing security features, you need to set up Two-Factor Authentication first.
               </p>
-              <Button 
+              <Button
                 onClick={() => window.location.hash = '#totp'}
                 className="bg-blue-600 hover:bg-blue-700"
               >
@@ -186,7 +185,7 @@ export function SigningSecuritySettings() {
           {/* Personal Signing Protection */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">Personal Signing Protection</h3>
-            
+
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -196,18 +195,16 @@ export function SigningSecuritySettings() {
                   </p>
                 </div>
                 <button
-                  onClick={() => updateSigningSettings({ 
-                    ...config, 
-                    signingMFAEnabled: !config.signingMFAEnabled 
+                  onClick={() => updateSigningSettings({
+                    ...config,
+                    signingMFAEnabled: !config.signingMFAEnabled
                   })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    config.signingMFAEnabled ? 'bg-blue-600' : 'bg-gray-200'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${config.signingMFAEnabled ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      config.signingMFAEnabled ? 'translate-x-6' : 'translate-x-1'
-                    }`}
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.signingMFAEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
                   />
                 </button>
               </div>
@@ -220,18 +217,16 @@ export function SigningSecuritySettings() {
                   </p>
                 </div>
                 <button
-                  onClick={() => updateSigningSettings({ 
-                    ...config, 
-                    defaultRequireTOTP: !config.defaultRequireTOTP 
+                  onClick={() => updateSigningSettings({
+                    ...config,
+                    defaultRequireTOTP: !config.defaultRequireTOTP
                   })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    config.defaultRequireTOTP ? 'bg-blue-600' : 'bg-gray-200'
-                  }`}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${config.defaultRequireTOTP ? 'bg-blue-600' : 'bg-gray-200'
+                    }`}
                 >
                   <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      config.defaultRequireTOTP ? 'translate-x-6' : 'translate-x-1'
-                    }`}
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.defaultRequireTOTP ? 'translate-x-6' : 'translate-x-1'
+                      }`}
                   />
                 </button>
               </div>
@@ -241,7 +236,7 @@ export function SigningSecuritySettings() {
           {/* Security Information */}
           <div className="bg-white border border-gray-200 rounded-lg p-6">
             <h3 className="text-lg font-medium text-gray-900 mb-4">How Signing Security Works</h3>
-            
+
             <div className="space-y-4">
               <div className="flex items-start space-x-3">
                 <div className="flex-shrink-0 w-6 h-6 bg-blue-100 rounded-full flex items-center justify-center">
@@ -299,7 +294,7 @@ export function SigningSecuritySettings() {
                   Manage Backup Codes
                 </Button>
               </div>
-              
+
               {config.backupCodesCount < 3 && (
                 <div className="mt-3 bg-yellow-50 border border-yellow-200 rounded p-3">
                   <p className="text-sm text-yellow-800">

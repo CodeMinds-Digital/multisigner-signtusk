@@ -354,7 +354,7 @@ async function createFeature(featureData: any, createdBy: string) {
 /**
  * Delete feature flag
  */
-async function deleteFeature(featureId: string, deletedBy: string) {
+async function deleteFeature(featureId: string, _deletedBy: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
     if (!adminSupabase) {
@@ -456,7 +456,7 @@ async function applyFeatureChange(key: string, enabled: boolean) {
 /**
  * Check if feature is enabled for user
  */
-async function checkFeatureEnabled(featureKey: string, userId?: string, userPlan?: string): Promise<boolean> {
+async function _checkFeatureEnabled(featureKey: string, userId?: string, userPlan?: string): Promise<boolean> {
   try {
     const adminSupabase = getAdminSupabaseInstance()
     if (!adminSupabase) {

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin, storeAdminSessionToken } from '@/lib/real-admin-auth'
+import { authenticateAdmin } from '@/lib/real-admin-auth'
 
 // =====================================================
 // REAL ADMIN LOGIN API
@@ -27,9 +27,9 @@ export async function POST(request: NextRequest) {
 
     if (!result.success) {
       return NextResponse.json(
-        { 
+        {
           error: result.error,
-          requiresTwoFA: result.requiresTwoFA 
+          requiresTwoFA: result.requiresTwoFA
         },
         { status: 401 }
       )

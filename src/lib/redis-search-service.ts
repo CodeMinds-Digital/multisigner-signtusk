@@ -1,5 +1,5 @@
 // Redis-powered search service with vector capabilities
-import { redis, CACHE_TTL, CACHE_KEYS, RedisUtils } from './upstash-config'
+import { redis, CACHE_TTL, RedisUtils } from './upstash-config'
 import { supabaseAdmin } from './supabase-admin'
 
 export interface SearchResult {

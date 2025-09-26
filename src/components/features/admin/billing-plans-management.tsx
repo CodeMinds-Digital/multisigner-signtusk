@@ -4,11 +4,11 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Input } from '@/components/ui/input'
+
 import { Switch } from '@/components/ui/switch'
 import {
-  CreditCard, DollarSign, Users, TrendingUp, Settings,
-  Edit, Save, X, Plus, Trash2, Eye, BarChart3
+  CreditCard, DollarSign, Users, TrendingUp,
+  Edit, Plus, BarChart3
 } from 'lucide-react'
 
 interface Plan {
@@ -44,8 +44,8 @@ export function BillingPlansManagement() {
   const [stats, setStats] = useState<BillingStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<'plans' | 'subscriptions' | 'analytics'>('plans')
-  const [editingPlan, setEditingPlan] = useState<string | null>(null)
-  const [showAddForm, setShowAddForm] = useState(false)
+  const [_editingPlan, setEditingPlan] = useState<string | null>(null)
+  const [_showAddForm, setShowAddForm] = useState(false)
 
   useEffect(() => {
     loadBillingData()

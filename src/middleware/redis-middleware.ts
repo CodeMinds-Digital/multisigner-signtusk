@@ -207,10 +207,10 @@ async function checkCache(request: NextRequest, pathname: string) {
 
     // Generate cache key
     const url = request.url
-    const cacheKey = `api_cache:${Buffer.from(url).toString('base64').slice(0, 32)}`
+    const _cacheKey = `api_cache:${Buffer.from(url).toString('base64').slice(0, 32)}`
 
     // Check cache
-    const cachedResponse = await RedisCacheService.getCacheStats() // This is a placeholder
+    const _cachedResponse = await RedisCacheService.getCacheStats() // This is a placeholder
 
     // For now, we'll skip actual response caching and just return cache miss
     // In a full implementation, you'd cache serialized responses

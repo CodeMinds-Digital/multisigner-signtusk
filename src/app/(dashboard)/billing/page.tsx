@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import {
   CreditCard, Calendar, Download, AlertTriangle, CheckCircle,
-  TrendingUp, FileText, PenTool, Database, Users, Zap
+  TrendingUp, FileText, PenTool, Database, Zap
 } from 'lucide-react'
 
 interface UserSubscription {
@@ -40,7 +40,7 @@ interface BillingHistory {
 }
 
 export default function BillingPage() {
-  const { user } = useAuth()
+  const { } = useAuth()
   const [subscription, setSubscription] = useState<UserSubscription | null>(null)
   const [billingHistory, setBillingHistory] = useState<BillingHistory[]>([])
   const [loading, setLoading] = useState(true)
@@ -217,8 +217,8 @@ export default function BillingPage() {
                     {formatUsage(subscription.usage.documents_used, subscription.usage.documents_limit)}
                   </span>
                 </div>
-                <Progress 
-                  value={getUsagePercentage(subscription.usage.documents_used, subscription.usage.documents_limit)} 
+                <Progress
+                  value={getUsagePercentage(subscription.usage.documents_used, subscription.usage.documents_limit)}
                   className="h-2"
                 />
               </div>
@@ -233,8 +233,8 @@ export default function BillingPage() {
                     {formatUsage(subscription.usage.signatures_used, subscription.usage.signatures_limit)}
                   </span>
                 </div>
-                <Progress 
-                  value={getUsagePercentage(subscription.usage.signatures_used, subscription.usage.signatures_limit)} 
+                <Progress
+                  value={getUsagePercentage(subscription.usage.signatures_used, subscription.usage.signatures_limit)}
                   className="h-2"
                 />
               </div>
@@ -249,8 +249,8 @@ export default function BillingPage() {
                     {subscription.usage.storage_used_gb.toFixed(1)} GB / {subscription.usage.storage_limit_gb} GB
                   </span>
                 </div>
-                <Progress 
-                  value={getUsagePercentage(subscription.usage.storage_used_gb, subscription.usage.storage_limit_gb)} 
+                <Progress
+                  value={getUsagePercentage(subscription.usage.storage_used_gb, subscription.usage.storage_limit_gb)}
                   className="h-2"
                 />
               </div>
@@ -265,8 +265,8 @@ export default function BillingPage() {
                     {formatUsage(subscription.usage.api_calls_used, subscription.usage.api_calls_limit)}
                   </span>
                 </div>
-                <Progress 
-                  value={getUsagePercentage(subscription.usage.api_calls_used, subscription.usage.api_calls_limit)} 
+                <Progress
+                  value={getUsagePercentage(subscription.usage.api_calls_used, subscription.usage.api_calls_limit)}
                   className="h-2"
                 />
               </div>

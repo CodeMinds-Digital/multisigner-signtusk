@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import {
   Smartphone,
   Shield,
-  QrCode,
   Key,
   Download,
   RefreshCw,
@@ -34,7 +33,7 @@ interface TOTPSetupData {
 }
 
 export function TOTPSettings() {
-  const { user } = useAuth()
+  const { user: _user } = useAuth()
   const [config, setConfig] = useState<TOTPConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [setupMode, setSetupMode] = useState(false)

@@ -91,7 +91,7 @@ export class DriveService {
   static async createDocumentTemplate(
     documentData: DocumentUploadData,
     pdfPath: string,
-    userId: string,
+    _userId: string,
     userEmail?: string
   ): Promise<DocumentTemplate> {
     try {
@@ -494,7 +494,7 @@ export class DriveService {
         try {
           const parsed = JSON.parse(document.schemas)
           documentSchemas = Array.isArray(parsed) ? parsed : []
-        } catch (error) {
+        } catch (_error) {
           console.warn('Failed to parse schemas as JSON:', document.schemas)
           documentSchemas = []
         }
@@ -857,7 +857,7 @@ export class DriveService {
   /**
    * Get document statistics
    */
-  static async getDocumentStats(userId: string): Promise<{
+  static async getDocumentStats(_userId: string): Promise<{
     total: number
     completed: number
     draft: number

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SSOService } from '@/lib/sso-service'
-import { generateTokenPair } from '@/lib/jwt-utils'
-import { setAuthCookies } from '@/lib/auth-cookies'
-import { supabaseAdmin } from '@/lib/supabase-admin'
+
 import crypto from 'crypto'
 
 export async function GET(request: NextRequest) {

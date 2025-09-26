@@ -5,12 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { 
-  Users, 
-  Settings, 
-  BarChart3, 
-  Shield, 
-  CreditCard, 
+import {
+  Users,
+  Settings,
+  BarChart3,
+  Shield,
+  CreditCard,
   Plug,
   Building2,
   UserPlus,
@@ -206,7 +206,7 @@ export function CorporateControlPanel() {
 }
 
 // Overview Tab Component
-function OverviewTab({ stats, domainInfo }: { stats: DomainStats | null, domainInfo: DomainInfo }) {
+function OverviewTab({ stats, domainInfo: _domainInfo }: { stats: DomainStats | null, domainInfo: DomainInfo }) {
   if (!stats) return <div>Loading stats...</div>
 
   return (

@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server'
-import { NotificationScheduler, SchedulerConfig } from '@/lib/notification-scheduler'
+import { NotificationScheduler } from '@/lib/notification-scheduler'
 
 export async function POST(request: NextRequest) {
   try {
     // Basic security check - in production, add proper admin authentication
     const authHeader = request.headers.get('authorization')
     const expectedToken = process.env.SCHEDULER_API_TOKEN || 'dev-scheduler-token'
-    
+
     if (authHeader !== `Bearer ${expectedToken}`) {
       return new Response(
         JSON.stringify({ error: 'Unauthorized' }),
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('❌ Error in notification scheduler API:', error)
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         error: 'Scheduler execution failed',
         details: error instanceof Error ? error.message : 'Unknown error'
       }),
@@ -74,7 +74,7 @@ export async function GET() {
       },
       actions: [
         'check_expired',
-        'check_deadline_warnings', 
+        'check_deadline_warnings',
         'send_auto_reminders',
         'run_all'
       ]

@@ -43,17 +43,17 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const { user: oauthUser, session: ssoSession } = result
+    const { user: oauthUser, session: _ssoSession } = result
 
     // Check if user exists in our system
-    let { data: existingUser, error: userError } = await supabaseAdmin
+    let { data: existingUser, error: _userError } = await supabaseAdmin
       .from('user_profiles')
       .select('*')
       .eq('email', oauthUser.email)
       .single()
 
-    if (userError && userError.code !== 'PGRST116') {
-      console.error('Database error:', userError)
+    if (_userError && _userError.code !== 'PGRST116') {
+      console.error('Database error:', _userError)
       return NextResponse.redirect(
         `${process.env.NEXT_PUBLIC_APP_URL}/login?error=database_error`
       )

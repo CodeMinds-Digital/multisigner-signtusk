@@ -2,11 +2,11 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  Bell, Search, Settings, User, LogOut, Shield, 
+import {
+  Bell, Search, Settings, User, LogOut, Shield,
   RefreshCw, AlertTriangle, CheckCircle, Clock
 } from 'lucide-react'
-import { getAdminSession, adminLogout } from '@/lib/admin-auth'
+import { adminLogout } from '@/lib/admin-auth'
 
 interface AdminHeaderProps {
   activeTab: string

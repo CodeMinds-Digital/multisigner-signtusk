@@ -215,7 +215,7 @@ export async function invalidateRelatedCaches(
 export async function getCachedData<T>(
   cacheKey: string,
   fallbackFn: () => Promise<T>,
-  ttl: number = 300
+  _ttl: number = 300
 ): Promise<T> {
   try {
     // Try cache first

@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
   RefreshCw, AlertTriangle, CheckCircle, Clock, XCircle,
-  Users, FileText, Mail, Settings, Eye, RotateCcw,
-  Calendar, Download, Search, Filter, MoreHorizontal
+  Users, FileText, Mail, Eye, RotateCcw,
+  Calendar, Download, Search, Filter
 } from 'lucide-react'
 import {
   AdminMultiSignatureRequest,

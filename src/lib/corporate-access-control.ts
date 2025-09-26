@@ -174,7 +174,7 @@ export async function getDomainUsers(
 export async function createDomainAdmin(
   userId: string,
   email: string,
-  role: 'domain_admin' | 'domain_manager' = 'domain_admin'
+  _role: 'domain_admin' | 'domain_manager' = 'domain_admin'
 ): Promise<boolean> {
   try {
     const domain = email.split('@')[1]

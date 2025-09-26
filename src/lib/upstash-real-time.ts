@@ -32,7 +32,7 @@ export class UpstashRealTime {
   // Real-time user notifications
   static async publishUserNotification(userId: string, notification: any) {
     await redis.publish(`user:${userId}:notifications`, JSON.stringify(notification))
-    
+
     // Increment unread count
     await redis.incr(`unread_count:${userId}`)
   }
@@ -55,7 +55,7 @@ export class UpstashRealTime {
   // Subscribe to document updates (for SSE endpoints)
   static async subscribeToDocumentUpdates(requestId: string, callback: (data: any) => void) {
     // This would be used in SSE endpoints
-    const subscriber = new Redis({
+    const _subscriber = new Redis({
       url: process.env.UPSTASH_REDIS_REST_URL!,
       token: process.env.UPSTASH_REDIS_REST_TOKEN!,
     })
@@ -89,7 +89,7 @@ export class UpstashRealTime {
   // Track real-time user activity
   static async trackUserActivity(userId: string, domain: string, activity: string) {
     const today = new Date().toISOString().split('T')[0]
-    
+
     await Promise.all([
       // Add user to today's active users
       redis.sadd(`active_users:${domain}:${today}`, userId),
