@@ -4,6 +4,7 @@ import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { MultiSignatureWorkflowService } from '@/lib/multi-signature-workflow-service'
 import { NotificationService } from '@/lib/notification-service'
+import { RealTimeStatusService } from '@/lib/real-time-status-service'
 
 export async function POST(request: NextRequest) {
   let requestId: string | undefined
@@ -452,6 +453,19 @@ export async function POST(request: NextRequest) {
 
     // Also calculate viewed count (signers who have viewed_at timestamp)
     console.log('✅ Signature saved successfully. Signed:', signedCount, 'Total:', totalSigners)
+
+    // ✅ PERFORMANCE FIX: Publish real-time status update
+    try {
+      await RealTimeStatusService.publishDocumentSigned(
+        requestId,
+        userEmail,
+        signedCount,
+        totalSigners
+      )
+      console.log('📡 Real-time status update published')
+    } catch (error) {
+      console.error('❌ Error publishing real-time update:', error)
+    }
 
     // Send signature completion notifications
     try {

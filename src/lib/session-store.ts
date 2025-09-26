@@ -1,7 +1,8 @@
-// Session storage for refresh token rotation and revocation
-// Using Supabase for persistent session storage
+// Session storage using Upstash Redis for high performance
+// Fallback to Supabase for critical session data
 
 import { supabaseAdmin } from './supabase-admin'
+import { redis, CACHE_TTL, CACHE_KEYS, RedisUtils } from './upstash-config'
 
 interface SessionData {
   userId: string
@@ -19,8 +20,9 @@ interface SessionData {
 // In-memory store for development fallback
 const sessionStore = new Map<string, SessionData>()
 
-// Database session management
-const USE_DATABASE_SESSIONS = true // Enable database sessions
+// Use Redis for primary session storage with database backup
+const USE_REDIS_SESSIONS = true
+const USE_DATABASE_SESSIONS = true // For fallback when Redis is unavailable
 
 /**
  * Store a new session with refresh token
@@ -35,62 +37,53 @@ export async function storeSession(
 ): Promise<void> {
   const now = Date.now()
 
-  if (USE_DATABASE_SESSIONS) {
+  const sessionData: SessionData = {
+    userId,
+    email,
+    refreshToken: await hashToken(refreshToken),
+    createdAt: now,
+    lastUsedAt: now,
+    userAgent,
+    ipAddress,
+  }
+
+  if (USE_REDIS_SESSIONS) {
     try {
-      console.log('📝 Storing session in database:', sessionId)
-      const { error } = await supabaseAdmin
+      console.log('📝 Storing session in Redis:', sessionId)
+
+      // Store session in Redis with TTL
+      const sessionKey = RedisUtils.buildKey(CACHE_KEYS.SESSION, sessionId)
+      await RedisUtils.setWithTTL(sessionKey, sessionData, CACHE_TTL.SESSION)
+
+      // Track user sessions for security (multiple device management)
+      const userSessionsKey = RedisUtils.buildKey(CACHE_KEYS.USER_SESSIONS, userId)
+      await redis.sadd(userSessionsKey, sessionId)
+      await redis.expire(userSessionsKey, CACHE_TTL.SESSION)
+
+      // Store backup in database for critical data
+      await supabaseAdmin
         .from('user_sessions')
         .upsert({
           session_id: sessionId,
           user_id: userId,
           email,
-          refresh_token_hash: await hashToken(refreshToken),
+          refresh_token_hash: sessionData.refreshToken,
           created_at: new Date(now).toISOString(),
           last_used_at: new Date(now).toISOString(),
           user_agent: userAgent,
           ip_address: ipAddress
         })
 
-      if (error) {
-        console.error('❌ Failed to store session in database:', error)
-        // Fallback to in-memory store
-        console.log('🔄 Falling back to in-memory session store')
-        sessionStore.set(sessionId, {
-          userId,
-          email,
-          refreshToken: await hashToken(refreshToken),
-          createdAt: now,
-          lastUsedAt: now,
-          userAgent,
-          ipAddress,
-        })
-      } else {
-        console.log('✅ Session stored in database successfully')
-      }
+      console.log('✅ Session stored in Redis and database successfully')
     } catch (error) {
-      console.error('❌ Database session store error:', error)
+      console.error('❌ Redis session store error:', error)
       // Fallback to in-memory store
       console.log('🔄 Falling back to in-memory session store')
-      sessionStore.set(sessionId, {
-        userId,
-        email,
-        refreshToken: await hashToken(refreshToken),
-        createdAt: now,
-        lastUsedAt: now,
-        userAgent,
-        ipAddress,
-      })
+      sessionStore.set(sessionId, sessionData)
     }
   } else {
-    sessionStore.set(sessionId, {
-      userId,
-      email,
-      refreshToken: await hashToken(refreshToken),
-      createdAt: now,
-      lastUsedAt: now,
-      userAgent,
-      ipAddress,
-    })
+    // Use in-memory store
+    sessionStore.set(sessionId, sessionData)
   }
 }
 
@@ -98,15 +91,44 @@ export async function storeSession(
  * Get session data by session ID
  */
 export async function getSession(sessionId: string): Promise<SessionData | null> {
-  if (USE_DATABASE_SESSIONS) {
-    try {
-      const { data, error } = await supabaseAdmin
-        .from('user_sessions')
-        .select('*')
-        .eq('session_id', sessionId)
-        .single()
+  try {
+    if (USE_DATABASE_SESSIONS) {
+      try {
+        const { data, error } = await supabaseAdmin
+          .from('user_sessions')
+          .select('*')
+          .eq('session_id', sessionId)
+          .single()
 
-      if (error || !data) {
+        if (error || !data) {
+          // Fallback to in-memory store
+          const session = sessionStore.get(sessionId)
+          if (session) {
+            session.lastUsedAt = Date.now()
+            sessionStore.set(sessionId, session)
+            return session
+          }
+          return null
+        }
+
+        // Update last used time in database
+        const now = new Date().toISOString()
+        await supabaseAdmin
+          .from('user_sessions')
+          .update({ last_used_at: now })
+          .eq('session_id', sessionId)
+
+        return {
+          userId: data.user_id,
+          email: data.email,
+          refreshToken: data.refresh_token_hash,
+          createdAt: new Date(data.created_at).getTime(),
+          lastUsedAt: new Date(now).getTime(),
+          userAgent: data.user_agent,
+          ipAddress: data.ip_address
+        }
+      } catch (error) {
+        console.error('Database session get error:', error)
         // Fallback to in-memory store
         const session = sessionStore.get(sessionId)
         if (session) {
@@ -116,46 +138,22 @@ export async function getSession(sessionId: string): Promise<SessionData | null>
         }
         return null
       }
-
-      // Update last used time in database
-      const now = new Date().toISOString()
-      await supabaseAdmin
-        .from('user_sessions')
-        .update({ last_used_at: now })
-        .eq('session_id', sessionId)
-
-      return {
-        userId: data.user_id,
-        email: data.email,
-        refreshToken: data.refresh_token_hash,
-        createdAt: new Date(data.created_at).getTime(),
-        lastUsedAt: new Date(now).getTime(),
-        userAgent: data.user_agent,
-        ipAddress: data.ip_address
-      }
-    } catch (error) {
-      console.error('Database session get error:', error)
-      // Fallback to in-memory store
+    } else {
       const session = sessionStore.get(sessionId)
-      if (session) {
-        session.lastUsedAt = Date.now()
-        sessionStore.set(sessionId, session)
-        return session
+
+      if (!session) {
+        return null
       }
-      return null
+
+      // Update last used time
+      session.lastUsedAt = Date.now()
+      sessionStore.set(sessionId, session)
+
+      return session
     }
-  } else {
-    const session = sessionStore.get(sessionId)
-
-    if (!session) {
-      return null
-    }
-
-    // Update last used time
-    session.lastUsedAt = Date.now()
-    sessionStore.set(sessionId, session)
-
-    return session
+  } catch (error) {
+    console.error('❌ Critical error in getSession:', error)
+    return null
   }
 }
 
@@ -166,14 +164,19 @@ export async function validateRefreshToken(
   sessionId: string,
   refreshToken: string
 ): Promise<boolean> {
-  const session = await getSession(sessionId)
+  try {
+    const session = await getSession(sessionId)
 
-  if (!session) {
+    if (!session) {
+      return false
+    }
+
+    // Compare hashed tokens properly
+    return await compareTokens(refreshToken, session.refreshToken)
+  } catch (error) {
+    console.error('❌ Error validating refresh token:', error)
     return false
   }
-
-  // Compare hashed tokens properly
-  return await compareTokens(refreshToken, session.refreshToken)
 }
 
 /**

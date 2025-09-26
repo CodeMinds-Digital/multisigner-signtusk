@@ -414,18 +414,20 @@ export class TokenRefreshManager {
   }
 }
 
+// ✅ PERFORMANCE FIX: Disabled auto-initialization to prevent duplicate auth refreshes
+// The SecureAuthProvider now handles all auth refresh logic
 // Auto-initialize when module loads (client-side only)
-if (typeof window !== 'undefined') {
-  // Initialize after a short delay to ensure DOM is ready
-  setTimeout(() => {
-    // Only initialize if we have a session
-    supabase.auth.getSession().then(({ data: { session } }: any) => {
-      if (session) {
-        TokenRefreshManager.initialize()
-      }
-    })
-  }, 2000)
-}
+// if (typeof window !== 'undefined') {
+//   // Initialize after a short delay to ensure DOM is ready
+//   setTimeout(() => {
+//     // Only initialize if we have a session
+//     supabase.auth.getSession().then(({ data: { session } }: any) => {
+//       if (session) {
+//         TokenRefreshManager.initialize()
+//       }
+//     })
+//   }, 2000)
+// }
 
 // Global error handler for unhandled promise rejections
 if (typeof window !== 'undefined') {

@@ -47,9 +47,15 @@ interface RequestDetailsModalProps {
   isOpen: boolean
   onClose: () => void
   currentUserEmail?: string
+  onStatusUpdate?: (requestId: string, updates: {
+    status: string
+    signed_count: number
+    total_signers: number
+    updated_at: string
+  }) => void
 }
 
-export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail }: RequestDetailsModalProps) {
+export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail, onStatusUpdate }: RequestDetailsModalProps) {
   const [showSigningScreen, setShowSigningScreen] = useState(false)
 
   if (!isOpen) return null
@@ -111,11 +117,15 @@ export function RequestDetailsModal({ request, isOpen, onClose, currentUserEmail
       setShowSigningScreen(false)
       onClose()
 
-      // Add a small delay before refresh to ensure database update is complete
-      setTimeout(() => {
-        console.log('🔄 Refreshing page to show updated signature status...')
-        window.location.reload()
-      }, 1000)
+      // ✅ PERFORMANCE FIX: Use callback instead of page reload
+      if (onStatusUpdate) {
+        onStatusUpdate(request.id, {
+          status: result.allSignersCompleted ? 'completed' : 'in_progress',
+          signed_count: result.signedCount,
+          total_signers: result.totalSigners,
+          updated_at: new Date().toISOString()
+        })
+      }
     } catch (error) {
       console.error('❌ Error accepting signature:', error)
       alert(`Error saving signature: ${error instanceof Error ? error.message : 'Unknown error'}`)

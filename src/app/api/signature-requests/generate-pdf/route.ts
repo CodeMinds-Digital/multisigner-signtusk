@@ -225,13 +225,30 @@ async function populateSchemaWithSignatures(schema: any[], signers: any[]) {
   const inputs: Record<string, any> = {}
 
   console.log(`📋 Processing ${schema.length} fields for ${signers.length} signers`)
+  console.log(`👥 Available signers:`, signers.map(s => ({
+    email: s.signer_email,
+    order: s.signing_order,
+    schema_id: s.schema_signer_id,
+    status: s.status || s.signer_status
+  })))
+
+  // Create a field counter for distributing unassigned fields among signers
+  let unassignedFieldCounter = 0
 
   for (const field of schema) {
     const fieldName = field.name
     if (!fieldName) continue
 
+    console.log(`🔍 Processing field: ${fieldName}`, {
+      signerId: field.signerId,
+      signer_email: field.signer_email,
+      signer_id: field.signer_id,
+      signing_order: field.signing_order,
+      properties: field.properties
+    })
+
     // Find the appropriate signer for this field
-    // Priority: schema signerId > signer_email > signer_id > signing_order > fallback
+    // Priority: schema signerId > signer_email > signer_id > signing_order > smart fallback
     let targetSigner = null
 
     // First, try to match by schema signerId (NEW: Primary method)
@@ -255,15 +272,29 @@ async function populateSchemaWithSignatures(schema: any[], signers: any[]) {
       targetSigner = signers.find(s => s.signing_order === field.signing_order)
       console.log(`🎯 Field ${fieldName} assigned to signing order: ${field.signing_order}`)
     } else if (!targetSigner) {
-      // No specific assignment - use first available signed signer
-      targetSigner = signers.find(s => s.status === 'signed' || s.signer_status === 'signed')
-      console.log(`🎯 Field ${fieldName} using first available signed signer`)
+      // Smart fallback: distribute unassigned fields among signers by order
+      const signedSigners = signers.filter(s => s.status === 'signed' || s.signer_status === 'signed')
+        .sort((a, b) => (a.signing_order || 0) - (b.signing_order || 0))
+
+      if (signedSigners.length > 0) {
+        const signerIndex = unassignedFieldCounter % signedSigners.length
+        targetSigner = signedSigners[signerIndex]
+        unassignedFieldCounter++
+        console.log(`🎯 Field ${fieldName} distributed to signer ${signerIndex + 1}/${signedSigners.length}: ${targetSigner.signer_email}`)
+      }
     }
 
     if (!targetSigner) {
       console.log(`⚠️ No signer found for field: ${fieldName}`)
       continue
     }
+
+    console.log(`✅ Selected signer for field ${fieldName}:`, {
+      email: targetSigner.signer_email,
+      name: targetSigner.signer_name,
+      order: targetSigner.signing_order,
+      status: targetSigner.status || targetSigner.signer_status
+    })
 
     if (!targetSigner.signature_data) {
       console.log(`⚠️ No signature data found for field: ${fieldName}, signer: ${targetSigner.signer_email}`)
@@ -285,6 +316,7 @@ async function populateSchemaWithSignatures(schema: any[], signers: any[]) {
     if (fieldValue !== null && fieldValue !== undefined) {
       inputs[fieldName] = fieldValue
       console.log(`✅ Populated field ${fieldName} with:`, fieldValue.substring ? fieldValue.substring(0, 50) + '...' : fieldValue)
+      console.log(`📝 Field details: type=${field.type}, signer=${targetSigner.signer_email}, value_type=${typeof fieldValue}`)
     }
   }
 

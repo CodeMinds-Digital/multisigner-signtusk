@@ -315,7 +315,27 @@ export default function PDFViewer({
             <div className="flex items-center justify-center h-full">
               <div className="text-center py-8">
                 <p className="text-red-600 mb-4">{error}</p>
-                <Button onClick={() => window.location.reload()}>
+                <Button onClick={() => {
+                  // ✅ PERFORMANCE FIX: Reset error state and retry
+                  setError(null)
+                  setLoading(true)
+                  // Re-trigger PDF loading with current fileUrl
+                  const fetchPdf = async () => {
+                    try {
+                      const base64 = await convertToBase64(fileUrl)
+                      const template: PDFTemplate = {
+                        basePdf: base64,
+                        schemas: [[]]
+                      }
+                      setPdfTemplate(template)
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Failed to load PDF')
+                    } finally {
+                      setLoading(false)
+                    }
+                  }
+                  fetchPdf()
+                }}>
                   Retry
                 </Button>
               </div>

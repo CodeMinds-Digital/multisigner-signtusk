@@ -234,7 +234,13 @@ export function PreviewSaveStep({
           <p className="text-gray-900 font-medium">Error generating preview</p>
           <p className="text-gray-600 mt-2">{error}</p>
           <Button
-            onClick={() => window.location.reload()}
+            onClick={() => {
+              // ✅ PERFORMANCE FIX: Reset error state instead of reload
+              setError(null)
+              setIsLoading(true)
+              setPreviewGenerated(false)
+              // Component will re-trigger preview generation via useEffect
+            }}
             className="mt-4"
           >
             Retry

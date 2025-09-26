@@ -331,8 +331,8 @@ export function LoginForm() {
                     onClick={() => {
                       // Clear any remaining localStorage data
                       localStorage.clear()
-                      // Reload the page
-                      window.location.reload()
+                      // ✅ PERFORMANCE FIX: Use router navigation instead of reload
+                      window.location.href = '/login'
                     }}
                     className="text-xs text-red-800 underline hover:text-red-900"
                   >

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { TOTPServiceSpeakeasy } from '@/lib/totp-service-speakeasy'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,7 +31,31 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('🔐 Verifying TOTP for signing request:', requestId, 'by user:', userEmail)
+    console.log('🔐 Verifying TOTP for signing request:', requestId, 'by user:', userEmail, 'userId:', userId)
+
+    // Check if this user is actually a signer for this request
+    const { data: signer, error: signerError } = await supabaseAdmin
+      .from('signing_request_signers')
+      .select('*')
+      .eq('signing_request_id', requestId)
+      .eq('signer_email', userEmail)
+      .single()
+
+    if (signerError || !signer) {
+      console.error('❌ User is not a signer for this request:', signerError)
+      return NextResponse.json(
+        { error: 'User is not authorized to sign this document' },
+        { status: 403 }
+      )
+    }
+
+    console.log('✅ Confirmed user is a signer:', {
+      signerId: signer.id,
+      signerEmail: signer.signer_email,
+      signerName: signer.signer_name,
+      status: signer.status,
+      totpVerified: signer.totp_verified
+    })
 
     // Get client IP for audit trail
     const rawClientIP = request.headers.get('x-forwarded-for') ||
