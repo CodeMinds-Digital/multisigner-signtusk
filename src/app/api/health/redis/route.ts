@@ -7,24 +7,24 @@ import { UpstashAnalytics } from '@/lib/upstash-analytics'
 export async function GET(request: NextRequest) {
   try {
     const startTime = Date.now()
-    
+
     // Check Redis connection
     const redisHealth = await checkRedisHealth()
-    
+
     // Check cache service
     const cacheHealth = await checkCacheHealth()
-    
+
     // Check job queue
     const jobQueueHealth = await checkJobQueueHealth()
-    
+
     // Check analytics
     const analyticsHealth = await checkAnalyticsHealth()
-    
+
     const totalTime = Date.now() - startTime
-    const allHealthy = redisHealth.status === 'healthy' && 
-                      cacheHealth.status === 'healthy' && 
-                      jobQueueHealth.status === 'healthy' && 
-                      analyticsHealth.status === 'healthy'
+    const allHealthy = redisHealth.status === 'healthy' &&
+      cacheHealth.status === 'healthy' &&
+      jobQueueHealth.status === 'healthy' &&
+      analyticsHealth.status === 'healthy'
 
     const response = {
       status: allHealthy ? 'healthy' : 'unhealthy',
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Redis health check failed:', error)
-    
+
     return NextResponse.json({
       status: 'unhealthy',
       timestamp: new Date().toISOString(),
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
         jobQueue: { status: 'unknown' },
         analytics: { status: 'unknown' }
       }
-    }, { 
+    }, {
       status: 503,
       headers: {
         'Cache-Control': 'no-cache, no-store, must-revalidate',
@@ -79,18 +79,18 @@ async function checkCacheHealth() {
   try {
     const testKey = 'health_check_cache'
     const testValue = { timestamp: Date.now(), test: true }
-    
+
     // Test cache set
     await RedisCacheService.cacheUserProfile(testKey, testValue)
-    
+
     // Test cache get
     const retrieved = await RedisCacheService.getUserProfile(testKey)
-    
+
     // Test cache delete
     await RedisCacheService.invalidateUserProfile(testKey)
-    
+
     const isWorking = retrieved && retrieved.timestamp === testValue.timestamp
-    
+
     return {
       status: isWorking ? 'healthy' : 'unhealthy',
       operations: {
@@ -99,7 +99,7 @@ async function checkCacheHealth() {
         delete: true
       }
     }
-    
+
   } catch (error) {
     return {
       status: 'unhealthy',
@@ -112,17 +112,17 @@ async function checkJobQueueHealth() {
   try {
     // Get job statistics
     const stats = await UpstashJobQueue.getJobStats()
-    
+
     // Check if we can get job status (this tests Redis connectivity)
     const testJobId = 'health_check_job'
     const jobStatus = await UpstashJobQueue.getJobStatus(testJobId)
-    
+
     return {
       status: 'healthy',
       stats,
       canAccessJobs: true
     }
-    
+
   } catch (error) {
     return {
       status: 'unhealthy',
@@ -135,10 +135,10 @@ async function checkAnalyticsHealth() {
   try {
     // Test analytics retrieval
     const analytics = await UpstashAnalytics.getRealtimeAnalytics()
-    
+
     // Test performance metrics
     const performance = await UpstashAnalytics.getAPIPerformance('/api/health/redis')
-    
+
     return {
       status: 'healthy',
       hasAnalytics: !!analytics,
@@ -146,7 +146,7 @@ async function checkAnalyticsHealth() {
       todayViews: analytics?.todayViews || 0,
       todaySignatures: analytics?.todaySignatures || 0
     }
-    
+
   } catch (error) {
     return {
       status: 'unhealthy',
@@ -160,7 +160,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { action, adminKey } = body
-    
+
     // Simple admin key check (in production, use proper authentication)
     if (adminKey !== process.env.ADMIN_HEALTH_KEY) {
       return NextResponse.json(
@@ -172,16 +172,16 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'detailed_diagnostics':
         return await runDetailedDiagnostics()
-      
+
       case 'clear_cache':
         return await clearAllCaches()
-      
+
       case 'test_job_queue':
         return await testJobQueue()
-      
+
       case 'reset_analytics':
         return await resetAnalytics()
-      
+
       default:
         return NextResponse.json(
           { error: 'Invalid action' },
@@ -191,7 +191,7 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     return NextResponse.json(
-      { 
+      {
         error: 'Diagnostic failed',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -254,7 +254,7 @@ async function clearAllCaches() {
     // This would clear all cache patterns
     // In a real implementation, you'd want to be more selective
     console.log('🧹 Clearing all caches (simulated)')
-    
+
     return NextResponse.json({
       status: 'completed',
       message: 'All caches cleared',
@@ -299,7 +299,7 @@ async function resetAnalytics() {
     // This would reset analytics data
     // In a real implementation, you'd want to be careful about this
     console.log('📊 Resetting analytics (simulated)')
-    
+
     return NextResponse.json({
       status: 'completed',
       message: 'Analytics reset',
@@ -319,17 +319,17 @@ async function testRedisConnection() {
     const { redis } = await import('@/lib/upstash-config')
     const testKey = 'connection_test'
     const testValue = Date.now().toString()
-    
+
     await redis.set(testKey, testValue)
     const retrieved = await redis.get(testKey)
     await redis.del(testKey)
-    
+
     return {
       canWrite: true,
       canRead: retrieved === testValue,
       canDelete: true
     }
-    
+
   } catch (error) {
     return {
       canWrite: false,
@@ -344,21 +344,21 @@ async function getRecentJobsSummary() {
   try {
     const jobTypes = ['email', 'pdf-generation', 'notification', 'audit-log']
     const summary: any = {}
-    
+
     for (const type of jobTypes) {
       const recentJobs = await UpstashJobQueue.getRecentJobs(type, 10)
       summary[type] = {
         count: recentJobs.length,
-        recent: recentJobs.slice(0, 3).map(job => ({
-          id: job.id,
-          status: job.status,
-          createdAt: job.createdAt
+        recent: recentJobs.slice(0, 3).map((job: any) => ({
+          id: job?.id || 'unknown',
+          status: job?.status || 'unknown',
+          createdAt: job?.createdAt || new Date().toISOString()
         }))
       }
     }
-    
+
     return summary
-    
+
   } catch (error) {
     return {
       error: error instanceof Error ? error.message : 'Unknown error'

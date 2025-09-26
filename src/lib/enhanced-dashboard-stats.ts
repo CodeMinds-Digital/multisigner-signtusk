@@ -100,18 +100,18 @@ export async function getEnhancedDashboardStats(): Promise<EnhancedDashboardStat
 
     const docs = documents || []
     console.log('📄 Documents fetched:', docs.length)
-    console.log('📊 Document statuses:', docs.map(d => d.status))
+    console.log('📊 Document statuses:', docs.map((d: any) => d.status))
 
     // Calculate basic counts based on actual status values
     const totalDocuments = docs.length
-    const draftDocuments = docs.filter(doc => doc.status === 'draft').length
-    const readyDocuments = docs.filter(doc => doc.status === 'ready').length
-    const publishedDocuments = docs.filter(doc => doc.status === 'published').length
+    const draftDocuments = docs.filter((doc: any) => doc.status === 'draft').length
+    const readyDocuments = docs.filter((doc: any) => doc.status === 'ready').length
+    const publishedDocuments = docs.filter((doc: any) => doc.status === 'published').length
 
     // Map to expected dashboard categories
     const pendingSignatures = readyDocuments // Ready documents are pending signatures
     const completedDocuments = publishedDocuments // Published documents are completed
-    const expiredDocuments = docs.filter(doc => doc.status === 'expired').length
+    const expiredDocuments = docs.filter((doc: any) => doc.status === 'expired').length
 
     console.log('📊 Calculated counts:', {
       totalDocuments,
@@ -129,15 +129,15 @@ export async function getEnhancedDashboardStats(): Promise<EnhancedDashboardStat
     const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
     const monthAgo = new Date(today.getTime() - 30 * 24 * 60 * 60 * 1000)
 
-    const todayActivity = docs.filter(doc =>
+    const todayActivity = docs.filter((doc: any) =>
       new Date(doc.created_at) >= today
     ).length
 
-    const weekActivity = docs.filter(doc =>
+    const weekActivity = docs.filter((doc: any) =>
       new Date(doc.created_at) >= weekAgo
     ).length
 
-    const monthActivity = docs.filter(doc =>
+    const monthActivity = docs.filter((doc: any) =>
       new Date(doc.created_at) >= monthAgo
     ).length
 
@@ -149,23 +149,23 @@ export async function getEnhancedDashboardStats(): Promise<EnhancedDashboardStat
 
     // Calculate signature metrics (simplified since signing_requests might not be available)
     const totalSignatures = completedDocuments // Use completed documents as proxy for signatures
-    const completedDocs = docs.filter(doc => doc.status === 'published' && doc.completed_at)
+    const completedDocs = docs.filter((doc: any) => doc.status === 'published' && doc.completed_at)
 
     // Calculate average completion time (in hours)
     const completionTimes = completedDocs
-      .map(doc => {
+      .map((doc: any) => {
         const created = new Date(doc.created_at)
         const completed = new Date(doc.completed_at!)
         return (completed.getTime() - created.getTime()) / (1000 * 60 * 60) // hours
       })
-      .filter(time => time > 0)
+      .filter((time: any) => time > 0)
 
     const averageCompletionTime = completionTimes.length > 0
-      ? completionTimes.reduce((sum, time) => sum + time, 0) / completionTimes.length
+      ? completionTimes.reduce((sum: any, time: any) => sum + time, 0) / completionTimes.length
       : 0
 
     // Calculate success rate
-    const totalRequests = docs.filter(doc => doc.status !== 'draft').length
+    const totalRequests = docs.filter((doc: any) => doc.status !== 'draft').length
     const successRate = totalRequests > 0
       ? Math.round((completedDocuments / totalRequests) * 100)
       : 0
@@ -177,7 +177,7 @@ export async function getEnhancedDashboardStats(): Promise<EnhancedDashboardStat
     })
 
     // Get recent documents
-    const recentDocuments = docs.slice(0, 5).map(doc => ({
+    const recentDocuments = docs.slice(0, 5).map((doc: any) => ({
       id: doc.id,
       title: doc.title || 'Untitled Document',
       status: doc.status,
@@ -186,11 +186,11 @@ export async function getEnhancedDashboardStats(): Promise<EnhancedDashboardStat
     }))
 
     // Calculate trends (simplified - comparing last 30 days to previous 30 days)
-    const last30Days = docs.filter(doc =>
+    const last30Days = docs.filter((doc: any) =>
       new Date(doc.created_at) >= monthAgo
     ).length
 
-    const previous30Days = docs.filter(doc => {
+    const previous30Days = docs.filter((doc: any) => {
       const created = new Date(doc.created_at)
       const twoMonthsAgo = new Date(monthAgo.getTime() - 30 * 24 * 60 * 60 * 1000)
       return created >= twoMonthsAgo && created < monthAgo
@@ -284,36 +284,36 @@ export async function getEnhancedDriveStats(): Promise<DriveStats> {
 
     // Calculate status group counts
     const allDocuments = docs.length
-    const draft = docs.filter(doc => doc.status === 'draft').length
-    const ready = docs.filter(doc => doc.status === 'ready').length
-    const inactive = docs.filter(doc =>
+    const draft = docs.filter((doc: any) => doc.status === 'draft').length
+    const ready = docs.filter((doc: any) => doc.status === 'ready').length
+    const inactive = docs.filter((doc: any) =>
       ['expired', 'cancelled', 'declined', 'archived'].includes(doc.status)
     ).length
 
     // Calculate activity metrics
     const now = new Date()
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-    const recentActivity = docs.filter(doc =>
+    const recentActivity = docs.filter((doc: any) =>
       new Date(doc.updated_at) >= weekAgo
     ).length
 
     // Calculate total signers
-    const totalSigners = docs.reduce((total, doc) => {
-      const signers = doc.signing_requests?.reduce((reqTotal, req) => {
+    const totalSigners = docs.reduce((total: any, doc: any) => {
+      const signers = doc.signing_requests?.reduce((reqTotal: any, req: any) => {
         return reqTotal + (req.signing_request_signers?.length || 0)
       }, 0) || 0
       return total + signers
     }, 0)
 
     // Document types breakdown
-    const documentTypes = docs.reduce((types, doc) => {
+    const documentTypes = docs.reduce((types: any, doc: any) => {
       const type = doc.document_type || 'Other'
       types[type] = (types[type] || 0) + 1
       return types
     }, {} as Record<string, number>)
 
     // Recent documents
-    const recentDocuments = docs.slice(0, 5).map(doc => ({
+    const recentDocuments = docs.slice(0, 5).map((doc: any) => ({
       id: doc.id,
       name: doc.name || 'Untitled Document',
       status: doc.status,

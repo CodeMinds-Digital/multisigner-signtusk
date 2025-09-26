@@ -64,8 +64,6 @@ export class TOTPServiceSpeakeasy {
       try {
         qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url, {
           errorCorrectionLevel: 'M',
-          type: 'image/png',
-          quality: 0.92,
           margin: 1,
           color: {
             dark: '#000000',

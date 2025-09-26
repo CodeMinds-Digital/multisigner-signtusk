@@ -7,7 +7,7 @@ export class UpstashJobQueue {
     const jobId = await qstash.publishJSON({
       url: JOB_URLS.SEND_EMAIL,
       body: { ...emailData, priority },
-      delay: delay ? `${delay}s` : undefined,
+      delay: delay ? `${BigInt(delay)}s` : undefined,
       retries: 3,
       headers: {
         'X-Priority': priority,
@@ -74,7 +74,7 @@ export class UpstashJobQueue {
     const jobId = await qstash.publishJSON({
       url: JOB_URLS.SEND_NOTIFICATION,
       body: notificationData,
-      delay: delay ? `${delay}s` : undefined,
+      delay: delay ? `${BigInt(delay)}s` : undefined,
       retries: 3,
       headers: {
         'X-Job-Type': 'notification'
@@ -225,9 +225,9 @@ export class UpstashJobQueue {
 
     for (const type of types) {
       const recentJobs = await this.getRecentJobs(type, 100)
-      const completed = recentJobs.filter(job => job.status === 'completed').length
-      const failed = recentJobs.filter(job => job.status === 'failed').length
-      const pending = recentJobs.filter(job => job.status === 'queued' || job.status === 'processing').length
+      const completed = recentJobs.filter((job: any) => job?.status === 'completed').length
+      const failed = recentJobs.filter((job: any) => job?.status === 'failed').length
+      const pending = recentJobs.filter((job: any) => job?.status === 'queued' || job?.status === 'processing').length
 
       stats[type] = {
         total: recentJobs.length,

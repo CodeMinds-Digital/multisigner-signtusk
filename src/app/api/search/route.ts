@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { RedisSearchService } from '@/lib/redis-search-service'
 import { VectorSearchService } from '@/lib/vector-search-service'
 import { rateLimiters } from '@/lib/upstash-config'
-import { getSession } from '@/lib/auth-utils'
+import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
+import { verifyAccessToken } from '@/lib/jwt-utils'
 
 export async function GET(request: NextRequest) {
   try {
     // Rate limiting
-    const identifier = request.ip ?? 'anonymous'
+    const identifier = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'anonymous'
     const { success } = await rateLimiters.api.limit(identifier)
 
     if (!success) {
@@ -18,8 +19,18 @@ export async function GET(request: NextRequest) {
     }
 
     // Get session for user context
-    const session = await getSession(request)
-    const userId = session?.user?.id
+    const tokens = getAuthTokensFromRequest(request)
+    let userId: string | undefined
+
+    if (tokens.accessToken) {
+      try {
+        const payload = await verifyAccessToken(tokens.accessToken)
+        userId = payload?.userId
+      } catch (error) {
+        // Continue without user context for public searches
+        console.log('🔍 Search without authentication:', error)
+      }
+    }
 
     const { searchParams } = new URL(request.url)
     const query = searchParams.get('q') || ''
@@ -75,8 +86,8 @@ export async function GET(request: NextRequest) {
 
     // Perform search based on type and mode
     let results
-    let semanticResults = []
-    let traditionalResults = []
+    let semanticResults: any[] = []
+    let traditionalResults: any[] = []
 
     if (searchMode === 'semantic' || searchMode === 'hybrid') {
       // Perform semantic search
@@ -90,7 +101,15 @@ export async function GET(request: NextRequest) {
         traditionalResults = await RedisSearchService.searchDocuments(query, filters, limit, userId)
       } else if (type === 'users') {
         // Only allow admin users to search users
-        if (!session?.user?.app_metadata?.role?.includes('admin')) {
+        if (!tokens.accessToken) {
+          return NextResponse.json(
+            { error: 'Authentication required to search users' },
+            { status: 401 }
+          )
+        }
+
+        const payload = await verifyAccessToken(tokens.accessToken)
+        if (!payload?.role?.includes('admin')) {
           return NextResponse.json(
             { error: 'Unauthorized to search users' },
             { status: 403 }
@@ -148,7 +167,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting
-    const identifier = request.ip ?? 'anonymous'
+    const identifier = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'anonymous'
     const { success } = await rateLimiters.api.limit(identifier)
 
     if (!success) {
@@ -159,12 +178,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Get session for user context
-    const session = await getSession(request)
-    const userId = session?.user?.id
+    const tokens = getAuthTokensFromRequest(request)
+    if (!tokens.accessToken) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    const payload = await verifyAccessToken(tokens.accessToken)
+    const userId = payload?.userId
 
     if (!userId) {
       return NextResponse.json(
-        { error: 'Authentication required' },
+        { error: 'Invalid authentication token' },
         { status: 401 }
       )
     }
@@ -185,7 +212,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ similar_documents: similarDocs })
 
       case 'index_document':
-        if (!session?.user?.app_metadata?.role?.includes('admin')) {
+        if (!payload?.role?.includes('admin')) {
           return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
         }
         await VectorSearchService.indexDocument(data.documentId, data.title, data.content, data.metadata)
@@ -197,7 +224,7 @@ export async function POST(request: NextRequest) {
 
       case 'clear_cache':
         // Only allow admin users to clear search cache
-        if (!session?.user?.app_metadata?.role?.includes('admin')) {
+        if (!payload?.role?.includes('admin')) {
           return NextResponse.json(
             { error: 'Unauthorized to clear cache' },
             { status: 403 }
@@ -291,7 +318,8 @@ async function performAdvancedSearch(searchData: any, userId: string) {
       description: result.description,
       score: result.score,
       url: result.url,
-      created_at: result.created_at
+      created_at: result.created_at,
+      metadata: {}
     }))
   }
 

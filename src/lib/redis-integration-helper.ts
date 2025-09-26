@@ -8,7 +8,7 @@ import { UpstashJobQueue } from './upstash-job-queue'
 /**
  * Wrapper for API routes to add Redis features
  */
-export function withRedisFeatures(handler: Function, options: {
+export function withRedisFeatures(handler: (...args: any[]) => any, options: {
   rateLimitType?: 'api' | 'auth' | 'corporateAdmin' | 'email' | 'pdfGeneration' | 'totp' | 'verify'
   enableAnalytics?: boolean
   enableCaching?: boolean
@@ -19,7 +19,7 @@ export function withRedisFeatures(handler: Function, options: {
     const startTime = Date.now()
     const pathname = request.nextUrl.pathname
     const method = request.method
-    const ip = request.ip || 'unknown'
+    const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
 
     try {
       // 1. Rate Limiting
@@ -30,13 +30,13 @@ export function withRedisFeatures(handler: Function, options: {
         if (!success) {
           await UpstashAnalytics.trackAPIPerformance(pathname, Date.now() - startTime, false)
           return NextResponse.json(
-            { 
+            {
               error: 'Too many requests',
               limit,
               remaining: 0,
               reset: new Date(reset).toISOString()
             },
-            { 
+            {
               status: 429,
               headers: {
                 'X-RateLimit-Limit': limit.toString(),
@@ -52,7 +52,7 @@ export function withRedisFeatures(handler: Function, options: {
       if (method === 'GET' && options.enableCaching) {
         const cacheKey = generateCacheKey(request)
         const cached = await RedisCacheService.getUserProfile(cacheKey) // Generic cache get
-        
+
         if (cached) {
           await UpstashAnalytics.trackAPIPerformance(pathname, Date.now() - startTime, true)
           return NextResponse.json(cached, {
@@ -82,7 +82,7 @@ export function withRedisFeatures(handler: Function, options: {
 
     } catch (error) {
       console.error('❌ Redis wrapper error:', error)
-      
+
       // Track error
       if (options.enableAnalytics) {
         await UpstashAnalytics.trackAPIPerformance(pathname, Date.now() - startTime, false)
@@ -113,7 +113,7 @@ export async function queueBackgroundJobs(jobs: Array<{
         case 'audit':
           return UpstashJobQueue.queueAuditLog(job.data)
         case 'pdf':
-          return UpstashJobQueue.queuePDFGeneration(job.data.requestId, job.priority)
+          return UpstashJobQueue.queuePDFGeneration(job.data.requestId, job.priority === 'low' ? 'normal' : job.priority)
         case 'analytics':
           return UpstashJobQueue.queueAnalyticsAggregation(job.data.domain, job.data.date)
         default:
@@ -226,10 +226,10 @@ export async function getCachedData<T>(
 
     // Fallback to database
     const data = await fallbackFn()
-    
+
     // Cache the result
     await RedisCacheService.cacheUserProfile(cacheKey, data) // Generic cache set
-    
+
     return data
 
   } catch (error) {
@@ -302,7 +302,7 @@ export async function publishRealTimeUpdate(
 ) {
   try {
     const { UpstashRealTime } = await import('./upstash-real-time')
-    
+
     switch (type) {
       case 'document':
         await UpstashRealTime.publishDocumentUpdate(identifier, update)
@@ -311,7 +311,7 @@ export async function publishRealTimeUpdate(
         await UpstashRealTime.publishUserNotification(identifier, update)
         break
       case 'corporate':
-        await UpstashRealTime.publishCorporateUpdate(identifier, update)
+        await UpstashRealTime.publishDomainMetrics(identifier, update)
         break
     }
 
@@ -351,7 +351,7 @@ export async function initializeRedisServices() {
   try {
     const { validateUpstashConfig } = await import('./upstash-config')
     validateUpstashConfig()
-    
+
     console.log('✅ Redis services initialized successfully')
     return true
   } catch (error) {

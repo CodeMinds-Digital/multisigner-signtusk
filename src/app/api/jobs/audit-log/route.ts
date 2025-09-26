@@ -1,17 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifySignature } from '@upstash/qstash/nextjs'
+import { verifySignatureAppRouter } from '@upstash/qstash/nextjs'
 import { UpstashJobQueue } from '@/lib/upstash-job-queue'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 async function handler(request: NextRequest) {
   try {
     const body = await request.json()
-    const { 
-      userId, 
-      action, 
-      resourceType, 
-      resourceId, 
-      details, 
+    const {
+      userId,
+      action,
+      resourceType,
+      resourceId,
+      details,
       metadata,
       ipAddress,
       userAgent,
@@ -76,8 +76,8 @@ async function handler(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
         timestamp: Date.now()
       },
@@ -87,7 +87,7 @@ async function handler(request: NextRequest) {
 }
 
 // Verify QStash signature for security
-export const POST = verifySignature(handler)
+export const POST = verifySignatureAppRouter(handler)
 
 export async function GET() {
   return NextResponse.json({

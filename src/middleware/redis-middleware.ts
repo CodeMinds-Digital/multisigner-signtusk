@@ -31,7 +31,7 @@ export async function redisMiddleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
   const method = request.method
   const userAgent = request.headers.get('user-agent') || ''
-  const ip = request.ip || request.headers.get('x-forwarded-for') || 'unknown'
+  const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown'
 
   try {
     // 1. Rate Limiting
@@ -49,10 +49,10 @@ export async function redisMiddleware(request: NextRequest) {
     // 3. Cache checks for GET requests
     if (method === 'GET') {
       const cacheResult = await checkCache(request, pathname)
-      if (cacheResult.hit) {
+      if (cacheResult.hit && (cacheResult as any).response) {
         // Track cache hit
         await UpstashAnalytics.trackAPIPerformance(pathname, Date.now() - startTime, true)
-        return cacheResult.response
+        return (cacheResult as any).response
       }
     }
 
@@ -61,10 +61,10 @@ export async function redisMiddleware(request: NextRequest) {
 
   } catch (error) {
     console.error('❌ Redis middleware error:', error)
-    
+
     // Track error
     await UpstashAnalytics.trackAPIPerformance(pathname, Date.now() - startTime, false)
-    
+
     // Continue without middleware features if Redis is down
     return NextResponse.next()
   }
@@ -74,7 +74,7 @@ async function applyRateLimit(request: NextRequest, pathname: string, ip: string
   try {
     // Determine which rate limiter to use
     let rateLimiter = RATE_LIMIT_CONFIG.default
-    
+
     for (const [path, limiter] of Object.entries(RATE_LIMIT_CONFIG)) {
       if (path !== 'default' && pathname.startsWith(path)) {
         rateLimiter = limiter
@@ -88,20 +88,20 @@ async function applyRateLimit(request: NextRequest, pathname: string, ip: string
 
     if (!success) {
       console.log('🚫 Rate limit exceeded:', { pathname, ip, limit, remaining })
-      
+
       // Track rate limit violation
       await RedisCacheService.trackFailedAttempt(`rate_limit:${ip}`)
-      
+
       return {
         success: false,
         response: new NextResponse(
-          JSON.stringify({ 
+          JSON.stringify({
             error: 'Too many requests',
             limit,
             remaining: 0,
             reset: new Date(reset).toISOString()
           }),
-          { 
+          {
             status: 429,
             headers: {
               'Content-Type': 'application/json',
@@ -133,22 +133,22 @@ async function performSecurityChecks(request: NextRequest, ip: string, userAgent
     ]
 
     const isSuspicious = suspiciousPatterns.some(pattern => pattern.test(userAgent))
-    
+
     if (isSuspicious) {
       console.log('🚨 Suspicious user agent detected:', { ip, userAgent })
-      
+
       // Track suspicious activity
       await RedisCacheService.trackFailedAttempt(`suspicious:${ip}`)
-      
+
       // Check if this IP has too many suspicious attempts
       const suspiciousCount = await RedisCacheService.getFailedAttempts(`suspicious:${ip}`)
-      
+
       if (suspiciousCount > 10) {
         return {
           success: false,
           response: new NextResponse(
             JSON.stringify({ error: 'Access denied' }),
-            { 
+            {
               status: 403,
               headers: { 'Content-Type': 'application/json' }
             }
@@ -161,18 +161,18 @@ async function performSecurityChecks(request: NextRequest, ip: string, userAgent
     const pathname = request.nextUrl.pathname
     if (pathname.includes('/auth/login') || pathname.includes('/auth/signup')) {
       const failedAttempts = await RedisCacheService.getFailedAttempts(`auth:${ip}`)
-      
+
       if (failedAttempts > 5) {
         console.log('🚫 Too many failed auth attempts:', { ip, attempts: failedAttempts })
-        
+
         return {
           success: false,
           response: new NextResponse(
-            JSON.stringify({ 
+            JSON.stringify({
               error: 'Too many failed attempts. Please try again later.',
               retryAfter: 3600 // 1 hour
             }),
-            { 
+            {
               status: 429,
               headers: { 'Content-Type': 'application/json' }
             }
@@ -200,7 +200,7 @@ async function checkCache(request: NextRequest, pathname: string) {
     ]
 
     const isCacheable = cacheableEndpoints.some(endpoint => pathname.startsWith(endpoint))
-    
+
     if (!isCacheable) {
       return { hit: false }
     }
@@ -208,13 +208,13 @@ async function checkCache(request: NextRequest, pathname: string) {
     // Generate cache key
     const url = request.url
     const cacheKey = `api_cache:${Buffer.from(url).toString('base64').slice(0, 32)}`
-    
+
     // Check cache
     const cachedResponse = await RedisCacheService.getCacheStats() // This is a placeholder
-    
+
     // For now, we'll skip actual response caching and just return cache miss
     // In a full implementation, you'd cache serialized responses
-    
+
     return { hit: false }
 
   } catch (error) {
@@ -225,8 +225,8 @@ async function checkCache(request: NextRequest, pathname: string) {
 
 // Analytics tracking for responses
 export async function trackResponse(
-  request: NextRequest, 
-  response: NextResponse, 
+  request: NextRequest,
+  response: NextResponse,
   startTime: number
 ) {
   try {

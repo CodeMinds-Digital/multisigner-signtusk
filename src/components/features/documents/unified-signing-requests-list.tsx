@@ -1147,7 +1147,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                     currentUserEmail={user?.email}
                     onStatusUpdate={(requestId, updates) => {
                         // ✅ PERFORMANCE FIX: Update specific request instead of full reload
-                        setAllRequests(prev => prev.map(req =>
+                        setRequests(prev => prev.map(req =>
                             req.id === requestId
                                 ? { ...req, ...updates }
                                 : req

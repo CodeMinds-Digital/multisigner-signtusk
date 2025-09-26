@@ -1,15 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { VectorSearchService } from '@/lib/vector-search-service'
 import { rateLimiters } from '@/lib/upstash-config'
-import { getSession } from '@/lib/auth-utils'
+import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
+import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting
-    const identifier = request.ip ?? 'anonymous'
+    const identifier = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'anonymous'
     const { success } = await rateLimiters.api.limit(identifier)
-    
+
     if (!success) {
       return NextResponse.json(
         { error: 'Too many requests' },
@@ -18,8 +19,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Get session for admin check
-    const session = await getSession(request)
-    if (!session?.user?.app_metadata?.role?.includes('admin')) {
+    const tokens = getAuthTokensFromRequest(request)
+    if (!tokens.accessToken) {
+      return NextResponse.json(
+        { error: 'Unauthorized - Access token required' },
+        { status: 401 }
+      )
+    }
+
+    const payload = await verifyAccessToken(tokens.accessToken)
+    if (!payload?.role?.includes('admin')) {
       return NextResponse.json(
         { error: 'Unauthorized - Admin access required' },
         { status: 403 }
@@ -32,28 +41,28 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'index_all_documents':
         return await indexAllDocuments()
-      
+
       case 'index_all_users':
         return await indexAllUsers()
-      
+
       case 'index_all_templates':
         return await indexAllTemplates()
-      
+
       case 'index_document':
         return await indexSingleDocument(data)
-      
+
       case 'index_user':
         return await indexSingleUser(data)
-      
+
       case 'index_template':
         return await indexSingleTemplate(data)
-      
+
       case 'reindex_all':
         return await reindexAll()
-      
+
       case 'clear_index':
         return await clearIndex(data.type)
-      
+
       default:
         return NextResponse.json(
           { error: 'Invalid action' },
@@ -64,7 +73,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('❌ Search indexing error:', error)
     return NextResponse.json(
-      { 
+      {
         error: 'Indexing failed',
         details: error instanceof Error ? error.message : 'Unknown error'
       },
@@ -76,17 +85,17 @@ export async function POST(request: NextRequest) {
 async function indexAllDocuments() {
   try {
     console.log('📚 Starting to index all documents...')
-    
+
     const { data: documents, error } = await supabaseAdmin
       .from('documents')
       .select('id, title, description, content, metadata, created_at')
       .limit(1000) // Process in batches
-    
+
     if (error) throw error
-    
+
     let indexed = 0
     let failed = 0
-    
+
     for (const doc of documents || []) {
       try {
         const content = doc.content || doc.description || ''
@@ -105,7 +114,7 @@ async function indexAllDocuments() {
         failed++
       }
     }
-    
+
     return NextResponse.json({
       success: true,
       message: 'Document indexing completed',
@@ -115,7 +124,7 @@ async function indexAllDocuments() {
         failed
       }
     })
-    
+
   } catch (error) {
     return NextResponse.json({
       success: false,
@@ -127,14 +136,14 @@ async function indexAllDocuments() {
 async function indexAllUsers() {
   try {
     console.log('👥 Starting to index all users...')
-    
+
     const { data: authData, error } = await supabaseAdmin.auth.admin.listUsers()
-    
+
     if (error) throw error
-    
+
     let indexed = 0
     let failed = 0
-    
+
     for (const user of authData.users || []) {
       try {
         await VectorSearchService.indexUser(
@@ -152,7 +161,7 @@ async function indexAllUsers() {
         failed++
       }
     }
-    
+
     return NextResponse.json({
       success: true,
       message: 'User indexing completed',
@@ -162,7 +171,7 @@ async function indexAllUsers() {
         failed
       }
     })
-    
+
   } catch (error) {
     return NextResponse.json({
       success: false,
@@ -174,17 +183,17 @@ async function indexAllUsers() {
 async function indexAllTemplates() {
   try {
     console.log('📄 Starting to index all templates...')
-    
+
     const { data: templates, error } = await supabaseAdmin
       .from('document_templates')
       .select('id, name, description, tags, metadata, created_at')
       .limit(1000)
-    
+
     if (error) throw error
-    
+
     let indexed = 0
     let failed = 0
-    
+
     for (const template of templates || []) {
       try {
         await VectorSearchService.indexTemplate(
@@ -203,7 +212,7 @@ async function indexAllTemplates() {
         failed++
       }
     }
-    
+
     return NextResponse.json({
       success: true,
       message: 'Template indexing completed',
@@ -213,7 +222,7 @@ async function indexAllTemplates() {
         failed
       }
     })
-    
+
   } catch (error) {
     return NextResponse.json({
       success: false,
@@ -225,22 +234,22 @@ async function indexAllTemplates() {
 async function indexSingleDocument(data: any) {
   try {
     const { documentId, title, content, metadata } = data
-    
+
     if (!documentId || !title) {
       return NextResponse.json(
         { error: 'Document ID and title are required' },
         { status: 400 }
       )
     }
-    
+
     await VectorSearchService.indexDocument(documentId, title, content || '', metadata || {})
-    
+
     return NextResponse.json({
       success: true,
       message: 'Document indexed successfully',
       documentId
     })
-    
+
   } catch (error) {
     return NextResponse.json({
       success: false,
@@ -252,22 +261,22 @@ async function indexSingleDocument(data: any) {
 async function indexSingleUser(data: any) {
   try {
     const { userId, email, profile } = data
-    
+
     if (!userId || !email) {
       return NextResponse.json(
         { error: 'User ID and email are required' },
         { status: 400 }
       )
     }
-    
+
     await VectorSearchService.indexUser(userId, email, profile || {})
-    
+
     return NextResponse.json({
       success: true,
       message: 'User indexed successfully',
       userId
     })
-    
+
   } catch (error) {
     return NextResponse.json({
       success: false,
@@ -279,14 +288,14 @@ async function indexSingleUser(data: any) {
 async function indexSingleTemplate(data: any) {
   try {
     const { templateId, name, description, tags, metadata } = data
-    
+
     if (!templateId || !name) {
       return NextResponse.json(
         { error: 'Template ID and name are required' },
         { status: 400 }
       )
     }
-    
+
     await VectorSearchService.indexTemplate(
       templateId,
       name,
@@ -294,13 +303,13 @@ async function indexSingleTemplate(data: any) {
       tags || [],
       metadata || {}
     )
-    
+
     return NextResponse.json({
       success: true,
       message: 'Template indexed successfully',
       templateId
     })
-    
+
   } catch (error) {
     return NextResponse.json({
       success: false,
@@ -312,25 +321,25 @@ async function indexSingleTemplate(data: any) {
 async function reindexAll() {
   try {
     console.log('🔄 Starting complete reindexing...')
-    
+
     const [docsResult, usersResult, templatesResult] = await Promise.allSettled([
       indexAllDocuments(),
       indexAllUsers(),
       indexAllTemplates()
     ])
-    
+
     const results = {
       documents: docsResult.status === 'fulfilled' ? await docsResult.value.json() : { success: false },
       users: usersResult.status === 'fulfilled' ? await usersResult.value.json() : { success: false },
       templates: templatesResult.status === 'fulfilled' ? await templatesResult.value.json() : { success: false }
     }
-    
+
     return NextResponse.json({
       success: true,
       message: 'Complete reindexing finished',
       results
     })
-    
+
   } catch (error) {
     return NextResponse.json({
       success: false,
@@ -350,12 +359,12 @@ async function clearIndex(type?: string) {
       console.log('🧹 Clearing all indexes...')
       // Implementation would clear all vector indexes
     }
-    
+
     return NextResponse.json({
       success: true,
       message: type ? `${type} index cleared` : 'All indexes cleared'
     })
-    
+
   } catch (error) {
     return NextResponse.json({
       success: false,
