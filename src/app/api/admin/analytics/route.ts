@@ -164,7 +164,7 @@ export async function POST(request: NextRequest) {
 /**
  * Get comprehensive analytics data
  */
-async function getAnalyticsData(timeRange: string, metrics: string[]): Promise<AnalyticsData> {
+async function getAnalyticsData(timeRange: string, _metrics: string[]): Promise<AnalyticsData> {
   try {
     const days = getTimeRangeDays(timeRange)
     const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString()
@@ -201,7 +201,7 @@ async function getAnalyticsData(timeRange: string, metrics: string[]): Promise<A
 /**
  * Get overview metrics
  */
-async function getOverviewMetrics(startDate: string) {
+async function getOverviewMetrics(_startDate: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
     if (!adminSupabase) {
@@ -260,7 +260,7 @@ async function getOverviewMetrics(startDate: string) {
 /**
  * Get user metrics
  */
-async function getUserMetrics(startDate: string) {
+async function getUserMetrics(_startDate: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
     if (!adminSupabase) {
@@ -310,7 +310,7 @@ async function getUserMetrics(startDate: string) {
 /**
  * Get document metrics
  */
-async function getDocumentMetrics(startDate: string) {
+async function getDocumentMetrics(_startDate: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
     if (!adminSupabase) {
@@ -361,7 +361,7 @@ async function getDocumentMetrics(startDate: string) {
 /**
  * Get revenue metrics
  */
-async function getRevenueMetrics(startDate: string) {
+async function getRevenueMetrics(_startDate: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
     if (!adminSupabase) {

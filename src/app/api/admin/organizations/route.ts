@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 // GET /api/admin/organizations - List all organizations
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     // In a real implementation, you'd verify admin authentication here
     // For now, we'll use mock data but structure it for real implementation

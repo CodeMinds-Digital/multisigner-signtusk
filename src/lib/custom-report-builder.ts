@@ -368,7 +368,7 @@ export class CustomReportBuilder {
     })
   }
 
-  private static applyGrouping(data: any[], grouping: ReportGrouping[]): any[] {
+  private static applyGrouping(data: any[], _grouping: ReportGrouping[]): any[] {
     // Simplified grouping implementation
     return data
   }

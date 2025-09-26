@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifySignatureAppRouter } from '@upstash/qstash/nextjs'
 import { UpstashJobQueue } from '@/lib/upstash-job-queue'
 import { cleanupExpiredSessions } from '@/lib/redis-session-store'
-import { RedisCacheService } from '@/lib/redis-cache-service'
+
 import { redis } from '@/lib/upstash-config'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 

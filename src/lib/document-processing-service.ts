@@ -213,7 +213,7 @@ export class DocumentProcessingService {
   /**
    * Merge multiple documents
    */
-  static mergeDocuments(documentIds: string[], title: string): {
+  static mergeDocuments(documentIds: string[], _title: string): {
     mergedDocumentId: string
     pageMapping: { originalDocId: string; originalPage: number; newPage: number }[]
   } {
@@ -272,7 +272,7 @@ export class DocumentProcessingService {
   /**
    * Extract text content from document
    */
-  static extractTextContent(documentId: string): Promise<{
+  static extractTextContent(_documentId: string): Promise<{
     fullText: string
     pageTexts: { page: number; text: string }[]
     wordCount: number
@@ -301,7 +301,7 @@ export class DocumentProcessingService {
   static searchInDocument(
     documentId: string,
     query: string,
-    caseSensitive: boolean = false
+    _caseSensitive: boolean = false
   ): {
     matches: { page: number; position: number; context: string }[]
     totalMatches: number
@@ -391,7 +391,7 @@ export class DocumentProcessingService {
       .map(word => word.toLowerCase())
   }
 
-  private static async extractPDFMetadata(file: File): Promise<Partial<DocumentMetadata>> {
+  private static async extractPDFMetadata(_file: File): Promise<Partial<DocumentMetadata>> {
     // In real implementation, would use PDF.js or similar library
     return {
       pageCount: Math.floor(Math.random() * 10) + 1,

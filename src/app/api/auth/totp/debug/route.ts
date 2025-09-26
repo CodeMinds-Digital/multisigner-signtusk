@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check dependencies
-    let dependencyCheck = {
+    const dependencyCheck = {
       speakeasy: false,
       qrcode: false,
       supabaseAdmin: false
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check authentication if token provided
-    let authCheck = {
+    const authCheck = {
       hasToken: false,
       tokenValid: false,
       userId: null as string | null,
@@ -77,7 +77,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Check database connection
-    let dbCheck = {
+    const dbCheck = {
       connected: false,
       tableExists: false,
       error: null as string | null
@@ -85,7 +85,7 @@ export async function GET(request: NextRequest) {
 
     try {
       // Test basic connection
-      const { data, error } = await supabaseAdmin
+      const { data: _data, error } = await supabaseAdmin
         .from('user_totp_configs')
         .select('count')
         .limit(1)

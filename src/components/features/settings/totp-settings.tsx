@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import {
   Smartphone,
   Shield,
-  QrCode,
   Key,
   Download,
   RefreshCw,
@@ -15,6 +14,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { CustomSwitch } from '@/components/ui/custom-switch'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 
 interface TOTPConfig {
@@ -34,7 +34,7 @@ interface TOTPSetupData {
 }
 
 export function TOTPSettings() {
-  const { user } = useAuth()
+  const { user: _user } = useAuth()
   const [config, setConfig] = useState<TOTPConfig | null>(null)
   const [loading, setLoading] = useState(true)
   const [setupMode, setSetupMode] = useState(false)
@@ -515,16 +515,10 @@ export function TOTPSettings() {
                   <label className="text-sm font-medium text-gray-900">Login Protection</label>
                   <p className="text-xs text-gray-600">Require TOTP when signing in to your account</p>
                 </div>
-                <button
-                  onClick={() => updateSettings({ ...config, loginMFAEnabled: !config.loginMFAEnabled })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${config.loginMFAEnabled ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.loginMFAEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                  />
-                </button>
+                <CustomSwitch
+                  checked={config.loginMFAEnabled}
+                  onCheckedChange={(checked) => updateSettings({ ...config, loginMFAEnabled: checked })}
+                />
               </div>
 
               <div className="flex items-center justify-between">
@@ -532,16 +526,10 @@ export function TOTPSettings() {
                   <label className="text-sm font-medium text-gray-900">Signing Protection</label>
                   <p className="text-xs text-gray-600">Require TOTP when signing documents</p>
                 </div>
-                <button
-                  onClick={() => updateSettings({ ...config, signingMFAEnabled: !config.signingMFAEnabled })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${config.signingMFAEnabled ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.signingMFAEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                  />
-                </button>
+                <CustomSwitch
+                  checked={config.signingMFAEnabled}
+                  onCheckedChange={(checked) => updateSettings({ ...config, signingMFAEnabled: checked })}
+                />
               </div>
 
               <div className="flex items-center justify-between">
@@ -549,16 +537,10 @@ export function TOTPSettings() {
                   <label className="text-sm font-medium text-gray-900">Default TOTP for New Requests</label>
                   <p className="text-xs text-gray-600">Automatically require TOTP for new signing requests you create</p>
                 </div>
-                <button
-                  onClick={() => updateSettings({ ...config, defaultRequireTOTP: !config.defaultRequireTOTP })}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${config.defaultRequireTOTP ? 'bg-blue-600' : 'bg-gray-200'
-                    }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${config.defaultRequireTOTP ? 'translate-x-6' : 'translate-x-1'
-                      }`}
-                  />
-                </button>
+                <CustomSwitch
+                  checked={config.defaultRequireTOTP}
+                  onCheckedChange={(checked) => updateSettings({ ...config, defaultRequireTOTP: checked })}
+                />
               </div>
             </div>
           </div>

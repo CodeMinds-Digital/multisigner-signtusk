@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
       .gte('last_sign_in_at', new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString())
 
     // Get domain settings to check verification status
-    const { data: domainSettings } = await supabaseAdmin
+    const { data: _domainSettings } = await supabaseAdmin
       .from('domain_settings')
       .select('*')
       .eq('domain', userDomain)
@@ -124,10 +124,10 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'verify_domain':
         return await verifyDomain(userDomain, user.id)
-      
+
       case 'update_company_info':
         return await updateCompanyInfo(userDomain, user.id, body.companyInfo)
-      
+
       default:
         return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
@@ -145,7 +145,7 @@ async function verifyDomain(domain: string, adminUserId: string) {
   try {
     // Generate verification token
     const verificationToken = Math.random().toString(36).substring(2, 15)
-    
+
     // Update domain administrator with verification token
     const { error } = await supabaseAdmin
       .from('domain_administrators')

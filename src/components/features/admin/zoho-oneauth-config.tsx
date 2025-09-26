@@ -6,11 +6,11 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { 
-  Shield, 
-  CheckCircle, 
-  XCircle, 
-  Settings, 
+import {
+  Shield,
+  CheckCircle,
+  XCircle,
+  Settings,
   ExternalLink,
   Copy,
   Eye,
@@ -52,7 +52,7 @@ export function ZohoOneAuthConfig() {
         userInfoUrl: 'https://accounts.zoho.com/oauth/user/info',
         configured: !!(process.env.NEXT_PUBLIC_ZOHO_CLIENT_ID && process.env.ZOHO_CLIENT_SECRET)
       }
-      
+
       setConfig(mockConfig)
     } catch (error) {
       console.error('Error fetching Zoho config:', error)
@@ -67,7 +67,7 @@ export function ZohoOneAuthConfig() {
       // Simulate connection test
       await new Promise(resolve => setTimeout(resolve, 2000))
       alert('Connection test successful! Zoho OneAuth integration is working.')
-    } catch (error) {
+    } catch (_error) {
       alert('Connection test failed. Please check your configuration.')
     } finally {
       setTestingConnection(false)
@@ -133,7 +133,7 @@ export function ZohoOneAuthConfig() {
                 <span className="text-sm text-green-600">Active</span>
               </div>
             </div>
-            
+
             <div className="flex items-center justify-between p-3 border rounded">
               <span className="text-sm font-medium">Zoho OneAuth Compatible</span>
               <div className="flex items-center">
@@ -141,7 +141,7 @@ export function ZohoOneAuthConfig() {
                 <span className="text-sm text-green-600">Yes</span>
               </div>
             </div>
-            
+
             <div className="flex items-center justify-between p-3 border rounded">
               <span className="text-sm font-medium">OAuth Integration</span>
               <div className="flex items-center">
@@ -158,7 +158,7 @@ export function ZohoOneAuthConfig() {
                 )}
               </div>
             </div>
-            
+
             <div className="flex items-center justify-between p-3 border rounded">
               <span className="text-sm font-medium">User Experience</span>
               <div className="flex items-center">
@@ -257,7 +257,7 @@ export function ZohoOneAuthConfig() {
               )}
               Test Connection
             </Button>
-            
+
             <Button
               variant="outline"
               onClick={() => window.open('https://api-console.zoho.com/', '_blank')}
@@ -286,11 +286,11 @@ export function ZohoOneAuthConfig() {
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <h4 className="font-medium text-blue-900 mb-2">Good News!</h4>
                 <p className="text-blue-700 text-sm">
-                  Your TOTP system already works with Zoho OneAuth! Users can scan QR codes with the Zoho OneAuth app right now. 
+                  Your TOTP system already works with Zoho OneAuth! Users can scan QR codes with the Zoho OneAuth app right now.
                   The configuration below is optional for enhanced integration.
                 </p>
               </div>
-              
+
               <ol className="list-decimal list-inside space-y-2 text-sm">
                 <li>Go to <a href="https://api-console.zoho.com/" target="_blank" className="text-blue-600 hover:underline">Zoho API Console</a></li>
                 <li>Create a new Web Application</li>

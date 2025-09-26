@@ -1,18 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { TOTPService } from '@/lib/totp-service'
 
 // POST /api/admin/emergency-access/grant - Grant emergency TOTP exemption
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { 
-      userId, 
-      organizationId, 
+    const {
+      userId,
+      organizationId,
       exemptionType = 'both', // 'login', 'signing', or 'both'
-      reason, 
+      reason,
       expiresInHours = 24,
-      adminId 
+      adminId
     } = body
 
     if (!userId || !reason || !adminId) {

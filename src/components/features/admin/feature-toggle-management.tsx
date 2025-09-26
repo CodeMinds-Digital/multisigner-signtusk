@@ -1,14 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { Input } from '@/components/ui/input'
 import {
   Settings, Shield, AlertTriangle, Globe, RefreshCw,
-  Search, Filter, TrendingUp, Users, Zap
+  Search, Filter, Zap
 } from 'lucide-react'
 
 interface FeatureFlag {
@@ -133,7 +133,7 @@ export function FeatureToggleManagement() {
     }
   }
 
-  const updateRolloutPercentage = async (featureId: string, percentage: number) => {
+  const _updateRolloutPercentage = async (featureId: string, percentage: number) => {
     try {
       setFeatures(prev => prev.map(feature =>
         feature.id === featureId

@@ -67,7 +67,7 @@ export class ErrorRecoveryService {
             : signingRequest.document.settings
           signingMode = settings.signing_order || 'sequential'
         }
-      } catch (error) {
+      } catch (_error) {
         console.log('⚠️ Could not parse document settings, using sequential mode')
       }
 

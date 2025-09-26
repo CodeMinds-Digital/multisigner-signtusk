@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import jwt from 'jsonwebtoken'
+
 import crypto from 'crypto'
 
 const supabase = createClient(
@@ -164,7 +164,7 @@ export class SSOService {
   static async handleOAuthCallback(
     providerId: string,
     code: string,
-    state?: string
+    _state?: string
   ): Promise<{ user: any; session: SSOSession } | null> {
     try {
       const provider = await this.getProvider(providerId)
@@ -352,7 +352,7 @@ export class SSOService {
 
       if (existingUser) {
         // Update existing user
-        const { data, error } = await supabase
+        const { data: _data, error: _error } = await supabase
           .from('profiles')
           .update({
             first_name: userData.first_name || existingUser.first_name,
@@ -366,7 +366,7 @@ export class SSOService {
           .select()
           .single()
 
-        return data
+        return _data
       } else {
         // Create new user
         const { data, error } = await supabase.auth.admin.createUser({

@@ -477,7 +477,7 @@ async function extendDeadline(documentId: string, expires_at: string) {
 /**
  * Resend notifications
  */
-async function resendNotifications(documentId: string) {
+async function resendNotifications(_documentId: string) {
   try {
     // This would trigger the notification system
     // For now, just return success

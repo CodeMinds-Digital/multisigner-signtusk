@@ -825,19 +825,43 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     }
 
     const getFromToDisplay = (request: UnifiedSigningRequest) => {
-        // Prioritize count-based display for sent requests
         if (request.type === 'sent') {
+            // For sent requests, show recipient information
             const signerCount = request.signers?.length || 0
             if (signerCount === 1) {
-                return `Single Signature`
+                // Show the recipient's name if available, otherwise show "1 recipient"
+                const recipientName = request.signers?.[0]?.email || request.signers?.[0]?.name
+                return recipientName ? `To ${recipientName}` : `To 1 recipient`
             } else if (signerCount > 1) {
-                return `${signerCount} Signers Required`
+                return `To ${signerCount} recipients`
             }
-            return `To ${signerCount} signer${signerCount !== 1 ? 's' : ''}`
+            return `To ${signerCount} recipient${signerCount !== 1 ? 's' : ''}`
         } else {
             // For received requests, show sender name
             return `From ${request.sender_name || 'Unknown'}`
         }
+    }
+
+    const getSignatureTypeDisplay = (request: UnifiedSigningRequest) => {
+        const signerCount = request.signers?.length || 0
+        if (signerCount === 1) {
+            return (
+                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                    Single Signature
+                </span>
+            )
+        } else if (signerCount > 1) {
+            return (
+                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800">
+                    Multi-Signature ({signerCount})
+                </span>
+            )
+        }
+        return (
+            <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-800">
+                No Signers
+            </span>
+        )
     }
 
     const getTimeRangeLabel = (range: TimeRange) => {
@@ -1015,6 +1039,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                     <TableHead>Sign ID</TableHead>
                                     <TableHead>Status</TableHead>
                                     <TableHead>From/To</TableHead>
+                                    <TableHead>Signature Type</TableHead>
                                     <TableHead>Date</TableHead>
                                     <TableHead>Expires</TableHead>
                                     <TableHead className="w-[100px]">Actions</TableHead>
@@ -1060,6 +1085,9 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                             >
                                                 {getFromToDisplay(request)}
                                             </button>
+                                        </TableCell>
+                                        <TableCell>
+                                            {getSignatureTypeDisplay(request)}
                                         </TableCell>
                                         <TableCell>
                                             <span className="text-sm text-gray-600">

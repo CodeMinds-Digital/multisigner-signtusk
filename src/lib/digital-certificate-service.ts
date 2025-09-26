@@ -409,12 +409,12 @@ export class DigitalCertificateService {
     userId: string,
     certificatePem: string,
     privateKeyPem: string,
-    caCertificatePem?: string
+    _caCertificatePem?: string
   ): Promise<DigitalCertificate | null> {
     try {
       // Parse certificate
       const cert = forge.pki.certificateFromPem(certificatePem)
-      const privateKey = forge.pki.privateKeyFromPem(privateKeyPem)
+      const _privateKey = forge.pki.privateKeyFromPem(privateKeyPem)
       const publicKey = cert.publicKey
 
       // Extract subject and issuer
@@ -500,7 +500,7 @@ export class DigitalCertificateService {
     return attr?.value
   }
 
-  private static async getTSATimestamp(documentHash: string): Promise<string | undefined> {
+  private static async getTSATimestamp(_documentHash: string): Promise<string | undefined> {
     try {
       // This would integrate with a Time Stamping Authority
       // For now, return undefined as TSA integration requires specific setup

@@ -425,7 +425,7 @@ export class DocumentIdService {
             let maxSequential = startingNumber - 1 // Start from one less than the starting number
             if (existingRequests && existingRequests.length > 0) {
                 const prefix = settings.prefix || 'DOC'
-                const separator = settings.separator || ''
+                const _separator = settings.separator || ''
 
                 existingRequests.forEach((request: { document_sign_id: string | null }) => {
                     const docId = request.document_sign_id

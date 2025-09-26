@@ -4,7 +4,7 @@ import { UpstashJobQueue } from '@/lib/upstash-job-queue'
 import { RedisCacheService } from '@/lib/redis-cache-service'
 import { UpstashAnalytics } from '@/lib/upstash-analytics'
 
-export async function GET(request: NextRequest) {
+export async function GET(_request: NextRequest) {
   try {
     const startTime = Date.now()
 
@@ -115,7 +115,7 @@ async function checkJobQueueHealth() {
 
     // Check if we can get job status (this tests Redis connectivity)
     const testJobId = 'health_check_job'
-    const jobStatus = await UpstashJobQueue.getJobStatus(testJobId)
+    const _jobStatus = await UpstashJobQueue.getJobStatus(testJobId)
 
     return {
       status: 'healthy',

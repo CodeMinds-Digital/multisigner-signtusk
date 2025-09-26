@@ -23,7 +23,7 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [showTOTPPopup, setShowTOTPPopup] = useState(false)
-  const [pendingUserId, setPendingUserId] = useState<string | null>(null)
+  const [_pendingUserId, setPendingUserId] = useState<string | null>(null)
   const { user, error, clearError, setUser, refreshAuth } = useAuth()
 
   // Handle already authenticated users

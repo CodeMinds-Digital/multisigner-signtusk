@@ -7,19 +7,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
-import { Textarea } from '@/components/ui/textarea'
+
 import {
   Shield,
   Building,
   Users,
-  Settings,
-  AlertTriangle,
   CheckCircle,
   Plus,
-  Edit,
-  Trash2,
   Key,
-  Clock,
   FileText
 } from 'lucide-react'
 
@@ -93,7 +88,7 @@ export function OrganizationTOTPPolicies() {
       })
 
       const realOrgs: Organization[] = Array.from(emailDomains.entries())
-        .filter(([domain, count]) => count > 1) // Only domains with multiple users
+        .filter(([_domain, count]) => count > 1) // Only domains with multiple users
         .map(([domain, count], index) => ({
           id: `org_${index + 1}`,
           name: domain.split('.')[0].charAt(0).toUpperCase() + domain.split('.')[0].slice(1),
@@ -242,8 +237,8 @@ export function OrganizationTOTPPolicies() {
                 <div
                   key={org.id}
                   className={`p-3 border rounded-lg cursor-pointer transition-colors ${selectedOrg?.id === org.id
-                      ? 'border-blue-500 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                    ? 'border-blue-500 bg-blue-50'
+                    : 'border-gray-200 hover:border-gray-300'
                     }`}
                   onClick={() => handleOrgSelect(org)}
                 >

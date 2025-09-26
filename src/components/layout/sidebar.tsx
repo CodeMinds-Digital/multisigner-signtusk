@@ -8,7 +8,6 @@ import {
   CreditCard,
   PenTool,
   Workflow,
-  Settings,
   QrCode,
   FileText,
   Shield

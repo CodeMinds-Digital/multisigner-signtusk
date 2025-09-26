@@ -307,7 +307,7 @@ export class WebhookService {
     webhookId: string,
     eventType: string,
     eventData: any,
-    attempt: number
+    _attempt: number
   ): Promise<void> {
     try {
       const { data: webhook } = await supabase

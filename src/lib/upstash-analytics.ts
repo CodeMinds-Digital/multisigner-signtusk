@@ -10,7 +10,7 @@ export class UpstashAnalytics {
   static async trackDocumentView(requestId: string, userId: string, domain?: string) {
     const today = new Date().toISOString().split('T')[0]
     const hour = new Date().getHours()
-    
+
     await Promise.all([
       // Daily document views
       redis.incr(`analytics:doc_views:${today}`),
@@ -31,7 +31,7 @@ export class UpstashAnalytics {
   static async trackSignatureCompletion(requestId: string, signerEmail: string, domain?: string) {
     const today = new Date().toISOString().split('T')[0]
     const timestamp = Date.now()
-    
+
     await Promise.all([
       // Daily signature count
       redis.incr(`analytics:signatures:${today}`),
@@ -55,7 +55,7 @@ export class UpstashAnalytics {
   // Track TOTP verifications for security analytics
   static async trackTOTPVerification(userId: string, success: boolean, domain?: string) {
     const today = new Date().toISOString().split('T')[0]
-    
+
     await Promise.all([
       // Daily TOTP attempts
       redis.incr(`analytics:totp_attempts:${today}`),
@@ -75,8 +75,8 @@ export class UpstashAnalytics {
   // Get real-time analytics dashboard data
   static async getRealtimeAnalytics(domain?: string) {
     const today = new Date().toISOString().split('T')[0]
-    const currentHour = new Date().getHours()
-    
+    const _currentHour = new Date().getHours()
+
     const baseKeys = domain ? [
       `analytics:domain:${domain}:views:${today}`,
       `analytics:domain:${domain}:signatures:${today}`,
@@ -108,14 +108,14 @@ export class UpstashAnalytics {
   // Get hourly analytics for charts
   static async getHourlyAnalytics(date: string = new Date().toISOString().split('T')[0]) {
     const hours = Array.from({ length: 24 }, (_, i) => i)
-    
+
     const hourlyData = await Promise.all(
       hours.map(async (hour) => {
         const [views, signatures] = await Promise.all([
           redis.get(`analytics:doc_views:${date}:${hour}`),
           redis.get(`analytics:signatures:${date}:${hour}`)
         ])
-        
+
         return {
           hour,
           views: parseInt(views as string || '0'),
@@ -159,7 +159,7 @@ export class UpstashAnalytics {
   // Performance monitoring
   static async trackAPIPerformance(endpoint: string, duration: number, success: boolean) {
     const today = new Date().toISOString().split('T')[0]
-    
+
     await Promise.all([
       // Track response times
       redis.lpush(`perf:${endpoint}:${today}`, duration),

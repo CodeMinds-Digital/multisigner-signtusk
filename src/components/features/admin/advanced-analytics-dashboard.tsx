@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import {
-  TrendingUp, TrendingDown, Users, FileText, DollarSign, Clock,
-  Download, RefreshCw, AlertTriangle, CheckCircle, Activity
+  TrendingUp, TrendingDown, Users, FileText, DollarSign,
+  Download, RefreshCw, CheckCircle, Activity
 } from 'lucide-react'
 import { AdminRealTimeService, RealTimeUpdate } from '@/lib/admin-real-time-service'
 

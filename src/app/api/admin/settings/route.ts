@@ -327,7 +327,7 @@ async function toggleSettingActive(settingId: string, updatedBy: string) {
 /**
  * Delete system setting
  */
-async function deleteSetting(settingId: string, deletedBy: string) {
+async function deleteSetting(settingId: string, _deletedBy: string) {
   try {
     const adminSupabase = getAdminSupabaseInstance()
     if (!adminSupabase) {
@@ -418,7 +418,7 @@ function validateSettingValue(value: any, type: string, validationRules?: any) {
 
     return { valid: true, processedValue }
 
-  } catch (error) {
+  } catch (_error) {
     return { valid: false, error: 'Validation failed' }
   }
 }

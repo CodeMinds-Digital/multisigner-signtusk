@@ -7,12 +7,10 @@ import { Button } from '@/components/ui/button'
 import {
   Shield,
   Users,
-  TrendingUp,
   AlertTriangle,
   CheckCircle,
   Clock,
   Key,
-  FileText,
   Activity,
   BarChart3,
   Download,
@@ -87,7 +85,7 @@ export function AdminSecurityDashboard() {
         riskLevel: analytics.overview.total_users > 1000 ? 'medium' : 'low'
       }
 
-      const mockEvents: SecurityEvent[] = [
+      const _mockEvents: SecurityEvent[] = [
         {
           id: '1',
           type: 'totp_setup',
@@ -117,7 +115,7 @@ export function AdminSecurityDashboard() {
         }
       ]
 
-      const mockCompliance: ComplianceData[] = [
+      const _mockCompliance: ComplianceData[] = [
         {
           organization: 'Acme Corporation',
           totalUsers: 45,

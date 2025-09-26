@@ -347,7 +347,7 @@ export class TOTPServiceSpeakeasy {
     userId: string,
     requestId: string,
     token: string,
-    ipAddress?: string
+    _ipAddress?: string
   ): Promise<TOTPVerificationResult> {
     try {
       console.log('🔐 Verifying TOTP for signing with Speakeasy:', { userId, requestId, token: token.substring(0, 3) + '***' })

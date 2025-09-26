@@ -366,7 +366,7 @@ async function banUser(userId: string) {
     if (!adminSupabase) {
       throw new Error('Failed to get admin Supabase instance')
     }
-    const { data, error } = await adminSupabase.auth.admin.updateUserById(userId, {
+    const { data: _data, error } = await adminSupabase.auth.admin.updateUserById(userId, {
       ban_duration: 'indefinite'
     })
 
@@ -391,7 +391,7 @@ async function unbanUser(userId: string) {
     if (!adminSupabase) {
       throw new Error('Failed to get admin Supabase instance')
     }
-    const { data, error } = await adminSupabase.auth.admin.updateUserById(userId, {
+    const { data: _data, error } = await adminSupabase.auth.admin.updateUserById(userId, {
       ban_duration: 'none'
     })
 

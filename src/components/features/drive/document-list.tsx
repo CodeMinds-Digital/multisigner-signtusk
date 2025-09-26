@@ -122,11 +122,6 @@ export function DocumentList({ documents, onEdit, onDelete, onArchive, onUnarchi
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-gray-900">Documents</h2>
-        <p className="text-sm text-gray-500">{documents.length} document{documents.length !== 1 ? 's' : ''}</p>
-      </div>
-
       <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
         {documents.map((document) => (
           <div key={document.id} className="bg-white rounded-lg border border-gray-200 p-6 hover:shadow-md transition-all">

@@ -74,17 +74,6 @@ export function DocumentStatsImproved({ documents, onFilterChange, activeFilter 
     <div className="space-y-6">
       {/* Enhanced Drive Stats */}
       <div>
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">Drive Overview</h2>
-            <p className="text-gray-600">Manage and track your document templates</p>
-          </div>
-          <div className="text-right">
-            <div className="text-2xl font-bold text-blue-600">{counts.total}</div>
-            <div className="text-sm font-medium text-gray-600">Total Documents</div>
-          </div>
-        </div>
-
         <ResponsiveStatsCards
           cards={createDriveStatsCards()}
           cardSize="md"
