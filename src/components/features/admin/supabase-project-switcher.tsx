@@ -56,7 +56,8 @@ export function SupabaseProjectSwitcher() {
         alert(result.message)
         setNewUrl('')
         setNewAnonKey('')
-        window.location.reload() // Refresh to update all components
+        // ✅ PERFORMANCE FIX: Use router navigation instead of reload
+        window.location.href = '/admin' // Navigate to admin page to refresh state
       } else {
         alert(result.error)
       }

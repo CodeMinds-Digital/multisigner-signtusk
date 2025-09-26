@@ -132,6 +132,7 @@ export function SecureAuthProvider({ children }: AuthProviderProps) {
 
   // Refresh authentication status
   const refreshAuth = useCallback(async () => {
+    // ✅ PERFORMANCE FIX: Don't set loading during background refresh
     try {
       const response = await fetch('/api/auth/refresh', {
         method: 'POST',
@@ -143,6 +144,7 @@ export function SecureAuthProvider({ children }: AuthProviderProps) {
         setUser(data.user)
       } else {
         // Refresh failed, user needs to log in again
+        console.log('🔄 Auth refresh failed, clearing user state')
         setUser(null)
       }
     } catch (err) {
@@ -155,17 +157,27 @@ export function SecureAuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Add a small delay to prevent hydration mismatch
-        await new Promise(resolve => setTimeout(resolve, 100))
+        // ✅ PERFORMANCE FIX: Reduce initial delay
+        await new Promise(resolve => setTimeout(resolve, 50))
 
         // Only try to refresh if we're not on the login page
         // This prevents unnecessary 401 errors on initial load
         if (typeof window !== 'undefined' && !window.location.pathname.includes('/login')) {
-          // Try to refresh to check if we have valid cookies
-          await refreshAuth()
+          // ✅ PERFORMANCE FIX: Add timeout to prevent hanging
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Auth check timeout')), 3000)
+          )
+
+          try {
+            await Promise.race([refreshAuth(), timeoutPromise])
+          } catch (timeoutError) {
+            console.warn('Auth refresh timed out, proceeding without auth')
+            setUser(null)
+          }
         }
       } catch (err) {
         console.error('Initial auth check failed:', err)
+        setUser(null)
       } finally {
         setLoading(false)
       }
@@ -191,42 +203,49 @@ export function SecureAuthProvider({ children }: AuthProviderProps) {
     return () => clearInterval(refreshInterval)
   }, [user, refreshAuth])
 
-  // Handle page visibility change (refresh when user returns after being away for a while)
+  // ✅ PERFORMANCE FIX: Optimized visibility and focus handlers
   useEffect(() => {
     let lastRefresh = Date.now()
+    let refreshTimeout: NodeJS.Timeout | null = null
 
     const handleVisibilityChange = () => {
       if (!document.hidden && user) {
-        // Only refresh if it's been more than 5 minutes since last refresh
+        // ✅ Increased interval to 15 minutes to reduce tab switching loads
         const now = Date.now()
-        if (now - lastRefresh > 5 * 60 * 1000) {
-          refreshAuth()
-          lastRefresh = now
+        if (now - lastRefresh > 15 * 60 * 1000) {
+          // ✅ Debounce refresh to prevent rapid calls
+          if (refreshTimeout) clearTimeout(refreshTimeout)
+          refreshTimeout = setTimeout(() => {
+            refreshAuth()
+            lastRefresh = now
+          }, 2000) // 2 second delay
+        }
+      }
+    }
+
+    const handleFocus = () => {
+      if (user) {
+        // ✅ Increased interval to 15 minutes to reduce tab switching loads
+        const now = Date.now()
+        if (now - lastRefresh > 15 * 60 * 1000) {
+          // ✅ Debounce refresh to prevent rapid calls
+          if (refreshTimeout) clearTimeout(refreshTimeout)
+          refreshTimeout = setTimeout(() => {
+            refreshAuth()
+            lastRefresh = now
+          }, 2000) // 2 second delay
         }
       }
     }
 
     document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [user, refreshAuth])
-
-  // Handle focus events (refresh when window gains focus after being away)
-  useEffect(() => {
-    let lastRefresh = Date.now()
-
-    const handleFocus = () => {
-      if (user) {
-        // Only refresh if it's been more than 5 minutes since last refresh
-        const now = Date.now()
-        if (now - lastRefresh > 5 * 60 * 1000) {
-          refreshAuth()
-          lastRefresh = now
-        }
-      }
-    }
-
     window.addEventListener('focus', handleFocus)
-    return () => window.removeEventListener('focus', handleFocus)
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.removeEventListener('focus', handleFocus)
+      if (refreshTimeout) clearTimeout(refreshTimeout)
+    }
   }, [user, refreshAuth])
 
   const value = {

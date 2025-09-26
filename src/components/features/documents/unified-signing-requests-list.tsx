@@ -745,11 +745,8 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
             setSigningRequest(null)
 
-            // Add a small delay before refresh to ensure database update is complete
-            setTimeout(() => {
-                console.log('🔄 Refreshing page to show updated signature status...')
-                window.location.reload()
-            }, 1000)
+            // ✅ PERFORMANCE FIX: Update state instead of page reload
+            loadAllRequests() // Refresh the requests list
         } catch (error) {
             console.error('❌ Error in signature accept handler:', error)
             alert(`Error: ${error instanceof Error ? error.message : 'Unknown error'}`)
@@ -1125,6 +1122,15 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                     isOpen={!!viewingRequest}
                     onClose={() => setViewingRequest(null)}
                     currentUserEmail={user?.email}
+                    onStatusUpdate={(requestId, updates) => {
+                        // ✅ PERFORMANCE FIX: Update specific request instead of full reload
+                        setAllRequests(prev => prev.map(req =>
+                            req.id === requestId
+                                ? { ...req, ...updates }
+                                : req
+                        ))
+                        setViewingRequest(null)
+                    }}
                 />
             )}
 

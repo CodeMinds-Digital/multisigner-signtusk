@@ -5,7 +5,7 @@ import { useAuth } from '@/components/providers/secure-auth-provider'
 import { DriveService } from '@/lib/drive-service'
 import { DocumentTemplate, Schema } from '@/types/drive'
 import { ArrowLeft, Save, Eye } from 'lucide-react'
-import { AntdWarningSuppressor } from '@/components/ui/antd-warning-suppressor'
+
 
 interface DocumentDesignerWrapperProps {
   document: DocumentTemplate
@@ -1530,89 +1530,85 @@ export function DocumentDesignerWrapper({
   if (!document || !document.id) {
     console.error('DocumentDesignerWrapper: Invalid document prop:', document)
     return (
-      <AntdWarningSuppressor>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <p className="text-red-600 font-medium">Error: Invalid document</p>
-            <button
-              onClick={onBack}
-              className="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
-            >
-              Back to Documents
-            </button>
-          </div>
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <p className="text-red-600 font-medium">Error: Invalid document</p>
+          <button
+            onClick={onBack}
+            className="mt-4 px-4 py-2 bg-gray-500 text-white rounded hover:bg-gray-600"
+          >
+            Back to Documents
+          </button>
         </div>
-      </AntdWarningSuppressor>
+      </div>
     )
   }
 
   return (
-    <AntdWarningSuppressor>
-      <div className="h-full flex flex-col">
-        {/* Header */}
-        <div className="bg-white border-b border-gray-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-4">
-              <button
-                onClick={onBack}
-                className="inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Documents
-              </button>
-              <div>
-                <h1 className="text-xl font-semibold text-gray-900">{document.name}</h1>
-                <p className="text-sm text-gray-600">
-                  {document.type} • {document.signature_type} signature •
-                  <span className={`ml-1 ${document.status === 'completed' ? 'text-green-600' : 'text-orange-600'}`}>
-                    {document.status}
-                  </span>
-                </p>
-              </div>
-            </div>
-
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={handlePreview}
-                className="inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
-              >
-                <Eye className="w-4 h-4 mr-2" />
-                Preview PDF
-              </button>
-              <button
-                onClick={handleSave}
-                disabled={saving || !template}
-                className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? (
-                  <>
-                    <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                    Saving...
-                  </>
-                ) : (
-                  <>
-                    <Save className="w-4 h-4 mr-2" />
-                    Save Template
-                  </>
-                )}
-              </button>
+    <div className="h-full flex flex-col">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={onBack}
+              className="inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back to Documents
+            </button>
+            <div>
+              <h1 className="text-xl font-semibold text-gray-900">{document.name}</h1>
+              <p className="text-sm text-gray-600">
+                {document.type} • {document.signature_type} signature •
+                <span className={`ml-1 ${document.status === 'completed' ? 'text-green-600' : 'text-orange-600'}`}>
+                  {document.status}
+                </span>
+              </p>
             </div>
           </div>
-        </div>
 
-        {/* Designer Container */}
-        <div className="flex-1 relative">
-          {isLoading && (
-            <div className="absolute inset-0 bg-white flex items-center justify-center z-10">
-              <div className="text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="text-gray-600 mt-2">Loading PDF Designer...</p>
-              </div>
-            </div>
-          )}
-          <div ref={designerRef} className="w-full h-full" />
+          <div className="flex items-center space-x-2">
+            <button
+              onClick={handlePreview}
+              className="inline-flex items-center px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md transition-colors"
+            >
+              <Eye className="w-4 h-4 mr-2" />
+              Preview PDF
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving || !template}
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? (
+                <>
+                  <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-2" />
+                  Save Template
+                </>
+              )}
+            </button>
+          </div>
         </div>
       </div>
-    </AntdWarningSuppressor>
+
+      {/* Designer Container */}
+      <div className="flex-1 relative">
+        {isLoading && (
+          <div className="absolute inset-0 bg-white flex items-center justify-center z-10">
+            <div className="text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="text-gray-600 mt-2">Loading PDF Designer...</p>
+            </div>
+          </div>
+        )}
+        <div ref={designerRef} className="w-full h-full" />
+      </div>
+    </div>
   )
 }

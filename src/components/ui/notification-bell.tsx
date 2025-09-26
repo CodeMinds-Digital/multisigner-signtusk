@@ -192,11 +192,11 @@ export function NotificationBell({ className }: NotificationBellProps) {
       fetchNotifications()
     }, 1000) // 1 second delay
 
-    // Poll for updates more frequently for better real-time experience
-    const interval = setInterval(fetchUnreadCount, 10000) // Every 10 seconds
+    // ✅ PERFORMANCE FIX: Reduced polling frequency
+    const interval = setInterval(fetchUnreadCount, 30000) // Every 30 seconds (reduced from 10s)
 
     // Also refresh full notifications periodically
-    const fullRefreshInterval = setInterval(fetchNotifications, 60000) // Every minute
+    const fullRefreshInterval = setInterval(fetchNotifications, 120000) // Every 2 minutes (reduced from 1m)
 
     return () => {
       clearTimeout(timer)
