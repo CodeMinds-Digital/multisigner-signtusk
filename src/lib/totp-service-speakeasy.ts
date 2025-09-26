@@ -24,12 +24,34 @@ export class TOTPServiceSpeakeasy {
     try {
       console.log('🔐 Setting up TOTP with Speakeasy for user:', userEmail)
 
+      // Validate inputs
+      if (!userId || !userEmail) {
+        throw new Error('Invalid user ID or email provided')
+      }
+
+      // Check if speakeasy is available
+      if (!speakeasy || typeof speakeasy.generateSecret !== 'function') {
+        console.error('❌ Speakeasy library not properly loaded')
+        throw new Error('TOTP library initialization failed')
+      }
+
+      // Check if QRCode is available
+      if (!QRCode || typeof QRCode.toDataURL !== 'function') {
+        console.error('❌ QRCode library not properly loaded')
+        throw new Error('QR code generation library not available')
+      }
+
       // Generate secret using speakeasy (much more reliable)
       const secret = speakeasy.generateSecret({
         name: userEmail,
         issuer: process.env.TOTP_ISSUER || 'SignTusk',
         length: 32 // 32 bytes = 256 bits for strong security
       })
+
+      if (!secret || !secret.base32 || !secret.otpauth_url) {
+        console.error('❌ Failed to generate TOTP secret')
+        throw new Error('TOTP secret generation failed')
+      }
 
       console.log('🔑 Generated TOTP secret:', {
         secretLength: secret.base32.length,
@@ -38,10 +60,31 @@ export class TOTPServiceSpeakeasy {
       })
 
       // Generate QR code from the otpauth URL
-      const qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url!)
+      let qrCodeUrl: string
+      try {
+        qrCodeUrl = await QRCode.toDataURL(secret.otpauth_url, {
+          errorCorrectionLevel: 'M',
+          type: 'image/png',
+          quality: 0.92,
+          margin: 1,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        })
+      } catch (qrError) {
+        console.error('❌ QR code generation failed:', qrError)
+        throw new Error('Failed to generate QR code')
+      }
 
       // Generate backup codes
       const backupCodes = this.generateBackupCodes()
+
+      // Validate supabaseAdmin connection
+      if (!supabaseAdmin) {
+        console.error('❌ Supabase admin client not initialized')
+        throw new Error('Database connection not available')
+      }
 
       // Store TOTP configuration (but don't enable until verified)
       const { error } = await supabaseAdmin
@@ -59,8 +102,13 @@ export class TOTPServiceSpeakeasy {
         })
 
       if (error) {
-        console.error('❌ Error storing TOTP config:', error)
-        throw new Error('Failed to store TOTP configuration')
+        console.error('❌ Error storing TOTP config:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        })
+        throw new Error(`Database error: ${error.message}`)
       }
 
       console.log('✅ TOTP configuration stored successfully')
@@ -72,8 +120,19 @@ export class TOTPServiceSpeakeasy {
         manualEntryKey: secret.base32
       }
     } catch (error) {
-      console.error('❌ TOTP setup error:', error)
-      throw error
+      console.error('❌ TOTP setup error:', {
+        message: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        userId,
+        userEmail
+      })
+
+      // Re-throw with more context
+      if (error instanceof Error) {
+        throw new Error(`TOTP setup failed: ${error.message}`)
+      } else {
+        throw new Error('TOTP setup failed: Unknown error occurred')
+      }
     }
   }
 
@@ -184,6 +243,95 @@ export class TOTPServiceSpeakeasy {
   }
 
   /**
+   * Verify TOTP token specifically for signing (checks signing_mfa_enabled)
+   */
+  static async verifySigningTOTPToken(userId: string, token: string): Promise<boolean> {
+    try {
+      console.log('🔐 Verifying TOTP token for signing:', { userId, token: token.substring(0, 3) + '***' })
+
+      // First check if user exists in user_profiles
+      const { data: userProfile, error: userError } = await supabaseAdmin
+        .from('user_profiles')
+        .select('id, email')
+        .eq('id', userId)
+        .single()
+
+      if (userError || !userProfile) {
+        console.error('❌ User profile not found:', userError)
+        return false
+      }
+
+      console.log('👤 User profile found:', { id: userProfile.id, email: userProfile.email })
+
+      const { data: config, error: configError } = await supabaseAdmin
+        .from('user_totp_configs')
+        .select('secret, enabled, signing_mfa_enabled, login_mfa_enabled')
+        .eq('user_id', userId)
+        .single()
+
+      console.log('📋 TOTP config query result:', {
+        hasConfig: !!config,
+        configError: configError?.message,
+        enabled: config?.enabled,
+        signingMfaEnabled: config?.signing_mfa_enabled,
+        loginMfaEnabled: config?.login_mfa_enabled,
+        hasSecret: !!config?.secret,
+        secretLength: config?.secret?.length
+      })
+
+      if (configError) {
+        console.error('❌ Error fetching TOTP config:', configError)
+        return false
+      }
+
+      if (!config) {
+        console.log('❌ No TOTP config found for user')
+        return false
+      }
+
+      if (!config.enabled) {
+        console.log('❌ TOTP not enabled for user')
+        return false
+      }
+
+      if (!config.signing_mfa_enabled) {
+        console.log('❌ TOTP not enabled for signing for this user')
+        return false
+      }
+
+      if (!config.secret) {
+        console.log('❌ No TOTP secret found')
+        return false
+      }
+
+      console.log('🔍 Attempting TOTP verification with speakeasy...')
+      const verified = speakeasy.totp.verify({
+        secret: config.secret,
+        encoding: 'base32',
+        token: token,
+        window: 2
+      })
+
+      console.log('🔍 TOTP verification result:', verified)
+
+      if (!verified) {
+        // Try to generate the current token for debugging (don't log it in production)
+        const currentToken = speakeasy.totp({
+          secret: config.secret,
+          encoding: 'base32'
+        })
+        console.log('🔍 Expected token starts with:', currentToken.substring(0, 3) + '***')
+        console.log('🔍 Provided token starts with:', token.substring(0, 3) + '***')
+      }
+
+      return verified
+    } catch (error) {
+      console.error('❌ TOTP signing verification error:', error)
+      return false
+    }
+  }
+
+  /**
    * Generate backup codes
    */
   private static generateBackupCodes(): string[] {
@@ -206,14 +354,15 @@ export class TOTPServiceSpeakeasy {
     try {
       console.log('🔐 Verifying TOTP for signing with Speakeasy:', { userId, requestId, token: token.substring(0, 3) + '***' })
 
-      // First verify the TOTP token
-      const isValid = await this.verifyTOTP(userId, token)
+      // First verify the TOTP token using signing-specific verification
+      const isValid = await this.verifySigningTOTPToken(userId, token)
 
       if (!isValid) {
+        console.log('❌ TOTP verification failed for signing')
         return { success: false, error: 'Invalid verification code' }
       }
 
-      console.log('✅ TOTP verified, updating signer record...')
+      console.log('✅ TOTP verified for signing, updating signer record...')
 
       // Get user email from userId to match signer record
       const { data: user, error: userError } = await supabaseAdmin
@@ -227,8 +376,9 @@ export class TOTPServiceSpeakeasy {
         return { success: false, error: 'User not found' }
       }
 
+      console.log('👤 Found user for TOTP verification:', { userId, email: user.email })
+
       // Update signer record with TOTP verification using signer_email
-      // Note: Temporarily removing totp_verification_ip due to schema cache issues
       const { error } = await supabaseAdmin
         .from('signing_request_signers')
         .update({
@@ -243,7 +393,7 @@ export class TOTPServiceSpeakeasy {
         return { success: false, error: 'Failed to update verification status' }
       }
 
-      console.log('✅ Signer TOTP verification updated successfully')
+      console.log('✅ Signer TOTP verification updated successfully for:', user.email)
       return { success: true }
     } catch (error) {
       console.error('❌ TOTP signing verification error:', error)

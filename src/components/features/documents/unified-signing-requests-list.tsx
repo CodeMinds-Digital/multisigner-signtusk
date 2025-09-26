@@ -497,6 +497,29 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const tryOpenPDF = async (documentPath: string, title: string) => {
         console.log('🔍 Trying to access PDF at path:', documentPath)
 
+        // If documentPath is already a full HTTP URL, use it directly
+        if (documentPath.startsWith('http')) {
+            console.log('✅ Document path is already a full URL, opening directly:', documentPath)
+            window.open(documentPath, '_blank')
+            return
+        }
+
+        // Extract just the file path if it contains the full storage URL structure
+        let cleanPath = documentPath
+        if (documentPath.includes('/storage/v1/object/public/')) {
+            // Extract the path after the bucket name
+            const urlParts = documentPath.split('/storage/v1/object/public/')
+            if (urlParts.length > 1) {
+                const pathWithBucket = urlParts[1]
+                // Remove bucket name from the beginning (e.g., "documents/" or "files/")
+                const pathParts = pathWithBucket.split('/')
+                if (pathParts.length > 1) {
+                    cleanPath = pathParts.slice(1).join('/')
+                    console.log('🧹 Cleaned path from URL:', cleanPath)
+                }
+            }
+        }
+
         // For Sign Inbox documents, use 'documents' bucket only (PDFs are stored here)
         // User confirmed: files bucket contains only JSON schemas, documents bucket contains PDFs
         const buckets = ['documents']
@@ -504,8 +527,8 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
         for (const bucket of buckets) {
             try {
-                console.log(`🔍 Trying bucket: ${bucket}`)
-                const previewResponse = await fetch(`/api/documents/preview?bucket=${bucket}&path=${documentPath}`)
+                console.log(`🔍 Trying bucket: ${bucket} with path: ${cleanPath}`)
+                const previewResponse = await fetch(`/api/documents/preview?bucket=${bucket}&path=${encodeURIComponent(cleanPath)}`)
                 console.log(`📡 Response from ${bucket}:`, previewResponse.status, previewResponse.statusText)
 
                 if (previewResponse.ok) {

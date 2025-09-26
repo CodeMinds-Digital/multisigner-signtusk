@@ -213,15 +213,28 @@ export function getStatusGroup(status: ExtendedDocumentStatus): StatusGroupConfi
 export function getDocumentCounts(documents: { status: ExtendedDocumentStatus }[]): { total: number } & Record<string, number> {
   const total = documents.length
 
+  // Get counts for status groups
   const counts = STATUS_GROUPS.reduce((acc, group) => {
     const count = documents.filter(doc => group.statuses.includes(doc.status)).length
     acc[group.label.toLowerCase().replace(/\s+/g, '_')] = count
     return acc
   }, {} as Record<string, number>)
 
+  // Add individual status counts for specific statuses
+  const individualCounts = {
+    draft: documents.filter(doc => doc.status === 'draft').length,
+    ready: documents.filter(doc => doc.status === 'ready').length,
+    pending: documents.filter(doc => doc.status === 'pending').length,
+    completed: documents.filter(doc => doc.status === 'completed').length,
+    expired: documents.filter(doc => doc.status === 'expired').length,
+    cancelled: documents.filter(doc => doc.status === 'cancelled').length,
+    archived: documents.filter(doc => doc.status === 'archived').length
+  }
+
   return {
     total,
-    ...counts
+    ...counts,
+    ...individualCounts
   }
 }
 

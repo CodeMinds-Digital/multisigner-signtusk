@@ -2,10 +2,23 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileText, Clock, CheckCircle, AlertTriangle, RefreshCw, Upload } from 'lucide-react'
+import {
+  FileText,
+  Clock,
+  CheckCircle,
+  RefreshCw,
+  Upload,
+  Users,
+  Timer,
+  Target,
+  Activity,
+  Calendar
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/components/providers/secure-auth-provider'
-import { getDashboardStats, getDocuments, type Document as DocumentType } from '@/lib/document-store'
+import { type DocumentTemplate } from '@/types/drive'
+import { getEnhancedDashboardStats, type EnhancedDashboardStats } from '@/lib/enhanced-dashboard-stats'
+import { ResponsiveStatsCards, type StatCardData } from '@/components/ui/responsive-stats-cards'
 import { UploadDocument } from '@/components/features/documents/upload-document'
 import { getStatusConfig } from '@/utils/document-status'
 
@@ -13,36 +26,76 @@ import { getStatusConfig } from '@/utils/document-status'
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const [stats, setStats] = useState({
-    totalDocuments: 0,
-    pendingSignatures: 0,
-    completedDocuments: 0,
-    expiredDocuments: 0
-  })
-  const [recentDocuments, setRecentDocuments] = useState<DocumentType[]>([])
+  const [enhancedStats, setEnhancedStats] = useState<EnhancedDashboardStats | null>(null)
+  const [recentDocuments, setRecentDocuments] = useState<DocumentTemplate[]>([])
   const [loading, setLoading] = useState(true)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
+  const [activeFilter, setActiveFilter] = useState<string>('all')
 
   const loadDashboardData = useCallback(async () => {
     if (!user) return
 
     setLoading(true)
     try {
-      // Get stats
-      const dashboardStats = await getDashboardStats()
-      setStats({
-        totalDocuments: dashboardStats.total,
-        pendingSignatures: dashboardStats.pending,
-        completedDocuments: dashboardStats.completed,
-        expiredDocuments: dashboardStats.expired
-      })
+      console.log('🔄 Loading dashboard data...')
 
-      // Get recent documents
-      const documents = await getDocuments()
-      setRecentDocuments(documents.slice(0, 5))
+      // Use the same API approach as Drive tab for consistency
+      const response = await fetch('/api/dashboard/stats')
+      if (response.ok) {
+        const { data } = await response.json()
+        console.log('✅ Dashboard stats loaded from API:', data)
+        setEnhancedStats({
+          ...data,
+          recentDocuments: [],
+          trends: { documents: 0, signatures: 0, completion: 0 }
+        })
+      } else {
+        console.error('❌ Dashboard stats API failed, trying enhanced stats fallback')
+
+        // Fallback to enhanced stats
+        try {
+          const stats = await getEnhancedDashboardStats()
+          console.log('✅ Enhanced stats fallback loaded:', stats)
+          setEnhancedStats(stats)
+        } catch (statsError) {
+          console.error('❌ Both API and enhanced stats failed:', statsError)
+          // Set fallback data to prevent blank dashboard
+          setEnhancedStats({
+            totalDocuments: 0,
+            pendingSignatures: 0,
+            completedDocuments: 0,
+            expiredDocuments: 0,
+            draftDocuments: 0,
+            todayActivity: 0,
+            weekActivity: 0,
+            monthActivity: 0,
+            totalSignatures: 0,
+            averageCompletionTime: 0,
+            successRate: 0,
+            recentDocuments: [],
+            trends: { documents: 0, signatures: 0, completion: 0 }
+          })
+        }
+      }
+
+      // Get recent documents using the same API approach as Drive
+      try {
+        const docsResponse = await fetch('/api/drive/templates')
+        if (docsResponse.ok) {
+          const { data: documents } = await docsResponse.json()
+          setRecentDocuments(documents.slice(0, 5))
+          console.log('✅ Recent documents loaded:', documents.length)
+        } else {
+          console.error('❌ Failed to load recent documents from API')
+          setRecentDocuments([])
+        }
+      } catch (docsError) {
+        console.error('❌ Failed to load recent documents:', docsError)
+        setRecentDocuments([])
+      }
 
     } catch (error) {
-      console.error('Failed to load dashboard data:', error)
+      console.error('❌ Failed to load dashboard data:', error)
     } finally {
       setLoading(false)
     }
@@ -52,7 +105,113 @@ export default function DashboardPage() {
     loadDashboardData()
   }, [loadDashboardData])
 
+  // Auto-refresh every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      loadDashboardData()
+    }, 30000)
 
+    return () => clearInterval(interval)
+  }, [loadDashboardData])
+
+  // Create stats cards configuration
+  const createStatsCards = useCallback((): StatCardData[] => {
+    if (!enhancedStats) return []
+
+    return [
+      {
+        id: 'total',
+        title: 'Total Documents',
+        value: enhancedStats.totalDocuments,
+        description: 'All documents in your account',
+        icon: FileText,
+        color: 'text-blue-600',
+        bgColor: 'bg-blue-50',
+        trend: {
+          value: enhancedStats.trends.documents,
+          label: 'vs last month',
+          isPositive: enhancedStats.trends.documents >= 0
+        },
+        onClick: () => setActiveFilter('all'),
+        isActive: activeFilter === 'all'
+      },
+      {
+        id: 'pending',
+        title: 'Pending Signatures',
+        value: enhancedStats.pendingSignatures,
+        description: 'Awaiting signatures',
+        icon: Clock,
+        color: 'text-amber-600',
+        bgColor: 'bg-amber-50',
+        onClick: () => setActiveFilter('pending'),
+        isActive: activeFilter === 'pending'
+      },
+      {
+        id: 'completed',
+        title: 'Completed',
+        value: enhancedStats.completedDocuments,
+        description: 'Successfully signed',
+        icon: CheckCircle,
+        color: 'text-green-600',
+        bgColor: 'bg-green-50',
+        onClick: () => setActiveFilter('completed'),
+        isActive: activeFilter === 'completed'
+      },
+      {
+        id: 'success-rate',
+        title: 'Success Rate',
+        value: `${enhancedStats.successRate}%`,
+        description: 'Completion percentage',
+        icon: Target,
+        color: 'text-purple-600',
+        bgColor: 'bg-purple-50'
+      }
+    ]
+  }, [enhancedStats, activeFilter])
+
+  // Create activity cards
+  const createActivityCards = useCallback((): StatCardData[] => {
+    if (!enhancedStats) return []
+
+    return [
+      {
+        id: 'today',
+        title: 'Today',
+        value: enhancedStats.todayActivity,
+        description: 'Documents created today',
+        icon: Calendar,
+        color: 'text-blue-600',
+        bgColor: 'bg-blue-50'
+      },
+      {
+        id: 'week',
+        title: 'This Week',
+        value: enhancedStats.weekActivity,
+        description: 'Weekly activity',
+        icon: Activity,
+        color: 'text-green-600',
+        bgColor: 'bg-green-50'
+      },
+      {
+        id: 'signatures',
+        title: 'Total Signatures',
+        value: enhancedStats.totalSignatures,
+        description: 'Signatures collected',
+        icon: Users,
+        color: 'text-indigo-600',
+        bgColor: 'bg-indigo-50'
+      },
+      {
+        id: 'avg-time',
+        title: 'Avg. Completion',
+        value: `${enhancedStats.averageCompletionTime}h`,
+        description: 'Average completion time',
+        icon: Timer,
+        color: 'text-orange-600',
+        bgColor: 'bg-orange-50'
+      }
+    ]
+  }, [enhancedStats])
 
   const getTimeAgo = (dateString: string) => {
     const date = new Date(dateString)
@@ -92,59 +251,26 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
-            <FileText className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? '...' : stats.totalDocuments}</div>
-            <p className="text-xs text-muted-foreground">
-              All documents in your account
-            </p>
-          </CardContent>
-        </Card>
+      {/* Enhanced Stats Cards */}
+      <div className="space-y-6">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Document Overview</h2>
+          <ResponsiveStatsCards
+            cards={createStatsCards()}
+            loading={loading}
+            showTrends={true}
+            cardSize="md"
+          />
+        </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-            <Clock className="h-4 w-4 text-yellow-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? '...' : stats.pendingSignatures}</div>
-            <p className="text-xs text-muted-foreground">
-              Awaiting signatures
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Completed</CardTitle>
-            <CheckCircle className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? '...' : stats.completedDocuments}</div>
-            <p className="text-xs text-muted-foreground">
-              Successfully signed
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Expired</CardTitle>
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? '...' : stats.expiredDocuments}</div>
-            <p className="text-xs text-muted-foreground">
-              Past due date
-            </p>
-          </CardContent>
-        </Card>
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Activity Metrics</h2>
+          <ResponsiveStatsCards
+            cards={createActivityCards()}
+            loading={loading}
+            cardSize="sm"
+          />
+        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -167,8 +293,8 @@ export default function DashboardPage() {
                   <div key={doc.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
                     <FileText className="w-8 h-8 text-blue-500" />
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-gray-900 truncate">{doc.title || doc.name}</p>
-                      <p className="text-xs text-gray-500">{doc.settings?.document_type || 'Document'} • {getTimeAgo(doc.created_at)}</p>
+                      <p className="text-sm font-medium text-gray-900 truncate">{doc.name}</p>
+                      <p className="text-xs text-gray-500">{doc.type || 'Document'} • {getTimeAgo(doc.created_at)}</p>
                     </div>
                     <div className="flex-shrink-0">
                       {(() => {
