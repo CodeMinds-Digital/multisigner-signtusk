@@ -241,6 +241,13 @@ async function populateSchemaWithSignatures(schema: any[], signers: any[]) {
       signatureData = typeof targetSigner.signature_data === 'string'
         ? JSON.parse(targetSigner.signature_data)
         : targetSigner.signature_data
+
+      console.log(`📦 Parsed signature data for ${fieldName}:`, {
+        hasSigner_name: !!signatureData.signer_name,
+        hasSignature_image: !!signatureData.signature_image,
+        hasSignature: !!signatureData.signature,
+        keys: Object.keys(signatureData)
+      })
     } catch (_error) {
       console.error(`❌ Error parsing signature data for ${fieldName}:`, _error)
       continue
@@ -251,6 +258,8 @@ async function populateSchemaWithSignatures(schema: any[], signers: any[]) {
     if (fieldValue !== null && fieldValue !== undefined) {
       inputs[fieldName] = fieldValue
       console.log(`✅ Populated field ${fieldName} with:`, fieldValue.substring ? fieldValue.substring(0, 50) + '...' : fieldValue)
+    } else {
+      console.warn(`⚠️ Field ${fieldName} has null/undefined value for signer ${targetSigner.signer_email}`)
     }
   }
 
@@ -263,7 +272,11 @@ function getFieldValue(field: any, signatureData: any, signer: any): any {
 
   switch (fieldType) {
     case 'signature':
-      return signatureData.signature_image || signatureData.signature || ''
+      const sigValue = signatureData.signature_image || signatureData.signature || ''
+      if (!sigValue) {
+        console.warn(`⚠️ No signature image found for field ${field.name}. Available keys:`, Object.keys(signatureData))
+      }
+      return sigValue
 
     case 'text':
       // For text fields, use signer_name as the content

@@ -29,6 +29,12 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table'
+import {
+    Tabs,
+    TabsList,
+    TabsTrigger,
+    TabsContent,
+} from '@/components/ui/tabs'
 
 interface UnifiedSigningRequestsListProps {
     onRefresh?: () => void
@@ -65,6 +71,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const [error, setError] = useState('')
     const [timeRange, setTimeRange] = useState<TimeRange>('30d')
     const [searchQuery, setSearchQuery] = useState('') // NEW: Search query state
+    const [activeTab, setActiveTab] = useState<'all' | 'sent' | 'received'>('all') // NEW: Active tab state
     const [viewingRequest, setViewingRequest] = useState<UnifiedSigningRequest | null>(null)
     const [showSignersSheet, setShowSignersSheet] = useState<UnifiedSigningRequest | null>(null)
     const [showActionsSheet, setShowActionsSheet] = useState<UnifiedSigningRequest | null>(null)
@@ -874,6 +881,22 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         }
     }
 
+    // Get requests filtered by active tab
+    const getTabFilteredRequests = (): UnifiedSigningRequest[] => {
+        if (activeTab === 'all') return filteredRequests
+        return filteredRequests.filter(req => req.type === activeTab)
+    }
+
+    // Get stats for current tab
+    const getTabStats = () => {
+        const tabRequests = getTabFilteredRequests()
+        return {
+            total: tabRequests.length,
+            sent: tabRequests.filter(r => r.type === 'sent').length,
+            received: tabRequests.filter(r => r.type === 'received').length
+        }
+    }
+
     if (loading) {
         return (
             <div className="space-y-6">
@@ -1005,12 +1028,12 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                 </Card>
             </div>
 
-            {/* Requests List */}
+            {/* Requests List with Tabs */}
             <Card>
                 <CardHeader>
-                    <CardTitle>All Signature Requests</CardTitle>
+                    <CardTitle>Signature Requests</CardTitle>
                     <CardDescription>
-                        Combined view of requests you've sent and received
+                        View and manage your signature requests
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -1024,145 +1047,391 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                         </div>
                     )}
 
-                    {filteredRequests.length === 0 ? (
-                        <EmptyState
-                            icon={File}
-                            title={searchQuery ? "No matching requests found" : "No signature requests found"}
-                            description={searchQuery ? `No requests match "${searchQuery}"` : `No requests found for ${getTimeRangeLabel(timeRange).toLowerCase()}`}
-                        />
-                    ) : (
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Type</TableHead>
-                                    <TableHead>Document Title</TableHead>
-                                    <TableHead>Sign ID</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>From/To</TableHead>
-                                    <TableHead>Signature Type</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Expires</TableHead>
-                                    <TableHead className="w-[100px]">Actions</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {filteredRequests.map((request) => (
-                                    <TableRow key={`${request.type}-${request.id}`}>
-                                        <TableCell>
-                                            <div className="flex items-center space-x-2">
-                                                {request.type === 'sent' ? (
-                                                    <Send className="w-4 h-4 text-green-600" />
-                                                ) : (
-                                                    <Inbox className="w-4 h-4 text-purple-600" />
-                                                )}
-                                                <span className="text-sm font-medium capitalize">
-                                                    {request.type}
-                                                </span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center space-x-2">
-                                                <File className="w-4 h-4 text-gray-400" />
-                                                <span className="font-medium">{request.title}</span>
-                                            </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            {request.document_sign_id ? (
-                                                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-                                                    🆔 {request.document_sign_id}
-                                                </span>
-                                            ) : (
-                                                <span className="text-xs text-gray-400">No ID</span>
-                                            )}
-                                        </TableCell>
-                                        <TableCell>
-                                            {getStatusBadge(request)}
-                                        </TableCell>
-                                        <TableCell>
-                                            <button
-                                                onClick={() => handleFromToClick(request)}
-                                                className="text-sm text-gray-600 hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left"
-                                            >
-                                                {getFromToDisplay(request)}
-                                            </button>
-                                        </TableCell>
-                                        <TableCell>
-                                            {getSignatureTypeDisplay(request)}
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className="text-sm text-gray-600">
-                                                {formatDate(request.initiated_at)}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            <span className={`text-sm ${getTimeRemaining(request.expires_at, request).includes('Expired')
-                                                ? 'text-red-600'
-                                                : getTimeRemaining(request.expires_at, request).includes('Completed')
-                                                    ? 'text-green-600'
-                                                    : 'text-gray-600'
-                                                }`}>
-                                                {getTimeRemaining(request.expires_at, request)}
-                                            </span>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="flex items-center space-x-2">
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handlePreviewPDF(request)}
-                                                    title="Preview PDF"
-                                                >
-                                                    <Eye className="w-4 h-4" />
-                                                </Button>
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() => handleViewDetails(request)}
-                                                    title="View Details"
-                                                >
-                                                    <Info className="w-4 h-4" />
-                                                </Button>
-                                                {request.type === 'received' && request.can_sign && (
-                                                    <Button
-                                                        size="sm"
-                                                        onClick={() => handleSign(request)}
-                                                        className="bg-green-600 hover:bg-green-700"
+                    <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'all' | 'sent' | 'received')}>
+                        <TabsList className="grid w-full grid-cols-3 mb-4">
+                            <TabsTrigger value="all" className="flex items-center gap-2">
+                                <File className="w-4 h-4" />
+                                All ({filteredStats.total})
+                            </TabsTrigger>
+                            <TabsTrigger value="sent" className="flex items-center gap-2">
+                                <Send className="w-4 h-4" />
+                                Sent ({filteredStats.sent})
+                            </TabsTrigger>
+                            <TabsTrigger value="received" className="flex items-center gap-2">
+                                <Inbox className="w-4 h-4" />
+                                Received ({filteredStats.received})
+                            </TabsTrigger>
+                        </TabsList>
+
+                        {/* All Requests Tab */}
+                        <TabsContent value="all">
+                            {getTabFilteredRequests().length === 0 ? (
+                                <EmptyState
+                                    icon={File}
+                                    title={searchQuery ? "No matching requests found" : "No signature requests found"}
+                                    description={searchQuery ? `No requests match "${searchQuery}"` : `No requests found for ${getTimeRangeLabel(timeRange).toLowerCase()}`}
+                                />
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead>Document Title</TableHead>
+                                            <TableHead>Sign ID</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>From/To</TableHead>
+                                            <TableHead>Signature Type</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Expires</TableHead>
+                                            <TableHead className="w-[100px]">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {getTabFilteredRequests().map((request) => (
+                                            <TableRow key={`${request.type}-${request.id}`}>
+                                                <TableCell>
+                                                    <div className="flex items-center space-x-2">
+                                                        {request.type === 'sent' ? (
+                                                            <Send className="w-4 h-4 text-green-600" />
+                                                        ) : (
+                                                            <Inbox className="w-4 h-4 text-purple-600" />
+                                                        )}
+                                                        <span className="text-sm font-medium capitalize">
+                                                            {request.type}
+                                                        </span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center space-x-2">
+                                                        <File className="w-4 h-4 text-gray-400" />
+                                                        <span className="font-medium">{request.title}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {request.document_sign_id ? (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                                                            🆔 {request.document_sign_id}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">No ID</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {getStatusBadge(request)}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <button
+                                                        onClick={() => handleFromToClick(request)}
+                                                        className="text-sm text-gray-600 hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left"
                                                     >
-                                                        Sign
-                                                    </Button>
-                                                )}
-                                                {request.type === 'received' && request.document_status === 'completed' && request.final_pdf_url && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => window.open(request.final_pdf_url, '_blank')}
-                                                    >
-                                                        <Download className="w-4 h-4 mr-1" />
-                                                        Final PDF
-                                                    </Button>
-                                                )}
-                                                {request.type === 'sent' && !isRequestCompleted(request) && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        onClick={() => setShowActionsSheet(request)}
-                                                        title="Document Actions"
-                                                    >
-                                                        <MoreHorizontal className="w-4 h-4" />
-                                                    </Button>
-                                                )}
-                                                {request.type === 'sent' && isRequestCompleted(request) && (
-                                                    <span className="text-sm text-green-600 font-medium">
-                                                        ✓ Completed
+                                                        {getFromToDisplay(request)}
+                                                    </button>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {getSignatureTypeDisplay(request)}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-sm text-gray-600">
+                                                        {formatDate(request.initiated_at)}
                                                     </span>
-                                                )}
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                            </TableBody>
-                        </Table>
-                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className={`text-sm ${getTimeRemaining(request.expires_at, request).includes('Expired')
+                                                        ? 'text-red-600'
+                                                        : getTimeRemaining(request.expires_at, request).includes('Completed')
+                                                            ? 'text-green-600'
+                                                            : 'text-gray-600'
+                                                        }`}>
+                                                        {getTimeRemaining(request.expires_at, request)}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center space-x-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handlePreviewPDF(request)}
+                                                            title="Preview PDF"
+                                                        >
+                                                            <Eye className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleViewDetails(request)}
+                                                            title="View Details"
+                                                        >
+                                                            <Info className="w-4 h-4" />
+                                                        </Button>
+                                                        {request.type === 'received' && request.can_sign && (
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={() => handleSign(request)}
+                                                                className="bg-green-600 hover:bg-green-700"
+                                                            >
+                                                                Sign
+                                                            </Button>
+                                                        )}
+                                                        {request.type === 'received' && request.document_status === 'completed' && request.final_pdf_url && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => window.open(request.final_pdf_url, '_blank')}
+                                                            >
+                                                                <Download className="w-4 h-4 mr-1" />
+                                                                Final PDF
+                                                            </Button>
+                                                        )}
+                                                        {request.type === 'sent' && !isRequestCompleted(request) && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => setShowActionsSheet(request)}
+                                                                title="Document Actions"
+                                                            >
+                                                                <MoreHorizontal className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
+                                                        {request.type === 'sent' && isRequestCompleted(request) && (
+                                                            <span className="text-sm text-green-600 font-medium">
+                                                                ✓ Completed
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </TabsContent>
+
+                        {/* Sent Requests Tab */}
+                        <TabsContent value="sent">
+                            {getTabFilteredRequests().length === 0 ? (
+                                <EmptyState
+                                    icon={Send}
+                                    title={searchQuery ? "No matching sent requests" : "No sent requests"}
+                                    description={searchQuery ? `No sent requests match "${searchQuery}"` : `You haven't sent any signature requests for ${getTimeRangeLabel(timeRange).toLowerCase()}`}
+                                />
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Document Title</TableHead>
+                                            <TableHead>Sign ID</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>To</TableHead>
+                                            <TableHead>Signature Type</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Expires</TableHead>
+                                            <TableHead className="w-[100px]">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {getTabFilteredRequests().map((request) => (
+                                            <TableRow key={`${request.type}-${request.id}`}>
+                                                <TableCell>
+                                                    <div className="flex items-center space-x-2">
+                                                        <File className="w-4 h-4 text-gray-400" />
+                                                        <span className="font-medium">{request.title}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {request.document_sign_id ? (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                                                            🆔 {request.document_sign_id}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">No ID</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {getStatusBadge(request)}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <button
+                                                        onClick={() => handleFromToClick(request)}
+                                                        className="text-sm text-gray-600 hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left"
+                                                    >
+                                                        {getFromToDisplay(request)}
+                                                    </button>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {getSignatureTypeDisplay(request)}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-sm text-gray-600">
+                                                        {formatDate(request.initiated_at)}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className={`text-sm ${getTimeRemaining(request.expires_at, request).includes('Expired')
+                                                        ? 'text-red-600'
+                                                        : getTimeRemaining(request.expires_at, request).includes('Completed')
+                                                            ? 'text-green-600'
+                                                            : 'text-gray-600'
+                                                        }`}>
+                                                        {getTimeRemaining(request.expires_at, request)}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center space-x-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handlePreviewPDF(request)}
+                                                            title="Preview PDF"
+                                                        >
+                                                            <Eye className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleViewDetails(request)}
+                                                            title="View Details"
+                                                        >
+                                                            <Info className="w-4 h-4" />
+                                                        </Button>
+                                                        {!isRequestCompleted(request) && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => setShowActionsSheet(request)}
+                                                                title="Document Actions"
+                                                            >
+                                                                <MoreHorizontal className="w-4 h-4" />
+                                                            </Button>
+                                                        )}
+                                                        {isRequestCompleted(request) && (
+                                                            <span className="text-sm text-green-600 font-medium">
+                                                                ✓ Completed
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </TabsContent>
+
+                        {/* Received Requests Tab */}
+                        <TabsContent value="received">
+                            {getTabFilteredRequests().length === 0 ? (
+                                <EmptyState
+                                    icon={Inbox}
+                                    title={searchQuery ? "No matching received requests" : "No received requests"}
+                                    description={searchQuery ? `No received requests match "${searchQuery}"` : `You haven't received any signature requests for ${getTimeRangeLabel(timeRange).toLowerCase()}`}
+                                />
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Document Title</TableHead>
+                                            <TableHead>Sign ID</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>From</TableHead>
+                                            <TableHead>Signature Type</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Expires</TableHead>
+                                            <TableHead className="w-[100px]">Actions</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {getTabFilteredRequests().map((request) => (
+                                            <TableRow key={`${request.type}-${request.id}`}>
+                                                <TableCell>
+                                                    <div className="flex items-center space-x-2">
+                                                        <File className="w-4 h-4 text-gray-400" />
+                                                        <span className="font-medium">{request.title}</span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {request.document_sign_id ? (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
+                                                            🆔 {request.document_sign_id}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-400">No ID</span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {getStatusBadge(request)}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <button
+                                                        onClick={() => handleFromToClick(request)}
+                                                        className="text-sm text-gray-600 hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left"
+                                                    >
+                                                        {getFromToDisplay(request)}
+                                                    </button>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {getSignatureTypeDisplay(request)}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className="text-sm text-gray-600">
+                                                        {formatDate(request.initiated_at)}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <span className={`text-sm ${getTimeRemaining(request.expires_at, request).includes('Expired')
+                                                        ? 'text-red-600'
+                                                        : getTimeRemaining(request.expires_at, request).includes('Completed')
+                                                            ? 'text-green-600'
+                                                            : 'text-gray-600'
+                                                        }`}>
+                                                        {getTimeRemaining(request.expires_at, request)}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <div className="flex items-center space-x-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handlePreviewPDF(request)}
+                                                            title="Preview PDF"
+                                                        >
+                                                            <Eye className="w-4 h-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => handleViewDetails(request)}
+                                                            title="View Details"
+                                                        >
+                                                            <Info className="w-4 h-4" />
+                                                        </Button>
+                                                        {request.can_sign && (
+                                                            <Button
+                                                                size="sm"
+                                                                onClick={() => handleSign(request)}
+                                                                className="bg-green-600 hover:bg-green-700"
+                                                            >
+                                                                Sign
+                                                            </Button>
+                                                        )}
+                                                        {request.document_status === 'completed' && request.final_pdf_url && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() => window.open(request.final_pdf_url, '_blank')}
+                                                            >
+                                                                <Download className="w-4 h-4 mr-1" />
+                                                                Final PDF
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </TabsContent>
+                    </Tabs>
                 </CardContent>
             </Card>
 
