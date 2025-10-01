@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { File, CheckCircle, Trash2, Share2, Users, Send, Inbox, Filter, X, Search, Shield } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { File, CheckCircle, Trash2, Share2, Users, Send, Inbox, Filter, X, Search, Shield, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { type SigningRequestListItem } from '@/lib/signing-workflow-service'
 import { supabase } from '@/lib/supabase'
@@ -78,12 +78,18 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const [pendingSigningRequest, setPendingSigningRequest] = useState<UnifiedSigningRequest | null>(null)
     const [userProfile, setUserProfile] = useState<any>(null)
 
+    // Smart Polling State
+    const [pollingRequestIds, setPollingRequestIds] = useState<Set<string>>(new Set())
+    const [isRefreshing, setIsRefreshing] = useState(false)
+    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+    const pollingStartTimeRef = useRef<Map<string, number>>(new Map())
+
     // Note: Toast context may not be available in all contexts
 
     const { user } = useAuth()
 
     // Helper function to check if all signers have completed signing
-    const isRequestCompleted = (request: UnifiedSigningRequest): boolean => {
+    const isRequestCompleted = useCallback((request: UnifiedSigningRequest): boolean => {
         // Check if status is explicitly completed
         if (request.status === 'completed' || request.document_status === 'completed') {
             return true
@@ -95,7 +101,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         }
 
         return false
-    }
+    }, [])
 
     const getDateFilter = (range: TimeRange): Date => {
         const now = new Date()
@@ -210,6 +216,133 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
     useEffect(() => {
         loadAllRequests()
+    }, [loadAllRequests])
+
+    // Smart Polling: Check for PDF generation completion
+    const checkPDFStatus = useCallback(async (requestId: string) => {
+        try {
+            const response = await fetch(`/api/signature-requests/${requestId}`)
+            if (!response.ok) return null
+
+            const result = await response.json()
+            if (result.success && result.data) {
+                return result.data
+            }
+            return null
+        } catch (error) {
+            console.error('Error checking PDF status:', error)
+            return null
+        }
+    }, [])
+
+    // Smart Polling Effect
+    useEffect(() => {
+        if (pollingRequestIds.size === 0) {
+            // Clear interval if no requests to poll
+            if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current)
+                pollingIntervalRef.current = null
+            }
+            return
+        }
+
+        console.log('🔄 Starting smart polling for', pollingRequestIds.size, 'request(s)')
+
+        // Poll every 3 seconds
+        pollingIntervalRef.current = setInterval(async () => {
+            const now = Date.now()
+            const idsToRemove: string[] = []
+
+            for (const requestId of pollingRequestIds) {
+                // Check if polling has exceeded 60 seconds (timeout)
+                const startTime = pollingStartTimeRef.current.get(requestId) || now
+                if (now - startTime > 60000) {
+                    console.log('⏱️ Polling timeout for request:', requestId)
+                    idsToRemove.push(requestId)
+                    continue
+                }
+
+                // Check PDF status
+                const updatedRequest = await checkPDFStatus(requestId)
+
+                if (updatedRequest && updatedRequest.final_pdf_url) {
+                    console.log('✅ Final PDF ready for request:', requestId)
+
+                    // Update the request in state
+                    setRequests(prev => prev.map(req =>
+                        req.id === requestId
+                            ? { ...req, final_pdf_url: updatedRequest.final_pdf_url, status: updatedRequest.status }
+                            : req
+                    ))
+
+                    // Remove from polling
+                    idsToRemove.push(requestId)
+                }
+            }
+
+            // Remove completed/timed-out requests from polling
+            if (idsToRemove.length > 0) {
+                setPollingRequestIds(prev => {
+                    const newSet = new Set(prev)
+                    idsToRemove.forEach(id => {
+                        newSet.delete(id)
+                        pollingStartTimeRef.current.delete(id)
+                    })
+                    return newSet
+                })
+            }
+        }, 3000)
+
+        // Cleanup on unmount
+        return () => {
+            if (pollingIntervalRef.current) {
+                clearInterval(pollingIntervalRef.current)
+                pollingIntervalRef.current = null
+            }
+        }
+    }, [pollingRequestIds, checkPDFStatus])
+
+    // Auto-refresh when window gains focus
+    useEffect(() => {
+        const handleFocus = () => {
+            console.log('🔄 Window focused, refreshing data...')
+            loadAllRequests()
+        }
+
+        window.addEventListener('focus', handleFocus)
+        return () => window.removeEventListener('focus', handleFocus)
+    }, [loadAllRequests])
+
+    // Start polling for completed requests without final PDF
+    useEffect(() => {
+        const requestsNeedingPDF = requests.filter(req =>
+            isRequestCompleted(req) && !req.final_pdf_url
+        )
+
+        if (requestsNeedingPDF.length > 0) {
+            const newPollingIds = new Set(pollingRequestIds)
+            let hasNewRequests = false
+
+            requestsNeedingPDF.forEach(req => {
+                if (!newPollingIds.has(req.id)) {
+                    newPollingIds.add(req.id)
+                    pollingStartTimeRef.current.set(req.id, Date.now())
+                    hasNewRequests = true
+                    console.log('📡 Starting to poll for PDF:', req.title)
+                }
+            })
+
+            if (hasNewRequests) {
+                setPollingRequestIds(newPollingIds)
+            }
+        }
+    }, [requests, pollingRequestIds, isRequestCompleted])
+
+    // Manual refresh function
+    const handleManualRefresh = useCallback(async () => {
+        setIsRefreshing(true)
+        await loadAllRequests()
+        setTimeout(() => setIsRefreshing(false), 500)
     }, [loadAllRequests])
 
     const getStatusBadge = (request: UnifiedSigningRequest) => {
@@ -985,16 +1118,17 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
                 {/* NEW: Search Bar and Refresh */}
                 <div className="flex items-center gap-2">
-                    <button
-                        onClick={loadAllRequests}
-                        className="px-3 py-2 rounded-lg font-medium transition-colors bg-gray-100 text-gray-700 hover:bg-gray-200 flex items-center gap-2"
+                    <Button
+                        onClick={handleManualRefresh}
+                        variant="outline"
+                        size="sm"
+                        disabled={isRefreshing}
+                        className="flex items-center gap-2"
                         title="Refresh data"
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        Refresh
-                    </button>
+                        <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                        {isRefreshing ? 'Refreshing...' : 'Refresh'}
+                    </Button>
                     <div className="relative">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                         <input
@@ -1131,6 +1265,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                         handleSign={handleSign}
                                         isRequestCompleted={isRequestCompleted}
                                         setShowActionsSheet={setShowActionsSheet}
+                                        isPolling={pollingRequestIds.has(request.id)}
                                     />
                                 ))}
                                 </div>
@@ -1163,6 +1298,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                         handleSign={handleSign}
                                         isRequestCompleted={isRequestCompleted}
                                         setShowActionsSheet={setShowActionsSheet}
+                                        isPolling={pollingRequestIds.has(request.id)}
                                     />
                                 ))}
                                 </div>
@@ -1195,6 +1331,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                         handleSign={handleSign}
                                         isRequestCompleted={isRequestCompleted}
                                         setShowActionsSheet={setShowActionsSheet}
+                                        isPolling={pollingRequestIds.has(request.id)}
                                     />
                                 ))}
                                 </div>
