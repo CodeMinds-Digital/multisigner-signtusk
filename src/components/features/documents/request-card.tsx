@@ -1,5 +1,5 @@
 import React from 'react'
-import { Calendar, Clock, User, FileText, Eye, Info, CheckCircle, Download, MoreHorizontal, Send, Inbox } from 'lucide-react'
+import { Calendar, Clock, User, FileText, Eye, Info, CheckCircle, Download, MoreHorizontal, Send, Inbox, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
@@ -57,6 +57,7 @@ interface RequestCardProps {
     handleSign: (request: UnifiedSigningRequest) => void
     isRequestCompleted: (request: UnifiedSigningRequest) => boolean
     setShowActionsSheet: (request: UnifiedSigningRequest | null) => void
+    isPolling?: boolean
 }
 
 export function RequestCard({
@@ -73,7 +74,8 @@ export function RequestCard({
     handleViewDetails,
     handleSign,
     isRequestCompleted,
-    setShowActionsSheet
+    setShowActionsSheet,
+    isPolling = false
 }: RequestCardProps) {
     const timeRemaining = getTimeRemaining(request.expires_at, request)
     const isExpired = timeRemaining === 'Expired'
@@ -129,7 +131,16 @@ export function RequestCard({
                             {/* Status */}
                             <div className="flex items-center gap-2">
                                 <div className="text-gray-500 font-medium min-w-fit">Status:</div>
-                                {getStatusBadge(request)}
+                                <div className="flex items-center gap-2">
+                                    {getStatusBadge(request)}
+                                    {/* Show PDF Generation Status */}
+                                    {isPolling && (
+                                        <Badge className="bg-blue-100 text-blue-800 border-blue-200 gap-1.5">
+                                            <Loader2 className="w-3 h-3 animate-spin" />
+                                            Generating PDF...
+                                        </Badge>
+                                    )}
+                                </div>
                             </div>
 
                             {/* From/To - Only show for single signature or sent requests */}
