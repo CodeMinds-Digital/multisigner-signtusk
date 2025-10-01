@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { File, CheckCircle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Send, Inbox, Filter, Info, X, Search, Shield } from 'lucide-react'
+import { File, CheckCircle, Trash2, Share2, Users, Send, Inbox, Filter, X, Search, Shield } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { type SigningRequestListItem } from '@/lib/signing-workflow-service'
 import { supabase } from '@/lib/supabase'
@@ -12,6 +12,7 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorAlert } from '@/components/ui/alert'
 import { RequestDetailsModal } from './request-details-modal'
 import { PDFSigningScreen } from './pdf-signing-screen'
+import { RequestCard } from './request-card'
 
 
 import {
@@ -21,14 +22,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select'
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '@/components/ui/table'
 import {
     Tabs,
     TabsList,
@@ -54,6 +47,11 @@ interface UnifiedSigningRequest extends SigningRequestListItem {
     document_sign_id?: string // NEW: Document Sign ID
     final_pdf_url?: string
     context_display?: string
+    metadata?: {
+        signing_mode?: 'sequential' | 'parallel'
+        message?: string
+        created_at?: string
+    }
 }
 
 interface RequestStats {
@@ -838,19 +836,53 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             if (signerCount === 1) {
                 // Show the recipient's name if available, otherwise show "1 recipient"
                 const recipientName = request.signers?.[0]?.email || request.signers?.[0]?.name
-                return recipientName ? `To ${recipientName}` : `To 1 recipient`
+                return recipientName ? `To: ${recipientName}` : `To: 1 recipient`
             } else if (signerCount > 1) {
-                return `To ${signerCount} recipients`
+                return `To: ${signerCount} recipients`
             }
-            return `To ${signerCount} recipient${signerCount !== 1 ? 's' : ''}`
+            return `To: ${signerCount} recipient${signerCount !== 1 ? 's' : ''}`
         } else {
             // For received requests, show sender name
-            return `From ${request.sender_name || 'Unknown'}`
+            return `From: ${request.sender_name || 'Unknown'}`
         }
+    }
+
+    const getAllSignersDisplay = (request: UnifiedSigningRequest) => {
+        const signers = request.signers || []
+        if (signers.length === 0) return null
+
+        return (
+            <div className="space-y-1">
+                {signers.map((signer, index) => {
+                    const statusColor =
+                        signer.status === 'signed' ? 'text-green-600' :
+                            signer.status === 'declined' ? 'text-red-600' :
+                                signer.status === 'viewed' ? 'text-blue-600' :
+                                    'text-gray-600'
+
+                    const statusIcon =
+                        signer.status === 'signed' ? '✓' :
+                            signer.status === 'declined' ? '✕' :
+                                signer.status === 'viewed' ? '👁' :
+                                    '○'
+
+                    return (
+                        <div key={index} className="flex items-center gap-2 text-sm">
+                            <span className={`font-medium ${statusColor}`}>{statusIcon}</span>
+                            <span className="text-gray-700">{signer.name || signer.email}</span>
+                            <span className={`text-xs ${statusColor} capitalize`}>
+                                ({signer.status || 'pending'})
+                            </span>
+                        </div>
+                    )
+                })}
+            </div>
+        )
     }
 
     const getSignatureTypeDisplay = (request: UnifiedSigningRequest) => {
         const signerCount = request.signers?.length || 0
+
         if (signerCount === 1) {
             return (
                 <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
@@ -858,10 +890,20 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                 </span>
             )
         } else if (signerCount > 1) {
+            // Get signing mode from metadata
+            const signingMode = request.metadata?.signing_mode || 'sequential'
+            const modeLabel = signingMode === 'parallel' ? 'Parallel' : 'Sequential'
+            const modeColor = signingMode === 'parallel' ? 'bg-purple-100 text-purple-800' : 'bg-indigo-100 text-indigo-800'
+
             return (
-                <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-purple-100 text-purple-800">
-                    Multi-Signature ({signerCount})
-                </span>
+                <div className="flex flex-col gap-1">
+                    <span className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium ${modeColor}`}>
+                        Multi-Signature ({signerCount})
+                    </span>
+                    <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-gray-100 text-gray-700">
+                        {modeLabel} Mode
+                    </span>
+                </div>
             )
         }
         return (
@@ -1064,7 +1106,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                         </TabsList>
 
                         {/* All Requests Tab */}
-                        <TabsContent value="all">
+                        <TabsContent value="all" className="mt-0">
                             {getTabFilteredRequests().length === 0 ? (
                                 <EmptyState
                                     icon={File}
@@ -1072,142 +1114,31 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                     description={searchQuery ? `No requests match "${searchQuery}"` : `No requests found for ${getTimeRangeLabel(timeRange).toLowerCase()}`}
                                 />
                             ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Type</TableHead>
-                                            <TableHead>Document Title</TableHead>
-                                            <TableHead>Sign ID</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>From/To</TableHead>
-                                            <TableHead>Signature Type</TableHead>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Expires</TableHead>
-                                            <TableHead className="w-[100px]">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {getTabFilteredRequests().map((request) => (
-                                            <TableRow key={`${request.type}-${request.id}`}>
-                                                <TableCell>
-                                                    <div className="flex items-center space-x-2">
-                                                        {request.type === 'sent' ? (
-                                                            <Send className="w-4 h-4 text-green-600" />
-                                                        ) : (
-                                                            <Inbox className="w-4 h-4 text-purple-600" />
-                                                        )}
-                                                        <span className="text-sm font-medium capitalize">
-                                                            {request.type}
-                                                        </span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center space-x-2">
-                                                        <File className="w-4 h-4 text-gray-400" />
-                                                        <span className="font-medium">{request.title}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {request.document_sign_id ? (
-                                                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-                                                            🆔 {request.document_sign_id}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-xs text-gray-400">No ID</span>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {getStatusBadge(request)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <button
-                                                        onClick={() => handleFromToClick(request)}
-                                                        className="text-sm text-gray-600 hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left"
-                                                    >
-                                                        {getFromToDisplay(request)}
-                                                    </button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {getSignatureTypeDisplay(request)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-sm text-gray-600">
-                                                        {formatDate(request.initiated_at)}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className={`text-sm ${getTimeRemaining(request.expires_at, request).includes('Expired')
-                                                        ? 'text-red-600'
-                                                        : getTimeRemaining(request.expires_at, request).includes('Completed')
-                                                            ? 'text-green-600'
-                                                            : 'text-gray-600'
-                                                        }`}>
-                                                        {getTimeRemaining(request.expires_at, request)}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center space-x-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handlePreviewPDF(request)}
-                                                            title="Preview PDF"
-                                                        >
-                                                            <Eye className="w-4 h-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleViewDetails(request)}
-                                                            title="View Details"
-                                                        >
-                                                            <Info className="w-4 h-4" />
-                                                        </Button>
-                                                        {request.type === 'received' && request.can_sign && (
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={() => handleSign(request)}
-                                                                className="bg-green-600 hover:bg-green-700"
-                                                            >
-                                                                Sign
-                                                            </Button>
-                                                        )}
-                                                        {request.type === 'received' && request.document_status === 'completed' && request.final_pdf_url && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => window.open(request.final_pdf_url, '_blank')}
-                                                            >
-                                                                <Download className="w-4 h-4 mr-1" />
-                                                                Final PDF
-                                                            </Button>
-                                                        )}
-                                                        {request.type === 'sent' && !isRequestCompleted(request) && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => setShowActionsSheet(request)}
-                                                                title="Document Actions"
-                                                            >
-                                                                <MoreHorizontal className="w-4 h-4" />
-                                                            </Button>
-                                                        )}
-                                                        {request.type === 'sent' && isRequestCompleted(request) && (
-                                                            <span className="text-sm text-green-600 font-medium">
-                                                                ✓ Completed
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                <div className="space-y-3">{getTabFilteredRequests().map((request) => (
+                                    <RequestCard
+                                        key={`${request.type}-${request.id}`}
+                                        request={request}
+                                        showType={true}
+                                        getStatusBadge={getStatusBadge}
+                                        getFromToDisplay={getFromToDisplay}
+                                        getAllSignersDisplay={getAllSignersDisplay}
+                                        getSignatureTypeDisplay={getSignatureTypeDisplay}
+                                        formatDate={formatDate}
+                                        getTimeRemaining={getTimeRemaining}
+                                        handleFromToClick={handleFromToClick}
+                                        handlePreviewPDF={handlePreviewPDF}
+                                        handleViewDetails={handleViewDetails}
+                                        handleSign={handleSign}
+                                        isRequestCompleted={isRequestCompleted}
+                                        setShowActionsSheet={setShowActionsSheet}
+                                    />
+                                ))}
+                                </div>
                             )}
                         </TabsContent>
 
                         {/* Sent Requests Tab */}
-                        <TabsContent value="sent">
+                        <TabsContent value="sent" className="mt-0">
                             {getTabFilteredRequests().length === 0 ? (
                                 <EmptyState
                                     icon={Send}
@@ -1215,110 +1146,31 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                     description={searchQuery ? `No sent requests match "${searchQuery}"` : `You haven't sent any signature requests for ${getTimeRangeLabel(timeRange).toLowerCase()}`}
                                 />
                             ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Document Title</TableHead>
-                                            <TableHead>Sign ID</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>To</TableHead>
-                                            <TableHead>Signature Type</TableHead>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Expires</TableHead>
-                                            <TableHead className="w-[100px]">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {getTabFilteredRequests().map((request) => (
-                                            <TableRow key={`${request.type}-${request.id}`}>
-                                                <TableCell>
-                                                    <div className="flex items-center space-x-2">
-                                                        <File className="w-4 h-4 text-gray-400" />
-                                                        <span className="font-medium">{request.title}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {request.document_sign_id ? (
-                                                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-                                                            🆔 {request.document_sign_id}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-xs text-gray-400">No ID</span>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {getStatusBadge(request)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <button
-                                                        onClick={() => handleFromToClick(request)}
-                                                        className="text-sm text-gray-600 hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left"
-                                                    >
-                                                        {getFromToDisplay(request)}
-                                                    </button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {getSignatureTypeDisplay(request)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-sm text-gray-600">
-                                                        {formatDate(request.initiated_at)}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className={`text-sm ${getTimeRemaining(request.expires_at, request).includes('Expired')
-                                                        ? 'text-red-600'
-                                                        : getTimeRemaining(request.expires_at, request).includes('Completed')
-                                                            ? 'text-green-600'
-                                                            : 'text-gray-600'
-                                                        }`}>
-                                                        {getTimeRemaining(request.expires_at, request)}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center space-x-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handlePreviewPDF(request)}
-                                                            title="Preview PDF"
-                                                        >
-                                                            <Eye className="w-4 h-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleViewDetails(request)}
-                                                            title="View Details"
-                                                        >
-                                                            <Info className="w-4 h-4" />
-                                                        </Button>
-                                                        {!isRequestCompleted(request) && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => setShowActionsSheet(request)}
-                                                                title="Document Actions"
-                                                            >
-                                                                <MoreHorizontal className="w-4 h-4" />
-                                                            </Button>
-                                                        )}
-                                                        {isRequestCompleted(request) && (
-                                                            <span className="text-sm text-green-600 font-medium">
-                                                                ✓ Completed
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                <div className="space-y-3">{getTabFilteredRequests().map((request) => (
+                                    <RequestCard
+                                        key={`${request.type}-${request.id}`}
+                                        request={request}
+                                        showType={false}
+                                        getStatusBadge={getStatusBadge}
+                                        getFromToDisplay={getFromToDisplay}
+                                        getAllSignersDisplay={getAllSignersDisplay}
+                                        getSignatureTypeDisplay={getSignatureTypeDisplay}
+                                        formatDate={formatDate}
+                                        getTimeRemaining={getTimeRemaining}
+                                        handleFromToClick={handleFromToClick}
+                                        handlePreviewPDF={handlePreviewPDF}
+                                        handleViewDetails={handleViewDetails}
+                                        handleSign={handleSign}
+                                        isRequestCompleted={isRequestCompleted}
+                                        setShowActionsSheet={setShowActionsSheet}
+                                    />
+                                ))}
+                                </div>
                             )}
                         </TabsContent>
 
                         {/* Received Requests Tab */}
-                        <TabsContent value="received">
+                        <TabsContent value="received" className="mt-0">
                             {getTabFilteredRequests().length === 0 ? (
                                 <EmptyState
                                     icon={Inbox}
@@ -1326,431 +1178,358 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                     description={searchQuery ? `No received requests match "${searchQuery}"` : `You haven't received any signature requests for ${getTimeRangeLabel(timeRange).toLowerCase()}`}
                                 />
                             ) : (
-                                <Table>
-                                    <TableHeader>
-                                        <TableRow>
-                                            <TableHead>Document Title</TableHead>
-                                            <TableHead>Sign ID</TableHead>
-                                            <TableHead>Status</TableHead>
-                                            <TableHead>From</TableHead>
-                                            <TableHead>Signature Type</TableHead>
-                                            <TableHead>Date</TableHead>
-                                            <TableHead>Expires</TableHead>
-                                            <TableHead className="w-[100px]">Actions</TableHead>
-                                        </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {getTabFilteredRequests().map((request) => (
-                                            <TableRow key={`${request.type}-${request.id}`}>
-                                                <TableCell>
-                                                    <div className="flex items-center space-x-2">
-                                                        <File className="w-4 h-4 text-gray-400" />
-                                                        <span className="font-medium">{request.title}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {request.document_sign_id ? (
-                                                        <span className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-blue-100 text-blue-800">
-                                                            🆔 {request.document_sign_id}
-                                                        </span>
-                                                    ) : (
-                                                        <span className="text-xs text-gray-400">No ID</span>
-                                                    )}
-                                                </TableCell>
-                                                <TableCell>
-                                                    {getStatusBadge(request)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <button
-                                                        onClick={() => handleFromToClick(request)}
-                                                        className="text-sm text-gray-600 hover:text-blue-600 hover:underline cursor-pointer transition-colors text-left"
-                                                    >
-                                                        {getFromToDisplay(request)}
-                                                    </button>
-                                                </TableCell>
-                                                <TableCell>
-                                                    {getSignatureTypeDisplay(request)}
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className="text-sm text-gray-600">
-                                                        {formatDate(request.initiated_at)}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <span className={`text-sm ${getTimeRemaining(request.expires_at, request).includes('Expired')
-                                                        ? 'text-red-600'
-                                                        : getTimeRemaining(request.expires_at, request).includes('Completed')
-                                                            ? 'text-green-600'
-                                                            : 'text-gray-600'
-                                                        }`}>
-                                                        {getTimeRemaining(request.expires_at, request)}
-                                                    </span>
-                                                </TableCell>
-                                                <TableCell>
-                                                    <div className="flex items-center space-x-2">
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handlePreviewPDF(request)}
-                                                            title="Preview PDF"
-                                                        >
-                                                            <Eye className="w-4 h-4" />
-                                                        </Button>
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            onClick={() => handleViewDetails(request)}
-                                                            title="View Details"
-                                                        >
-                                                            <Info className="w-4 h-4" />
-                                                        </Button>
-                                                        {request.can_sign && (
-                                                            <Button
-                                                                size="sm"
-                                                                onClick={() => handleSign(request)}
-                                                                className="bg-green-600 hover:bg-green-700"
-                                                            >
-                                                                Sign
-                                                            </Button>
-                                                        )}
-                                                        {request.document_status === 'completed' && request.final_pdf_url && (
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                                onClick={() => window.open(request.final_pdf_url, '_blank')}
-                                                            >
-                                                                <Download className="w-4 h-4 mr-1" />
-                                                                Final PDF
-                                                            </Button>
-                                                        )}
-                                                    </div>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
+                                <div className="space-y-3">{getTabFilteredRequests().map((request) => (
+                                    <RequestCard
+                                        key={`${request.type}-${request.id}`}
+                                        request={request}
+                                        showType={false}
+                                        getStatusBadge={getStatusBadge}
+                                        getFromToDisplay={getFromToDisplay}
+                                        getAllSignersDisplay={getAllSignersDisplay}
+                                        getSignatureTypeDisplay={getSignatureTypeDisplay}
+                                        formatDate={formatDate}
+                                        getTimeRemaining={getTimeRemaining}
+                                        handleFromToClick={handleFromToClick}
+                                        handlePreviewPDF={handlePreviewPDF}
+                                        handleViewDetails={handleViewDetails}
+                                        handleSign={handleSign}
+                                        isRequestCompleted={isRequestCompleted}
+                                        setShowActionsSheet={setShowActionsSheet}
+                                    />
+                                ))}
+                                </div>
                             )}
                         </TabsContent>
                     </Tabs>
                 </CardContent>
-            </Card>
+            </Card >
 
             {/* Request Details Modal */}
-            {viewingRequest && (
-                <RequestDetailsModal
-                    request={viewingRequest}
-                    isOpen={!!viewingRequest}
-                    onClose={() => setViewingRequest(null)}
-                    currentUserEmail={user?.email}
-                    onStatusUpdate={(requestId, updates) => {
-                        // ✅ PERFORMANCE FIX: Update specific request instead of full reload
-                        setRequests(prev => prev.map(req =>
-                            req.id === requestId
-                                ? { ...req, ...updates }
-                                : req
-                        ))
-                        setViewingRequest(null)
-                    }}
-                />
-            )}
+            {
+                viewingRequest && (
+                    <RequestDetailsModal
+                        request={viewingRequest}
+                        isOpen={!!viewingRequest}
+                        onClose={() => setViewingRequest(null)}
+                        currentUserEmail={user?.email}
+                        onStatusUpdate={(requestId, updates) => {
+                            // ✅ PERFORMANCE FIX: Update specific request instead of full reload
+                            setRequests(prev => prev.map(req =>
+                                req.id === requestId
+                                    ? { ...req, ...updates }
+                                    : req
+                            ))
+                            setViewingRequest(null)
+                        }}
+                    />
+                )
+            }
 
             {/* Signers Bottom Sheet */}
-            {showSignersSheet && (
-                <div className="fixed inset-0 z-50 flex items-end justify-center">
-                    {/* Backdrop - no opacity overlay */}
-                    <div
-                        className="fixed inset-0"
-                        onClick={() => setShowSignersSheet(null)}
-                    />
+            {
+                showSignersSheet && (
+                    <div className="fixed inset-0 z-50 flex items-end justify-center">
+                        {/* Backdrop - no opacity overlay */}
+                        <div
+                            className="fixed inset-0"
+                            onClick={() => setShowSignersSheet(null)}
+                        />
 
-                    {/* Bottom Sheet */}
-                    <div className="relative bg-white rounded-t-lg shadow-xl w-full max-w-md max-h-[70vh] overflow-hidden transform transition-transform duration-300 ease-out translate-y-0">
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                                {showSignersSheet.type === 'sent' ? 'Document Signers' : 'Sender Information'}
-                            </h3>
-                            <button
-                                onClick={() => setShowSignersSheet(null)}
-                                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-                            >
-                                <X className="w-5 h-5 text-gray-500" />
-                            </button>
-                        </div>
-
-                        {/* Content */}
-                        <div className="p-4 overflow-y-auto max-h-[calc(70vh-80px)]">
-                            {showSignersSheet.type === 'sent' ? (
-                                // Show signers for sent requests
-                                <div className="space-y-3">
-                                    <p className="text-sm text-gray-600 mb-4">
-                                        {showSignersSheet.signers?.length === 1
-                                            ? 'This document requires a single signature:'
-                                            : `This document requires ${showSignersSheet.signers?.length || 0} signatures:`
-                                        }
-                                    </p>
-                                    {showSignersSheet.signers?.map((signer, index) => (
-                                        <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                                            <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                                <Users className="w-4 h-4 text-blue-600" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className="font-medium text-gray-900">{signer.name}</p>
-                                                <p className="text-sm text-gray-600">{signer.email}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <span className={`px-2 py-1 text-xs font-medium rounded-full ${signer.status === 'signed' ? 'bg-green-100 text-green-800' :
-                                                    signer.status === 'viewed' ? 'bg-blue-100 text-blue-800' :
-                                                        signer.status === 'declined' ? 'bg-red-100 text-red-800' :
-                                                            'bg-yellow-100 text-yellow-800'
-                                                    }`}>
-                                                    {/* Display proper capitalized status */}
-                                                    {signer.status === 'signed' ? 'Signed' :
-                                                        signer.status === 'viewed' ? 'Viewed' :
-                                                            signer.status === 'declined' ? 'Declined' :
-                                                                signer.status || 'Pending'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    )) || (
-                                            <p className="text-sm text-gray-500 italic">No signers found</p>
-                                        )}
-                                </div>
-                            ) : (
-                                // Show sender info for received requests
-                                <div className="space-y-3">
-                                    <p className="text-sm text-gray-600 mb-4">
-                                        This document was sent by:
-                                    </p>
-                                    <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                                        <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                                            <Send className="w-4 h-4 text-green-600" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="font-medium text-gray-900">
-                                                {showSignersSheet.sender_name || 'Unknown Sender'}
-                                            </p>
-                                            <p className="text-sm text-gray-600">Sender</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Actions Bottom Sheet */}
-            {showActionsSheet && (
-                <div className="fixed inset-0 z-50 flex items-end justify-center">
-                    {/* Backdrop - no opacity overlay */}
-                    <div
-                        className="fixed inset-0"
-                        onClick={() => setShowActionsSheet(null)}
-                    />
-
-                    {/* Bottom Sheet */}
-                    <div className="relative bg-white rounded-t-lg shadow-xl w-full max-w-md max-h-[50vh] overflow-hidden transform transition-transform duration-300 ease-out translate-y-0">
-                        {/* Header */}
-                        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-                            <h3 className="text-lg font-semibold text-gray-900">
-                                Document Actions
-                            </h3>
-                            <button
-                                onClick={() => setShowActionsSheet(null)}
-                                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-                            >
-                                <X className="w-5 h-5 text-gray-500" />
-                            </button>
-                        </div>
-
-                        {/* Content */}
-                        <div className="p-4">
-                            <div className="space-y-2">
-                                {/* Send Reminder Action - Only show if not expired */}
-                                {!getTimeRemaining(showActionsSheet.expires_at, showActionsSheet).includes('Expired') && (
-                                    <button
-                                        onClick={() => {
-                                            handleShare(showActionsSheet)
-                                            setShowActionsSheet(null)
-                                        }}
-                                        className="w-full flex items-center p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
-                                    >
-                                        <Share2 className="w-5 h-5 text-blue-600 mr-3" />
-                                        <div>
-                                            <p className="font-medium text-gray-900">Send Reminder</p>
-                                            <p className="text-sm text-gray-600">Notify signers about pending signatures</p>
-                                        </div>
-                                    </button>
-                                )}
-
-                                {/* Verify Document Action */}
+                        {/* Bottom Sheet */}
+                        <div className="relative bg-white rounded-t-lg shadow-xl w-full max-w-md max-h-[70vh] overflow-hidden transform transition-transform duration-300 ease-out translate-y-0">
+                            {/* Header */}
+                            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                                <h3 className="text-lg font-semibold text-gray-900">
+                                    {showSignersSheet.type === 'sent' ? 'Document Signers' : 'Sender Information'}
+                                </h3>
                                 <button
-                                    onClick={() => {
-                                        const verifyUrl = showActionsSheet.document_sign_id
-                                            ? `/verify?documentSignId=${encodeURIComponent(showActionsSheet.document_sign_id)}`
-                                            : `/verify?requestId=${showActionsSheet.id}`
-                                        window.open(verifyUrl, '_blank')
-                                        setShowActionsSheet(null)
-                                    }}
-                                    className="w-full flex items-center p-3 text-left hover:bg-green-50 rounded-lg transition-colors"
+                                    onClick={() => setShowSignersSheet(null)}
+                                    className="p-1 hover:bg-gray-100 rounded-full transition-colors"
                                 >
-                                    <Shield className="w-5 h-5 text-green-600 mr-3" />
-                                    <div>
-                                        <p className="font-medium text-green-900">Verify Document</p>
-                                        <p className="text-sm text-green-600">
-                                            {showActionsSheet.document_sign_id
-                                                ? `Verify using ID: ${showActionsSheet.document_sign_id}`
-                                                : 'Verify document authenticity'
+                                    <X className="w-5 h-5 text-gray-500" />
+                                </button>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-4 overflow-y-auto max-h-[calc(70vh-80px)]">
+                                {showSignersSheet.type === 'sent' ? (
+                                    // Show signers for sent requests
+                                    <div className="space-y-3">
+                                        <p className="text-sm text-gray-600 mb-4">
+                                            {showSignersSheet.signers?.length === 1
+                                                ? 'This document requires a single signature:'
+                                                : `This document requires ${showSignersSheet.signers?.length || 0} signatures:`
                                             }
                                         </p>
+                                        {showSignersSheet.signers?.map((signer, index) => (
+                                            <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                                    <Users className="w-4 h-4 text-blue-600" />
+                                                </div>
+                                                <div className="flex-1">
+                                                    <p className="font-medium text-gray-900">{signer.name}</p>
+                                                    <p className="text-sm text-gray-600">{signer.email}</p>
+                                                </div>
+                                                <div className="text-right">
+                                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${signer.status === 'signed' ? 'bg-green-100 text-green-800' :
+                                                        signer.status === 'viewed' ? 'bg-blue-100 text-blue-800' :
+                                                            signer.status === 'declined' ? 'bg-red-100 text-red-800' :
+                                                                'bg-yellow-100 text-yellow-800'
+                                                        }`}>
+                                                        {/* Display proper capitalized status */}
+                                                        {signer.status === 'signed' ? 'Signed' :
+                                                            signer.status === 'viewed' ? 'Viewed' :
+                                                                signer.status === 'declined' ? 'Declined' :
+                                                                    signer.status || 'Pending'}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        )) || (
+                                                <p className="text-sm text-gray-500 italic">No signers found</p>
+                                            )}
                                     </div>
-                                </button>
-
-                                {/* Delete Action */}
-                                <button
-                                    onClick={() => {
-                                        handleDelete(showActionsSheet)
-                                        setShowActionsSheet(null)
-                                    }}
-                                    className="w-full flex items-center p-3 text-left hover:bg-red-50 rounded-lg transition-colors"
-                                >
-                                    <Trash2 className="w-5 h-5 text-red-600 mr-3" />
-                                    <div>
-                                        <p className="font-medium text-red-900">Delete Request</p>
-                                        <p className="text-sm text-red-600">Permanently remove this signature request</p>
+                                ) : (
+                                    // Show sender info for received requests
+                                    <div className="space-y-3">
+                                        <p className="text-sm text-gray-600 mb-4">
+                                            This document was sent by:
+                                        </p>
+                                        <div className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+                                            <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                                                <Send className="w-4 h-4 text-green-600" />
+                                            </div>
+                                            <div className="flex-1">
+                                                <p className="font-medium text-gray-900">
+                                                    {showSignersSheet.sender_name || 'Unknown Sender'}
+                                                </p>
+                                                <p className="text-sm text-gray-600">Sender</p>
+                                            </div>
+                                        </div>
                                     </div>
-                                </button>
+                                )}
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
+
+            {/* Actions Bottom Sheet */}
+            {
+                showActionsSheet && (
+                    <div className="fixed inset-0 z-50 flex items-end justify-center">
+                        {/* Backdrop - no opacity overlay */}
+                        <div
+                            className="fixed inset-0"
+                            onClick={() => setShowActionsSheet(null)}
+                        />
+
+                        {/* Bottom Sheet */}
+                        <div className="relative bg-white rounded-t-lg shadow-xl w-full max-w-md max-h-[50vh] overflow-hidden transform transition-transform duration-300 ease-out translate-y-0">
+                            {/* Header */}
+                            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                                <h3 className="text-lg font-semibold text-gray-900">
+                                    Document Actions
+                                </h3>
+                                <button
+                                    onClick={() => setShowActionsSheet(null)}
+                                    className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+                                >
+                                    <X className="w-5 h-5 text-gray-500" />
+                                </button>
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-4">
+                                <div className="space-y-2">
+                                    {/* Send Reminder Action - Only show if not expired */}
+                                    {!getTimeRemaining(showActionsSheet.expires_at, showActionsSheet).includes('Expired') && (
+                                        <button
+                                            onClick={() => {
+                                                handleShare(showActionsSheet)
+                                                setShowActionsSheet(null)
+                                            }}
+                                            className="w-full flex items-center p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                                        >
+                                            <Share2 className="w-5 h-5 text-blue-600 mr-3" />
+                                            <div>
+                                                <p className="font-medium text-gray-900">Send Reminder</p>
+                                                <p className="text-sm text-gray-600">Notify signers about pending signatures</p>
+                                            </div>
+                                        </button>
+                                    )}
+
+                                    {/* Verify Document Action */}
+                                    <button
+                                        onClick={() => {
+                                            const verifyUrl = showActionsSheet.document_sign_id
+                                                ? `/verify?documentSignId=${encodeURIComponent(showActionsSheet.document_sign_id)}`
+                                                : `/verify?requestId=${showActionsSheet.id}`
+                                            window.open(verifyUrl, '_blank')
+                                            setShowActionsSheet(null)
+                                        }}
+                                        className="w-full flex items-center p-3 text-left hover:bg-green-50 rounded-lg transition-colors"
+                                    >
+                                        <Shield className="w-5 h-5 text-green-600 mr-3" />
+                                        <div>
+                                            <p className="font-medium text-green-900">Verify Document</p>
+                                            <p className="text-sm text-green-600">
+                                                {showActionsSheet.document_sign_id
+                                                    ? `Verify using ID: ${showActionsSheet.document_sign_id}`
+                                                    : 'Verify document authenticity'
+                                                }
+                                            </p>
+                                        </div>
+                                    </button>
+
+                                    {/* Delete Action */}
+                                    <button
+                                        onClick={() => {
+                                            handleDelete(showActionsSheet)
+                                            setShowActionsSheet(null)
+                                        }}
+                                        className="w-full flex items-center p-3 text-left hover:bg-red-50 rounded-lg transition-colors"
+                                    >
+                                        <Trash2 className="w-5 h-5 text-red-600 mr-3" />
+                                        <div>
+                                            <p className="font-medium text-red-900">Delete Request</p>
+                                            <p className="text-sm text-red-600">Permanently remove this signature request</p>
+                                        </div>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
 
             {/* Profile Validation Popup */}
-            {showProfileValidation && userProfile && (
-                <div className="fixed inset-0 flex items-center justify-center z-50">
-                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-                        <h3 className="text-lg font-semibold mb-4">Complete Your Profile</h3>
-                        <p className="text-sm text-gray-600 mb-4">
-                            Before signing, please ensure your profile contains the required information:
-                        </p>
+            {
+                showProfileValidation && userProfile && (
+                    <div className="fixed inset-0 flex items-center justify-center z-50">
+                        <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+                            <h3 className="text-lg font-semibold mb-4">Complete Your Profile</h3>
+                            <p className="text-sm text-gray-600 mb-4">
+                                Before signing, please ensure your profile contains the required information:
+                            </p>
 
-                        <div className="space-y-3 mb-6">
-                            {/* Name Status */}
-                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div className="flex items-center space-x-3">
-                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${userProfile.full_name ? 'bg-green-100' : 'bg-red-100'
-                                        }`}>
-                                        {userProfile.full_name ? (
-                                            <CheckCircle className="w-3 h-3 text-green-600" />
-                                        ) : (
-                                            <X className="w-3 h-3 text-red-600" />
-                                        )}
+                            <div className="space-y-3 mb-6">
+                                {/* Name Status */}
+                                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div className="flex items-center space-x-3">
+                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${userProfile.full_name ? 'bg-green-100' : 'bg-red-100'
+                                            }`}>
+                                            {userProfile.full_name ? (
+                                                <CheckCircle className="w-3 h-3 text-green-600" />
+                                            ) : (
+                                                <X className="w-3 h-3 text-red-600" />
+                                            )}
+                                        </div>
+                                        <span className="font-medium">Name</span>
                                     </div>
-                                    <span className="font-medium">Name</span>
+                                    {userProfile.full_name ? (
+                                        <span className="text-sm text-green-600">Available</span>
+                                    ) : (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                                window.open('/profile', '_blank')
+                                            }}
+                                        >
+                                            Setup
+                                        </Button>
+                                    )}
                                 </div>
-                                {userProfile.full_name ? (
-                                    <span className="text-sm text-green-600">Available</span>
-                                ) : (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                            window.open('/profile', '_blank')
-                                        }}
-                                    >
-                                        Setup
-                                    </Button>
-                                )}
+
+                                {/* Signature Status */}
+                                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                    <div className="flex items-center space-x-3">
+                                        <div className={`w-5 h-5 rounded-full flex items-center justify-center ${userProfile.signatures && userProfile.signatures.length > 0 ? 'bg-green-100' : 'bg-red-100'
+                                            }`}>
+                                            {userProfile.signatures && userProfile.signatures.length > 0 ? (
+                                                <CheckCircle className="w-3 h-3 text-green-600" />
+                                            ) : (
+                                                <X className="w-3 h-3 text-red-600" />
+                                            )}
+                                        </div>
+                                        <span className="font-medium">Primary Signature</span>
+                                    </div>
+                                    {userProfile.signatures && userProfile.signatures.length > 0 ? (
+                                        <span className="text-sm text-green-600">Available</span>
+                                    ) : (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={() => {
+                                                window.open('/signatures', '_blank')
+                                            }}
+                                        >
+                                            Setup
+                                        </Button>
+                                    )}
+                                </div>
                             </div>
 
-                            {/* Signature Status */}
-                            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                                <div className="flex items-center space-x-3">
-                                    <div className={`w-5 h-5 rounded-full flex items-center justify-center ${userProfile.signatures && userProfile.signatures.length > 0 ? 'bg-green-100' : 'bg-red-100'
-                                        }`}>
-                                        {userProfile.signatures && userProfile.signatures.length > 0 ? (
-                                            <CheckCircle className="w-3 h-3 text-green-600" />
-                                        ) : (
-                                            <X className="w-3 h-3 text-red-600" />
-                                        )}
-                                    </div>
-                                    <span className="font-medium">Primary Signature</span>
-                                </div>
-                                {userProfile.signatures && userProfile.signatures.length > 0 ? (
-                                    <span className="text-sm text-green-600">Available</span>
-                                ) : (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => {
-                                            window.open('/signatures', '_blank')
-                                        }}
-                                    >
-                                        Setup
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="space-y-3">
-                            <Button
-                                className="w-full"
-                                onClick={async () => {
-                                    // Re-check profile after setup
-                                    const updatedProfile = await fetchUserProfile()
-                                    if (updatedProfile) {
-                                        const validation = validateProfileForSigning(updatedProfile)
-                                        if (validation.isValid && pendingSigningRequest) {
-                                            setShowProfileValidation(false)
-                                            // Continue with the signing flow
-                                            handleSign(pendingSigningRequest)
-                                        } else {
-                                            alert('Please complete all required profile fields before continuing.')
+                            <div className="space-y-3">
+                                <Button
+                                    className="w-full"
+                                    onClick={async () => {
+                                        // Re-check profile after setup
+                                        const updatedProfile = await fetchUserProfile()
+                                        if (updatedProfile) {
+                                            const validation = validateProfileForSigning(updatedProfile)
+                                            if (validation.isValid && pendingSigningRequest) {
+                                                setShowProfileValidation(false)
+                                                // Continue with the signing flow
+                                                handleSign(pendingSigningRequest)
+                                            } else {
+                                                alert('Please complete all required profile fields before continuing.')
+                                            }
                                         }
-                                    }
-                                }}
-                            >
-                                Check & Continue
-                            </Button>
-                            <Button
-                                variant="outline"
-                                className="w-full"
-                                onClick={() => {
-                                    setShowProfileValidation(false)
-                                    setPendingSigningRequest(null)
-                                }}
-                            >
-                                Cancel
-                            </Button>
+                                    }}
+                                >
+                                    Check & Continue
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    className="w-full"
+                                    onClick={() => {
+                                        setShowProfileValidation(false)
+                                        setPendingSigningRequest(null)
+                                    }}
+                                >
+                                    Cancel
+                                </Button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )
+            }
 
             {/* PDF Signing Screen */}
-            {signingRequest && (
-                <PDFSigningScreen
-                    request={{
-                        id: signingRequest.id,
-                        title: signingRequest.title,
-                        document_url: signingRequest.document_url || '',
-                        expires_at: signingRequest.expires_at || '',
-                        signers: signingRequest.signers.map(s => ({
-                            id: s.email,
-                            name: s.name,
-                            email: s.email,
-                            status: s.status,
-                            signing_order: 1
-                        }))
-                    }}
-                    currentUserEmail={user?.email || ''}
-                    onClose={() => setSigningRequest(null)}
-                    onSign={handleSignatureAccept}
-                    onDecline={handleSignatureDecline}
-                />
-            )}
-        </div>
+            {
+                signingRequest && (
+                    <PDFSigningScreen
+                        request={{
+                            id: signingRequest.id,
+                            title: signingRequest.title,
+                            document_url: signingRequest.document_url || '',
+                            expires_at: signingRequest.expires_at || '',
+                            signers: signingRequest.signers.map(s => ({
+                                id: s.email,
+                                name: s.name,
+                                email: s.email,
+                                status: s.status,
+                                signing_order: 1
+                            }))
+                        }}
+                        currentUserEmail={user?.email || ''}
+                        onClose={() => setSigningRequest(null)}
+                        onSign={handleSignatureAccept}
+                        onDecline={handleSignatureDecline}
+                    />
+                )
+            }
+        </div >
     )
 }
