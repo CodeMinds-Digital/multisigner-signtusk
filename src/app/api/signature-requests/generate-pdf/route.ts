@@ -114,8 +114,31 @@ export async function POST(request: NextRequest) {
     console.log('📋 Found', schemas.length, 'schema(s)')
     console.log('📋 First schema fields:', schemas[0]?.length || 0)
 
+    // Log detailed schema information
+    console.log('📋 Schema fields details:')
+    schemas[0]?.forEach((field: any, index: number) => {
+      console.log(`  Field ${index}:`, {
+        name: field.name,
+        type: field.type,
+        signerId: field.signerId,
+        signer_email: field.signer_email,
+        position: field.position
+      })
+    })
+
     // Populate schema with signature data
     const populatedInputs = await populateSchemaWithSignatures(schemas[0], allSigners)
+
+    console.log('📊 Populated inputs summary:')
+    Object.keys(populatedInputs).forEach(key => {
+      const value = populatedInputs[key]
+      console.log(`  ${key}:`, {
+        type: typeof value,
+        isImage: value?.startsWith?.('data:image') || false,
+        length: value?.length || 0,
+        preview: typeof value === 'string' ? value.substring(0, 50) + '...' : value
+      })
+    })
 
     console.log('🎨 Generating PDF with pdfme-complete...')
 
@@ -130,7 +153,16 @@ export async function POST(request: NextRequest) {
       }))
     )
 
-    console.log('📋 Server-compatible schemas:', serverSchemas)
+    console.log('📋 Server-compatible schemas:')
+    serverSchemas[0]?.forEach((field: any, index: number) => {
+      console.log(`  Schema ${index}:`, {
+        name: field.name,
+        type: field.type,
+        originalType: schemas[0][index]?.type,
+        hasInput: !!populatedInputs[field.name],
+        inputPreview: populatedInputs[field.name]?.substring?.(0, 30) + '...'
+      })
+    })
 
     // Create plugins object with signature support
     const plugins = {
@@ -306,6 +338,13 @@ async function populateSchemaWithSignatures(schema: any[], signers: any[]) {
       signatureData = typeof targetSigner.signature_data === 'string'
         ? JSON.parse(targetSigner.signature_data)
         : targetSigner.signature_data
+
+      console.log(`📦 Parsed signature data for ${fieldName}:`, {
+        hasSigner_name: !!signatureData.signer_name,
+        hasSignature_image: !!signatureData.signature_image,
+        hasSignature: !!signatureData.signature,
+        keys: Object.keys(signatureData)
+      })
     } catch (error) {
       console.error(`❌ Error parsing signature data for ${fieldName}:`, error)
       continue
@@ -317,6 +356,8 @@ async function populateSchemaWithSignatures(schema: any[], signers: any[]) {
       inputs[fieldName] = fieldValue
       console.log(`✅ Populated field ${fieldName} with:`, fieldValue.substring ? fieldValue.substring(0, 50) + '...' : fieldValue)
       console.log(`📝 Field details: type=${field.type}, signer=${targetSigner.signer_email}, value_type=${typeof fieldValue}`)
+    } else {
+      console.warn(`⚠️ Field ${fieldName} has null/undefined value for signer ${targetSigner.signer_email}`)
     }
   }
 
@@ -329,7 +370,11 @@ function getFieldValue(field: any, signatureData: any, signer: any): any {
 
   switch (fieldType) {
     case 'signature':
-      return signatureData.signature_image || signatureData.signature || ''
+      const sigValue = signatureData.signature_image || signatureData.signature || ''
+      if (!sigValue) {
+        console.warn(`⚠️ No signature image found for field ${field.name}. Available keys:`, Object.keys(signatureData))
+      }
+      return sigValue
 
     case 'text':
       // For text fields, use signer_name as the content
