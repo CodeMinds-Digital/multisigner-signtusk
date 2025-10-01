@@ -1567,20 +1567,22 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                         {/* Content */}
                         <div className="p-4">
                             <div className="space-y-2">
-                                {/* Send Reminder Action */}
-                                <button
-                                    onClick={() => {
-                                        handleShare(showActionsSheet)
-                                        setShowActionsSheet(null)
-                                    }}
-                                    className="w-full flex items-center p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
-                                >
-                                    <Share2 className="w-5 h-5 text-blue-600 mr-3" />
-                                    <div>
-                                        <p className="font-medium text-gray-900">Send Reminder</p>
-                                        <p className="text-sm text-gray-600">Notify signers about pending signatures</p>
-                                    </div>
-                                </button>
+                                {/* Send Reminder Action - Only show if not expired */}
+                                {!getTimeRemaining(showActionsSheet.expires_at, showActionsSheet).includes('Expired') && (
+                                    <button
+                                        onClick={() => {
+                                            handleShare(showActionsSheet)
+                                            setShowActionsSheet(null)
+                                        }}
+                                        className="w-full flex items-center p-3 text-left hover:bg-gray-50 rounded-lg transition-colors"
+                                    >
+                                        <Share2 className="w-5 h-5 text-blue-600 mr-3" />
+                                        <div>
+                                            <p className="font-medium text-gray-900">Send Reminder</p>
+                                            <p className="text-sm text-gray-600">Notify signers about pending signatures</p>
+                                        </div>
+                                    </button>
+                                )}
 
                                 {/* Verify Document Action */}
                                 <button

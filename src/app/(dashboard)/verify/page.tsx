@@ -53,6 +53,7 @@ export default function VerifyPage() {
 
   const verifyDocument = async (requestId: string) => {
     setIsVerifying(true)
+    setVerificationResult(null) // Clear previous results
     try {
       const response = await fetch(`/api/verify/${requestId}`)
       const result = await response.json()
@@ -182,6 +183,61 @@ export default function VerifyPage() {
     return `Multi (${signingMode})`
   }
 
+  const getVerificationBadge = (status: string, expiresAt?: string) => {
+    // Check status first
+    const statusLower = status.toLowerCase()
+
+    // Completed documents are always valid, regardless of expiration date
+    if (statusLower === 'completed') {
+      return {
+        icon: '✓',
+        text: 'Valid Document',
+        className: 'bg-green-100 text-green-800 border-green-200'
+      }
+    }
+
+    // Check if document is expired (only for non-completed documents)
+    const isExpired = status === 'expired' || (expiresAt && new Date(expiresAt) < new Date())
+
+    if (isExpired) {
+      return {
+        icon: '⚠️',
+        text: 'Expired Document',
+        className: 'bg-orange-100 text-orange-800 border-orange-200'
+      }
+    }
+
+    // Check other statuses
+    switch (statusLower) {
+      case 'pending':
+      case 'initiated':
+      case 'in_progress':
+        return {
+          icon: '⏳',
+          text: 'Pending Signatures',
+          className: 'bg-blue-100 text-blue-800 border-blue-200'
+        }
+      case 'cancelled':
+        return {
+          icon: '✕',
+          text: 'Cancelled Document',
+          className: 'bg-gray-100 text-gray-800 border-gray-200'
+        }
+      case 'declined':
+        return {
+          icon: '✕',
+          text: 'Declined Document',
+          className: 'bg-red-100 text-red-800 border-red-200'
+        }
+      default:
+        return {
+          icon: '✓',
+          text: 'Valid Document',
+          className: 'bg-green-100 text-green-800 border-green-200'
+        }
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -227,7 +283,13 @@ export default function VerifyPage() {
                   id="document-id"
                   type="text"
                   value={documentId}
-                  onChange={(e) => setDocumentId(e.target.value)}
+                  onChange={(e) => {
+                    setDocumentId(e.target.value)
+                    // Clear previous verification result when user changes input
+                    if (verificationResult) {
+                      setVerificationResult(null)
+                    }
+                  }}
                   placeholder="Enter DOC-ABCD123456"
                   className="w-full"
                   maxLength={50}
@@ -278,7 +340,25 @@ export default function VerifyPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               {verificationResult.success ? (
-                <CheckCircle className="w-5 h-5 text-green-600" />
+                (() => {
+                  const status = verificationResult.data?.signing_request.status
+                  const expiresAt = verificationResult.data?.signing_request.expires_at
+                  const statusLower = status?.toLowerCase()
+
+                  // Completed documents are always valid (green)
+                  if (statusLower === 'completed') {
+                    return <CheckCircle className="w-5 h-5 text-green-600" />
+                  }
+
+                  // Check expiration only for non-completed documents
+                  const isExpired = status === 'expired' || (expiresAt && new Date(expiresAt) < new Date())
+
+                  if (isExpired) {
+                    return <AlertTriangle className="w-5 h-5 text-orange-600" />
+                  } else {
+                    return <CheckCircle className="w-5 h-5 text-blue-600" />
+                  }
+                })()
               ) : (
                 <AlertTriangle className="w-5 h-5 text-red-600" />
               )}
@@ -289,14 +369,22 @@ export default function VerifyPage() {
             {verificationResult.success && verificationResult.data ? (
               <div className="space-y-6">
                 {/* Status Badge */}
-                <div className="flex items-center gap-2">
-                  <Badge variant="default" className="bg-green-100 text-green-800">
-                    ✓ Valid Document
-                  </Badge>
-                  <span className="text-sm text-gray-500">
-                    Verified on {formatDate(verificationResult.data.verified_at)}
-                  </span>
-                </div>
+                {(() => {
+                  const badge = getVerificationBadge(
+                    verificationResult.data.signing_request.status,
+                    verificationResult.data.signing_request.expires_at
+                  )
+                  return (
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={badge.className}>
+                        {badge.icon} {badge.text}
+                      </Badge>
+                      <span className="text-sm text-gray-500">
+                        Verified on {formatDate(verificationResult.data.verified_at)}
+                      </span>
+                    </div>
+                  )
+                })()}
 
                 {/* Document Information */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -373,12 +461,14 @@ export default function VerifyPage() {
                           </Badge>
                         </div>
                       )}
-                      <div className="flex justify-between">
-                        <span className="text-gray-500">Document Hash:</span>
-                        <span className="font-mono text-xs">
-                          {verificationResult.data.qr_verification.document_hash.substring(0, 16)}...
-                        </span>
-                      </div>
+                      {verificationResult.data.qr_verification?.document_hash && (
+                        <div className="flex justify-between">
+                          <span className="text-gray-500">Document Hash:</span>
+                          <span className="font-mono text-xs">
+                            {verificationResult.data.qr_verification.document_hash.substring(0, 16)}...
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -470,14 +560,16 @@ export default function VerifyPage() {
                         }
                       })
 
-                      // QR Code Generation (after all signing activities)
-                      activities.push({
-                        type: 'qr_generated',
-                        timestamp: verificationResult.data.qr_verification.created_at,
-                        title: 'QR Code Generated',
-                        description: 'Document verification QR code was generated and embedded',
-                        color: 'purple'
-                      })
+                      // QR Code Generation (after all signing activities) - only if qr_verification exists
+                      if (verificationResult.data.qr_verification?.created_at) {
+                        activities.push({
+                          type: 'qr_generated',
+                          timestamp: verificationResult.data.qr_verification.created_at,
+                          title: 'QR Code Generated',
+                          description: 'Document verification QR code was generated and embedded',
+                          color: 'purple'
+                        })
+                      }
 
                       // Document Verification
                       activities.push({

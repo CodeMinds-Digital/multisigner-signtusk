@@ -50,6 +50,12 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
         return false
     }
 
+    // Helper function to check if a request is expired
+    const isRequestExpired = (request: SigningRequestListItem): boolean => {
+        if (!request.expires_at) return false
+        return new Date(request.expires_at) < new Date()
+    }
+
     const loadSigningRequests = useCallback(async () => {
         if (!user?.id) return
 
@@ -296,10 +302,13 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
                                                         <Eye className="w-4 h-4 mr-2" />
                                                         View Details
                                                     </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => handleShare(request)}>
-                                                        <Share2 className="w-4 h-4 mr-2" />
-                                                        Send Reminder
-                                                    </DropdownMenuItem>
+                                                    {/* Only show Send Reminder if not expired */}
+                                                    {!isRequestExpired(request) && (
+                                                        <DropdownMenuItem onClick={() => handleShare(request)}>
+                                                            <Share2 className="w-4 h-4 mr-2" />
+                                                            Send Reminder
+                                                        </DropdownMenuItem>
+                                                    )}
                                                     <DropdownMenuItem
                                                         onClick={() => handleCancel(request.id)}
                                                         className="text-red-600"
