@@ -1,3 +1,4 @@
+import React from 'react'
 import { Calendar, Clock, User, FileText, Eye, Info, CheckCircle, Download, MoreHorizontal, Send, Inbox } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -44,10 +45,10 @@ interface UnifiedSigningRequest {
 interface RequestCardProps {
     request: UnifiedSigningRequest
     showType: boolean
-    getStatusBadge: (request: UnifiedSigningRequest) => JSX.Element
+    getStatusBadge: (request: UnifiedSigningRequest) => React.ReactElement
     getFromToDisplay: (request: UnifiedSigningRequest) => string
-    getAllSignersDisplay: (request: UnifiedSigningRequest) => JSX.Element | null
-    getSignatureTypeDisplay: (request: UnifiedSigningRequest) => JSX.Element
+    getAllSignersDisplay: (request: UnifiedSigningRequest) => React.ReactElement | null
+    getSignatureTypeDisplay: (request: UnifiedSigningRequest) => React.ReactElement
     formatDate: (date: string) => string
     getTimeRemaining: (expiresAt?: string, request?: UnifiedSigningRequest) => string
     handleFromToClick: (request: UnifiedSigningRequest) => void

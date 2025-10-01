@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { File, CheckCircle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Send, Inbox, Filter, Info, X, Search, Shield, Calendar, Clock, User, FileText } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { type SigningRequestListItem } from '@/lib/signing-workflow-service'
@@ -468,9 +468,9 @@ export function UnifiedSigningRequestsListRedesigned({ onRefresh }: UnifiedSigni
 interface RequestCardProps {
     request: UnifiedSigningRequest
     showType: boolean
-    getStatusBadge: (request: UnifiedSigningRequest) => JSX.Element
+    getStatusBadge: (request: UnifiedSigningRequest) => React.ReactElement
     getFromToDisplay: (request: UnifiedSigningRequest) => string
-    getSignatureTypeDisplay: (request: UnifiedSigningRequest) => JSX.Element
+    getSignatureTypeDisplay: (request: UnifiedSigningRequest) => React.ReactElement
     formatDate: (date: string) => string
     getTimeRemaining: (expiresAt?: string, request?: UnifiedSigningRequest) => string
     handleFromToClick: (request: UnifiedSigningRequest) => void
@@ -570,11 +570,10 @@ function RequestCard({
                         {/* Expiration */}
                         <div className="flex items-center gap-2 text-sm">
                             <Clock className="w-4 h-4 text-gray-400" />
-                            <span className={`font-medium ${
-                                isExpired ? 'text-red-600' : 
-                                isCompleted ? 'text-green-600' : 
-                                'text-gray-700'
-                            }`}>
+                            <span className={`font-medium ${isExpired ? 'text-red-600' :
+                                isCompleted ? 'text-green-600' :
+                                    'text-gray-700'
+                                }`}>
                                 {timeRemaining}
                             </span>
                         </div>
