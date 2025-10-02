@@ -1,4 +1,4 @@
-# Industry Standards Assessment for SignTusk
+A# Industry Standards Assessment for SignTusk
 
 ## 📊 **Executive Summary**
 
