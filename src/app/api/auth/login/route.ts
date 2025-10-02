@@ -5,6 +5,7 @@ import { generateTokenPair, generateSessionId } from '@/lib/jwt-utils'
 import { storeSession } from '@/lib/session-store'
 import { createAuthResponse } from '@/lib/auth-cookies'
 import { TOTPService } from '@/lib/totp-service'
+import { UpstashAnalytics } from '@/lib/upstash-analytics'
 
 export async function POST(request: NextRequest) {
   console.log('🚀 Login endpoint called - v3 with TOTP support')
@@ -166,6 +167,13 @@ export async function POST(request: NextRequest) {
     // Sign out from Supabase (we manage our own sessions now)
     await supabase.auth.signOut()
 
+    // Track login analytics (non-blocking, before response)
+    try {
+      await UpstashAnalytics.trackAPIPerformance('/api/auth/login', Date.now(), true)
+    } catch (analyticsError) {
+      console.warn('⚠️ Analytics tracking failed (non-critical):', analyticsError)
+    }
+
     // Return response with secure HttpOnly cookies and full profile
     return createAuthResponse(
       {
@@ -207,6 +215,14 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error('Login error:', error)
+
+    // Track failed login (non-blocking)
+    try {
+      await UpstashAnalytics.trackAPIPerformance('/api/auth/login', Date.now(), false)
+    } catch (analyticsError) {
+      console.warn('⚠️ Analytics tracking failed (non-critical):', analyticsError)
+    }
+
     return new Response(
       JSON.stringify({ error: 'Internal server error' }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
