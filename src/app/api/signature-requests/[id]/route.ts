@@ -2,6 +2,8 @@ import { NextRequest } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { RedisCacheService } from '@/lib/redis-cache-service'
+import { UpstashAnalytics } from '@/lib/upstash-analytics'
 
 export async function DELETE(
   request: NextRequest,
@@ -157,22 +159,45 @@ export async function GET(
 
     console.log('📋 Fetching signature request details:', requestId)
 
-    // Get signature request with all related data
-    const { data: signatureRequest, error: fetchError } = await supabaseAdmin
-      .from('signing_requests')
-      .select(`
-        *,
-        signers:signing_request_signers(*),
-        document:documents!document_template_id(id, title, pdf_url, file_url)
-      `)
-      .eq('id', requestId)
-      .single()
+    // Try to get from cache first (non-blocking, with fallback)
+    let signatureRequest = null
+    try {
+      signatureRequest = await RedisCacheService.getDocument(requestId)
+      if (signatureRequest) {
+        console.log('✅ Cache hit for signature request:', requestId)
+      }
+    } catch (cacheError) {
+      console.warn('⚠️ Cache read failed (non-critical), fetching from database:', cacheError)
+    }
 
-    if (fetchError || !signatureRequest) {
-      return new Response(
-        JSON.stringify({ error: 'Signature request not found' }),
-        { status: 404, headers: { 'Content-Type': 'application/json' } }
-      )
+    // If not in cache, fetch from database
+    if (!signatureRequest) {
+      const { data, error: fetchError } = await supabaseAdmin
+        .from('signing_requests')
+        .select(`
+          *,
+          signers:signing_request_signers(*),
+          document:documents!document_template_id(id, title, pdf_url, file_url)
+        `)
+        .eq('id', requestId)
+        .single()
+
+      if (fetchError || !data) {
+        return new Response(
+          JSON.stringify({ error: 'Signature request not found' }),
+          { status: 404, headers: { 'Content-Type': 'application/json' } }
+        )
+      }
+
+      signatureRequest = data
+
+      // Cache for future requests (non-blocking)
+      try {
+        await RedisCacheService.cacheDocument(requestId, signatureRequest)
+        console.log('✅ Cached signature request:', requestId)
+      } catch (cacheError) {
+        console.warn('⚠️ Cache write failed (non-critical):', cacheError)
+      }
     }
 
     // Check if user has access (either sender or signer)
@@ -184,6 +209,14 @@ export async function GET(
         JSON.stringify({ error: 'Access denied' }),
         { status: 403, headers: { 'Content-Type': 'application/json' } }
       )
+    }
+
+    // Track document view analytics (non-blocking)
+    try {
+      await UpstashAnalytics.trackDocumentView(requestId, userId)
+      console.log('✅ Tracked document view for:', requestId)
+    } catch (analyticsError) {
+      console.warn('⚠️ Analytics tracking failed (non-critical):', analyticsError)
     }
 
     return new Response(

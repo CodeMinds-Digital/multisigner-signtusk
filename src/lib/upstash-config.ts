@@ -132,7 +132,21 @@ export class RedisUtils {
 
   static async get<T>(key: string): Promise<T | null> {
     const value = await redis.get(key)
-    return value ? JSON.parse(value as string) : null
+    if (!value) return null
+
+    // Upstash Redis REST API returns parsed JSON already
+    // Only parse if it's a string
+    if (typeof value === 'string') {
+      try {
+        return JSON.parse(value)
+      } catch (error) {
+        console.error('Failed to parse Redis value:', error)
+        return null
+      }
+    }
+
+    // Already parsed object
+    return value as T
   }
 
   static async del(key: string): Promise<void> {

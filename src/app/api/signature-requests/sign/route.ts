@@ -5,6 +5,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { MultiSignatureWorkflowService } from '@/lib/multi-signature-workflow-service'
 import { NotificationService } from '@/lib/notification-service'
 import { RealTimeStatusService } from '@/lib/real-time-status-service'
+import { UpstashAnalytics } from '@/lib/upstash-analytics'
+import { RedisCacheService } from '@/lib/redis-cache-service'
 
 export async function POST(request: NextRequest) {
   let requestId: string | undefined
@@ -546,7 +548,22 @@ export async function POST(request: NextRequest) {
 
     console.log('📊 Signer completion result:', completionResult)
 
+    // Track signature completion analytics (non-blocking)
+    try {
+      // Use email as identifier since userId might not be available for all signers
+      await UpstashAnalytics.trackSignatureCompletion(requestId, userEmail)
+      console.log('✅ Tracked signature completion for:', requestId, 'by', userEmail)
+    } catch (analyticsError) {
+      console.warn('⚠️ Analytics tracking failed (non-critical):', analyticsError)
+    }
 
+    // Invalidate cache for this document (non-blocking)
+    try {
+      await RedisCacheService.invalidateDocument(requestId)
+      console.log('✅ Invalidated cache for:', requestId)
+    } catch (cacheError) {
+      console.warn('⚠️ Cache invalidation failed (non-critical):', cacheError)
+    }
 
     return new Response(
       JSON.stringify({

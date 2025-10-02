@@ -10,7 +10,8 @@ import {
   Workflow,
   QrCode,
   FileText,
-  Shield
+  Shield,
+  Bell
 } from 'lucide-react'
 
 export function Sidebar() {
@@ -126,6 +127,16 @@ export function Sidebar() {
               >
                 <Shield className="w-5 h-5 mr-3" />
                 Security Settings
+              </Link>
+            </li>
+            <li>
+              <Link
+                href="/settings/notifications"
+                className={`flex items-center px-3 py-2 rounded-md ${isActive('/settings/notifications') ? 'text-blue-600 bg-blue-50 font-medium' : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+              >
+                <Bell className="w-5 h-5 mr-3" />
+                Email Preferences
               </Link>
             </li>
           </ul>

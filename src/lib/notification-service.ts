@@ -52,6 +52,10 @@ export interface NotificationPreferences {
   document_updates: boolean
   reminders: boolean
   marketing: boolean
+  // Granular email preferences (Phase 1 optimization)
+  progress_updates: boolean // Signature completed, PDF generated
+  document_viewed_emails: boolean // Document viewed/accessed (disabled by default)
+  other_signer_notifications: boolean // Notify when other signers sign (disabled by default)
 }
 
 export class NotificationService {
@@ -239,6 +243,25 @@ export class NotificationService {
         return true
       }
 
+      // Phase 1 optimization: Check granular preferences
+      // ❌ Document viewed/accessed emails (disabled by default - too frequent)
+      if ((type === 'document_viewed' || type === 'document_accessed') && !preferences.document_viewed_emails) {
+        console.log('📧 Document viewed/accessed emails disabled for user:', userId, '(Phase 1 optimization)')
+        return true // Skip email, but in-app notification was already created
+      }
+
+      // ❌ Other signer progress notifications (disabled by default - spammy)
+      if (type === 'signature_request_signed' && !preferences.other_signer_notifications) {
+        console.log('📧 Other signer notification emails disabled for user:', userId, '(Phase 1 optimization)')
+        return true // Skip email, but in-app notification was already created
+      }
+
+      // Progress updates (signature completed, PDF generated)
+      if ((type === 'pdf_generated' || type === 'final_document_ready') && !preferences.progress_updates) {
+        console.log('📧 Progress update emails disabled for user:', userId)
+        return true
+      }
+
       // Get user email from user_profiles table
       const { data: profile, error: profileError } = await supabaseAdmin
         .from('user_profiles')
@@ -314,11 +337,21 @@ export class NotificationService {
           signature_requests: true,
           document_updates: true,
           reminders: true,
-          marketing: false
+          marketing: false,
+          // Phase 1 optimization: Disable redundant emails by default
+          progress_updates: true,
+          document_viewed_emails: false, // ❌ Disabled by default (too frequent)
+          other_signer_notifications: false // ❌ Disabled by default (spammy)
         }
       }
 
-      return data
+      return {
+        ...data,
+        // Ensure new preferences have defaults if not set
+        progress_updates: data.progress_updates ?? true,
+        document_viewed_emails: data.document_viewed_emails ?? false,
+        other_signer_notifications: data.other_signer_notifications ?? false
+      }
     } catch (error) {
       console.error('Error getting notification preferences:', error)
       return {
@@ -327,7 +360,11 @@ export class NotificationService {
         signature_requests: true,
         document_updates: true,
         reminders: true,
-        marketing: false
+        marketing: false,
+        // Phase 1 optimization: Disable redundant emails by default
+        progress_updates: true,
+        document_viewed_emails: false,
+        other_signer_notifications: false
       }
     }
   }
@@ -513,6 +550,8 @@ export class NotificationService {
 
   /**
    * Notify other signers when someone signs a document
+   * 📧 Phase 1 Optimization: Email disabled by default (spammy, not actionable)
+   * ✅ In-app notification still created
    */
   static async notifyOtherSignersOfSignature(
     requestId: string,
@@ -523,6 +562,7 @@ export class NotificationService {
   ): Promise<void> {
     try {
       console.log('📧 Starting signature notifications for other signers:', otherSignerEmails)
+      console.log('📧 Phase 1: Emails disabled by default, in-app notifications only')
 
       for (const otherSignerEmail of otherSignerEmails) {
         console.log('📧 Looking up user profile for:', otherSignerEmail)
@@ -559,6 +599,8 @@ export class NotificationService {
         }
 
         if (profile) {
+          // Creates in-app notification
+          // Email only sent if user enables other_signer_notifications preference
           await this.createNotification(
             profile.user_id,
             'signature_request_signed',
@@ -571,7 +613,7 @@ export class NotificationService {
               signer_name: signerName
             }
           )
-          console.log('📧 Created signature progress notification for:', otherSignerEmail)
+          console.log('📧 Created signature progress notification (in-app only by default) for:', otherSignerEmail)
         } else {
           console.log('📧 Skipping notification for unregistered user:', otherSignerEmail)
         }
@@ -681,6 +723,8 @@ export class NotificationService {
 
   /**
    * Notify when document is viewed
+   * 📧 Phase 1 Optimization: Email disabled by default (too frequent)
+   * ✅ In-app notification still created
    */
   static async notifyDocumentViewed(
     requesterId: string,
@@ -689,6 +733,8 @@ export class NotificationService {
     requestId: string
   ): Promise<void> {
     try {
+      // Creates in-app notification
+      // Email only sent if user enables document_viewed_emails preference
       await this.createNotification(
         requesterId,
         'document_viewed',
@@ -1034,6 +1080,8 @@ export class NotificationService {
 
   /**
    * Notify when document is accessed for the first time
+   * 📧 Phase 1 Optimization: Email disabled by default (redundant with document_viewed)
+   * ✅ In-app notification still created
    */
   static async notifyDocumentAccessed(
     requestId: string,
@@ -1043,6 +1091,8 @@ export class NotificationService {
     requesterId: string
   ): Promise<void> {
     try {
+      // Creates in-app notification
+      // Email only sent if user enables document_viewed_emails preference
       await this.createNotification(
         requesterId,
         'document_accessed',

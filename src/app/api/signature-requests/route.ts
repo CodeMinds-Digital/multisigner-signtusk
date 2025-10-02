@@ -5,6 +5,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { sendBulkSignatureRequests } from '@/lib/email-service'
 import { NotificationService } from '@/lib/notification-service'
 import { DocumentIdService } from '@/lib/document-id-service'
+import { UpstashJobQueue } from '@/lib/upstash-job-queue'
+import { UpstashAnalytics } from '@/lib/upstash-analytics'
 
 export async function GET(request: NextRequest) {
   try {
@@ -740,32 +742,57 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if notifications fail
     }
 
-    // Send emails using Resend
+    // Send emails using QStash job queue (with fallback to direct sending)
     try {
-      const emailResult = await sendBulkSignatureRequests(
-        documentTitle,
-        userEmail, // sender name (use email for now)
-        signers.map((signer: any) => ({ name: signer.name, email: signer.email })),
-        {
+      console.log('📧 Attempting to queue email job with QStash...')
+
+      // Try to queue email job with QStash (non-blocking, better performance)
+      try {
+        await UpstashJobQueue.queueEmail({
+          type: 'bulk',
+          documentTitle,
+          senderName: userEmail,
+          emails: signers.map((signer: any) => ({ name: signer.name, email: signer.email })),
           message,
           dueDate: dueDate || expiresAt.toISOString(),
-          documentId: signatureRequest.id // Use signature request ID for signing URL
+          documentId: signatureRequest.id
+        }, undefined, 'high') // High priority for signature requests
+
+        console.log('✅ Email job queued successfully with QStash')
+
+        // Track analytics (non-blocking)
+        try {
+          await UpstashAnalytics.trackAPIPerformance('/api/signature-requests', Date.now(), true)
+        } catch (analyticsError) {
+          console.warn('⚠️ Analytics tracking failed (non-critical):', analyticsError)
         }
-      )
 
-      console.log('Email sending results:', emailResult)
+      } catch (queueError) {
+        // Fallback to direct email sending if QStash fails
+        console.warn('⚠️ QStash email queuing failed, falling back to direct sending:', queueError)
 
-      // Update signature request status based on email results
-      if (emailResult.success && emailResult.errors.length === 0) {
-        // All emails sent successfully - status is already set to in_progress
-        console.log('All emails sent successfully')
-      } else if (emailResult.errors.length > 0) {
-        // Some emails failed
-        console.warn('Some emails failed to send:', emailResult.errors)
+        const emailResult = await sendBulkSignatureRequests(
+          documentTitle,
+          userEmail,
+          signers.map((signer: any) => ({ name: signer.name, email: signer.email })),
+          {
+            message,
+            dueDate: dueDate || expiresAt.toISOString(),
+            documentId: signatureRequest.id
+          }
+        )
+
+        console.log('📧 Fallback email sending results:', emailResult)
+
+        if (emailResult.success && emailResult.errors.length === 0) {
+          console.log('✅ All emails sent successfully (fallback)')
+        } else if (emailResult.errors.length > 0) {
+          console.warn('⚠️ Some emails failed to send (fallback):', emailResult.errors)
+        }
       }
 
     } catch (emailError) {
-      console.error('Error sending emails:', emailError)
+      console.error('❌ Error in email sending process:', emailError)
       // Don't fail the request creation, just log the error
     }
 
