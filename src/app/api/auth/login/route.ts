@@ -74,6 +74,17 @@ export async function POST(request: NextRequest) {
       console.log('ℹ️ TOTP not required for this user, proceeding with normal login')
     }
 
+    // Check if email is verified
+    if (!user.email_confirmed_at) {
+      return new Response(
+        JSON.stringify({
+          error: 'Please verify your email before logging in. Check your inbox for the verification link.',
+          requiresEmailVerification: true
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Fetch full user profile from user_profiles table using admin client
     const profileResult = await supabaseAdmin
       .from('user_profiles')
@@ -136,10 +147,24 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Update last login timestamp
+    // Check if corporate user account is suspended (waiting for approval)
+    if (profile.account_type === 'corporate' && profile.account_status === 'suspended') {
+      return new Response(
+        JSON.stringify({
+          error: 'Your corporate account access is pending admin approval. Please wait for an administrator to approve your request.',
+          requiresApproval: true
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Update last login timestamp and email_verified status
     await supabaseAdmin
       .from('user_profiles')
-      .update({ last_login_at: new Date().toISOString() })
+      .update({
+        last_login_at: new Date().toISOString(),
+        email_verified: true // Ensure it's marked as verified
+      })
       .eq('id', user.id)
 
     // Generate our own JWT tokens (short-lived access + long-lived refresh)

@@ -7,7 +7,7 @@ import { IoPersonSharp } from 'react-icons/io5'
 import { MdFactory } from 'react-icons/md'
 import { supabase } from '@/lib/supabase'
 
-// Corporate email validation utility
+// Enterprise email validation utility
 const validateCorporateEmail = (email: string): { isValid: boolean; error?: string } => {
   const domain = email.toLowerCase().split('@')[1]
 
@@ -15,8 +15,8 @@ const validateCorporateEmail = (email: string): { isValid: boolean; error?: stri
     return { isValid: false, error: 'Invalid email format' }
   }
 
-  // List of personal email domains to reject
-  const personalDomains = [
+  // List of individual email domains to reject
+  const individualDomains = [
     'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'aol.com',
     'icloud.com', 'me.com', 'mac.com', 'live.com', 'msn.com',
     'ymail.com', 'rocketmail.com', 'mail.com', 'gmx.com', 'protonmail.com',
@@ -24,16 +24,16 @@ const validateCorporateEmail = (email: string): { isValid: boolean; error?: stri
     'rediffmail.com', 'indiatimes.com', 'sify.com', 'vsnl.net'
   ]
 
-  if (personalDomains.includes(domain)) {
+  if (individualDomains.includes(domain)) {
     return {
       isValid: false,
-      error: 'Please use a valid corporate email address. Personal email domains (gmail.com, yahoo.com, etc.) are not allowed for corporate accounts.'
+      error: 'Please use a valid enterprise email address. Individual email domains (gmail.com, yahoo.com, etc.) are not allowed for enterprise accounts.'
     }
   }
 
   // Additional validation: domain should have at least one dot and be longer than 4 characters
   if (domain.length < 4 || !domain.includes('.')) {
-    return { isValid: false, error: 'Please enter a valid corporate email domain' }
+    return { isValid: false, error: 'Please enter a valid enterprise email domain' }
   }
 
   // Domain should not start or end with a dot or hyphen
@@ -47,7 +47,7 @@ const validateCorporateEmail = (email: string): { isValid: boolean; error?: stri
 export function SignUpForm() {
   const navigate = useRouter()
   const [step, setStep] = useState(1)
-  const [accountType, setAccountType] = useState('Personal')
+  const [accountType, setAccountType] = useState('Individual')
   const [termsPopup, setTermsPopup] = useState(false)
   const [agreedToTerms, setAgreedToTerms] = useState(false)
   const [formData, setFormData] = useState({
@@ -68,6 +68,43 @@ export function SignUpForm() {
   const [emailError, setEmailError] = useState('')
   const [loading, setLoading] = useState(false)
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({})
+  const [domainCheckInfo, setDomainCheckInfo] = useState<{
+    exists: boolean
+    isFirstUser: boolean
+    companyName?: string
+    accessMode?: string
+    message?: string
+    canSignup?: boolean
+  } | null>(null)
+  const [checkingDomain, setCheckingDomain] = useState(false)
+
+  // Check domain when email changes (for enterprise accounts)
+  const checkDomain = async (email: string) => {
+    if (!email || !email.includes('@')) return
+
+    setCheckingDomain(true)
+    try {
+      const response = await fetch('/api/corporate/check-domain', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setDomainCheckInfo(data)
+
+        // Auto-fill company name if it's an existing enterprise account
+        if (data.exists && data.companyName && !formData.companyName) {
+          setFormData(prev => ({ ...prev, companyName: data.companyName }))
+        }
+      }
+    } catch (error) {
+      console.error('Domain check error:', error)
+    } finally {
+      setCheckingDomain(false)
+    }
+  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target
@@ -78,12 +115,20 @@ export function SignUpForm() {
       setValidationErrors(prev => ({ ...prev, [name]: '' }))
     }
 
-    // Real-time email validation for corporate accounts
-    if (name === 'email' && accountType === 'Corporate' && value) {
+    // Real-time email validation for enterprise accounts
+    if (name === 'email' && accountType === 'Enterprise' && value) {
       const validation = validateCorporateEmail(value)
       setEmailError(validation.error || '')
+
+      // Check domain if email is valid
+      if (validation.isValid) {
+        checkDomain(value)
+      } else {
+        setDomainCheckInfo(null)
+      }
     } else if (name === 'email') {
       setEmailError('')
+      setDomainCheckInfo(null)
     }
   }
 
@@ -116,19 +161,19 @@ export function SignUpForm() {
       errors.confirmPassword = 'Passwords do not match'
     }
 
-    // Corporate-specific validations
-    if (accountType === 'Corporate') {
+    // Enterprise-specific validations
+    if (accountType === 'Enterprise') {
       if (!formData.companyName.trim()) {
         errors.companyName = 'Company name is required'
       } else if (formData.companyName.trim().length < 2) {
         errors.companyName = 'Company name must be at least 2 characters long'
       }
 
-      // Validate corporate email
+      // Validate enterprise email
       if (formData.email) {
         const emailValidation = validateCorporateEmail(formData.email)
         if (!emailValidation.isValid) {
-          errors.email = emailValidation.error || 'Invalid corporate email'
+          errors.email = emailValidation.error || 'Invalid enterprise email'
         }
       }
     }
@@ -165,20 +210,56 @@ export function SignUpForm() {
     }
 
     try {
-      // Prepare user metadata for the enhanced trigger
+      // ENTERPRISE SIGNUP: Use dedicated enterprise signup endpoint
+      if (accountType === 'Enterprise') {
+        const response = await fetch('/api/corporate/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: formData.email,
+            password: formData.password,
+            fullName: `${formData.firstName} ${formData.lastName}`.trim(),
+            firstName: formData.firstName,
+            lastName: formData.lastName,
+            companyName: formData.companyName,
+            industryField: formData.industryField || null,
+            employeeCount: formData.employeeCount || null,
+            jobTitle: formData.jobTitle || null,
+            department: formData.department || null,
+            phoneNumber: formData.phoneNumber || null
+          })
+        })
+
+        const result = await response.json()
+
+        if (!response.ok) {
+          if (result.requiresInvitation) {
+            setError(result.error || 'This enterprise account is invite-only')
+          } else if (result.requiresApproval) {
+            // Show success message for approval mode
+            navigate.push('/verify-email?status=pending_approval')
+          } else {
+            setError(result.error || 'Enterprise signup failed')
+          }
+          setLoading(false)
+          return
+        }
+
+        // Success - redirect based on status
+        if (result.requiresApproval) {
+          navigate.push('/verify-email?status=pending_approval')
+        } else {
+          navigate.push('/verify-email')
+        }
+        return
+      }
+
+      // INDIVIDUAL SIGNUP: Use standard Supabase signup
       const userMetadata = {
-        account_type: accountType.toLowerCase(),
+        account_type: 'individual',
         first_name: formData.firstName,
         last_name: formData.lastName,
-        full_name: `${formData.firstName} ${formData.lastName}`.trim(),
-        ...(accountType === 'Corporate' && {
-          company_name: formData.companyName,
-          industry_field: formData.industryField,
-          employee_count: formData.employeeCount ? parseInt(formData.employeeCount) : null,
-          job_title: formData.jobTitle,
-          department: formData.department,
-          phone_number: formData.phoneNumber,
-        })
+        full_name: `${formData.firstName} ${formData.lastName}`.trim()
       }
 
       const { data, error: signUpError } = await supabase.auth.signUp({
@@ -198,7 +279,6 @@ export function SignUpForm() {
       }
 
       if (data.user) {
-        // Enhanced user profile will be created automatically by the database trigger
         navigate.push('/verify-email')
       }
     } catch (error) {
@@ -245,24 +325,24 @@ export function SignUpForm() {
 
               {/* Buttons Container */}
               <div className="flex flex-col sm:flex-row gap-4 mt-12 w-full justify-center px-4">
-                {/* Personal Button */}
+                {/* Individual Button */}
                 <button
-                  onClick={() => setAccountType('Personal')}
-                  className={`w-full sm:w-64 ${accountType === 'Personal' ? 'bg-blue-50 border-blue-500' : 'bg-gray-100'} hover:bg-blue-50 transition-colors duration-200 rounded-xl p-6 flex flex-col items-center group border-2`}
+                  onClick={() => setAccountType('Individual')}
+                  className={`w-full sm:w-64 ${accountType === 'Individual' ? 'bg-blue-50 border-blue-500' : 'bg-gray-100'} hover:bg-blue-50 transition-colors duration-200 rounded-xl p-6 flex flex-col items-center group border-2`}
                 >
-                  <IoPersonSharp className={`${accountType === 'Personal' ? 'text-blue-600' : 'text-gray-700'} text-2xl sm:text-3xl mb-3 group-hover:text-blue-600`} />
-                  <h3 className="text-gray-900 font-semibold mb-1">Personal</h3>
+                  <IoPersonSharp className={`${accountType === 'Individual' ? 'text-blue-600' : 'text-gray-700'} text-2xl sm:text-3xl mb-3 group-hover:text-blue-600`} />
+                  <h3 className="text-gray-900 font-semibold mb-1">Individual</h3>
                   <p className="text-gray-500 text-xs">Person</p>
                 </button>
 
-                {/* Corporate Button */}
+                {/* Enterprise Button */}
                 <button
-                  onClick={() => setAccountType('Corporate')}
-                  className={`w-full sm:w-64 ${accountType === 'Corporate' ? 'bg-blue-50 border-blue-500' : 'bg-gray-100'} hover:bg-blue-50 transition-colors duration-200 rounded-xl p-6 flex flex-col items-center group border-2`}
+                  onClick={() => setAccountType('Enterprise')}
+                  className={`w-full sm:w-64 ${accountType === 'Enterprise' ? 'bg-blue-50 border-blue-500' : 'bg-gray-100'} hover:bg-blue-50 transition-colors duration-200 rounded-xl p-6 flex flex-col items-center group border-2`}
                 >
-                  <MdFactory className={`${accountType === 'Corporate' ? 'text-blue-600' : 'text-gray-700'} text-2xl sm:text-3xl mb-3 group-hover:text-blue-600`} />
-                  <h3 className="text-gray-900 font-semibold mb-1">Corporate</h3>
-                  <p className="text-gray-500 text-xs">Corporate</p>
+                  <MdFactory className={`${accountType === 'Enterprise' ? 'text-blue-600' : 'text-gray-700'} text-2xl sm:text-3xl mb-3 group-hover:text-blue-600`} />
+                  <h3 className="text-gray-900 font-semibold mb-1">Enterprise</h3>
+                  <p className="text-gray-500 text-xs">Enterprise</p>
                 </button>
               </div>
 
@@ -316,23 +396,23 @@ export function SignUpForm() {
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
               <button
                 type="button"
-                className={`rounded-xl py-3 px-4 w-full sm:w-48 ${accountType === 'Personal'
+                className={`rounded-xl py-3 px-4 w-full sm:w-48 ${accountType === 'Individual'
                   ? 'bg-blue-200 text-blue-600'
                   : 'bg-gray-200 text-black'
                   } hover:bg-blue-200 hover:text-blue-600 flex items-center justify-center`}
-                onClick={() => setAccountType('Personal')}
+                onClick={() => setAccountType('Individual')}
               >
-                <IoPersonSharp className="mr-2" /> Personal
+                <IoPersonSharp className="mr-2" /> Individual
               </button>
               <button
                 type="button"
-                className={`rounded-xl py-3 px-4 w-full sm:w-48 ${accountType === 'Corporate'
+                className={`rounded-xl py-3 px-4 w-full sm:w-48 ${accountType === 'Enterprise'
                   ? 'bg-blue-200 text-blue-600'
                   : 'bg-gray-200 text-black'
                   } hover:bg-blue-200 hover:text-blue-600 flex items-center justify-center`}
-                onClick={() => setAccountType('Corporate')}
+                onClick={() => setAccountType('Enterprise')}
               >
-                <MdFactory className="mr-2" /> Corporate
+                <MdFactory className="mr-2" /> Enterprise
               </button>
             </div>
           </div>
@@ -350,7 +430,7 @@ export function SignUpForm() {
               </div>
             )}
 
-            {accountType === 'Personal' ? (
+            {accountType === 'Individual' ? (
               <>
                 <div className="flex flex-col sm:flex-row gap-4 mb-4">
                   <div className="w-full">
@@ -452,22 +532,53 @@ export function SignUpForm() {
                 </div>
 
                 <div className="mb-4">
-                  <label className="block text-xs font-semibold mb-1">Corporate Email *</label>
+                  <label className="block text-xs font-semibold mb-1">Enterprise Email *</label>
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    placeholder="Enter your corporate email address"
+                    placeholder="Enter your enterprise email address"
                     className={`w-full p-2.5 text-sm rounded-md border ${validationErrors.email || emailError ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                     required
                   />
                   {validationErrors.email && (
                     <p className="text-red-500 text-xs mt-1">{validationErrors.email}</p>
                   )}
-                  <p className="text-gray-500 text-xs mt-1">
-                    Please use your corporate email address. Personal email domains (gmail.com, yahoo.com, etc.) are not allowed.
-                  </p>
+
+                  {/* Domain Check Status */}
+                  {checkingDomain && (
+                    <div className="mt-2 p-2 bg-blue-50 text-blue-600 rounded text-xs flex items-center">
+                      <svg className="animate-spin h-4 w-4 mr-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Checking domain...
+                    </div>
+                  )}
+
+                  {domainCheckInfo && !checkingDomain && (
+                    <div className={`mt-2 p-2 rounded text-xs ${domainCheckInfo.isFirstUser
+                      ? 'bg-green-50 text-green-700 border border-green-200'
+                      : domainCheckInfo.canSignup
+                        ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                        : 'bg-yellow-50 text-yellow-700 border border-yellow-200'
+                      }`}>
+                      <p className="font-semibold mb-1">
+                        {domainCheckInfo.isFirstUser ? '🎉 You\'ll be the first!' : '📋 Enterprise Account Info'}
+                      </p>
+                      <p>{domainCheckInfo.message}</p>
+                      {!domainCheckInfo.canSignup && (
+                        <p className="mt-1 font-semibold">⚠️ Signup is not available. Please contact your administrator.</p>
+                      )}
+                    </div>
+                  )}
+
+                  {!domainCheckInfo && !checkingDomain && (
+                    <p className="text-gray-500 text-xs mt-1">
+                      Please use your enterprise email address. Individual email domains (gmail.com, yahoo.com, etc.) are not allowed.
+                    </p>
+                  )}
                 </div>
 
                 <div className="flex flex-col sm:flex-row gap-4 mb-4">
@@ -604,7 +715,7 @@ export function SignUpForm() {
             <button
               type="submit"
               className="flex items-center justify-center bg-blue-600 text-white w-full py-3 rounded-md hover:bg-blue-700 transition-colors duration-200 mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading || (accountType === 'Corporate' && !!emailError)}
+              disabled={loading || (accountType === 'Enterprise' && !!emailError)}
             >
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>

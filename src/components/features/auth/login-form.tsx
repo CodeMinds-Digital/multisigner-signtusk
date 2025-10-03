@@ -9,6 +9,7 @@ import { useAuth } from '@/components/providers/secure-auth-provider'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { TOTPVerificationPopup } from './totp-verification-popup'
+import { ResendVerificationPopup } from './resend-verification-popup'
 
 export function LoginForm() {
   const searchParams = useSearchParams()
@@ -23,6 +24,7 @@ export function LoginForm() {
   const [isLoading, setIsLoading] = useState(false)
   const [rememberMe, setRememberMe] = useState(false)
   const [showTOTPPopup, setShowTOTPPopup] = useState(false)
+  const [showResendVerificationPopup, setShowResendVerificationPopup] = useState(false)
   const [_pendingUserId, setPendingUserId] = useState<string | null>(null)
   const { user, error, clearError, setUser, refreshAuth } = useAuth()
 
@@ -116,6 +118,21 @@ export function LoginForm() {
         console.log('🔐 TOTP required, showing popup')
         setPendingUserId(data.userId)
         setShowTOTPPopup(true)
+        setIsLoading(false)
+        return
+      }
+
+      // Check for email verification requirement
+      if (data.requiresEmailVerification) {
+        console.log('📧 Email verification required, showing resend popup')
+        setShowResendVerificationPopup(true)
+        setIsLoading(false)
+        return
+      }
+
+      // Check for approval requirement
+      if (data.requiresApproval) {
+        setLocalError(data.error || 'Your account is pending admin approval.')
         setIsLoading(false)
         return
       }
@@ -374,6 +391,13 @@ export function LoginForm() {
         description="Enter your TOTP code to complete login"
         email={formData.email}
         password={formData.password}
+      />
+
+      {/* Resend Verification Email Popup */}
+      <ResendVerificationPopup
+        isOpen={showResendVerificationPopup}
+        onClose={() => setShowResendVerificationPopup(false)}
+        email={formData.email}
       />
     </div>
   )
