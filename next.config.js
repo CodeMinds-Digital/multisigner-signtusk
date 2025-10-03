@@ -68,8 +68,7 @@ const nextConfig = {
         if (request && (
           request.includes('react-email') ||
           request.includes('next/document') ||
-          request.includes('resend') ||
-          request === 'resend' ||
+          request === 'resend' ||  // Only exact match, not includes!
           request.startsWith('@react-email/')
         )) {
           return callback(null, `commonjs ${request}`);

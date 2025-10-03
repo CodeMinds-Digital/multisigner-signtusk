@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useAuth } from '@/components/providers/auth-provider'
-import { NotificationService, NotificationPreferences } from '@/lib/notification-service'
+import { useAuth } from '@/components/providers/secure-auth-provider'
+import { NotificationPreferences } from '@/lib/notification-service'
 import { useToast } from '@/components/ui/toast'
 
 export function EmailPreferencesSettings() {
@@ -31,7 +31,13 @@ export function EmailPreferencesSettings() {
 
     try {
       setLoading(true)
-      const prefs = await NotificationService.getNotificationPreferences(user.id)
+      const response = await fetch('/api/user/notification-preferences')
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch preferences')
+      }
+
+      const prefs = await response.json()
       setPreferences(prefs)
     } catch (error) {
       console.error('Error loading preferences:', error)
@@ -52,11 +58,23 @@ export function EmailPreferencesSettings() {
 
     try {
       setSaving(true)
-      const success = await NotificationService.updateNotificationPreferences(user.id, {
-        [key]: newValue
+      const response = await fetch('/api/user/notification-preferences', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          [key]: newValue
+        })
       })
 
-      if (success) {
+      if (!response.ok) {
+        throw new Error('Failed to update preferences')
+      }
+
+      const result = await response.json()
+
+      if (result.success) {
         toast.success('Email preferences updated')
       } else {
         // Revert on failure
