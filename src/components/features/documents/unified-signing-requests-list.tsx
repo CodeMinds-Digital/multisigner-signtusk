@@ -83,6 +83,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const [isRefreshing, setIsRefreshing] = useState(false)
     const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
     const pollingStartTimeRef = useRef<Map<string, number>>(new Map())
+    const lastPollTimeRef = useRef<Map<string, number>>(new Map()) // Track last poll time per request
 
     // Note: Toast context may not be available in all contexts
 
@@ -248,7 +249,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
         console.log('🔄 Starting smart polling for', pollingRequestIds.size, 'request(s)')
 
-        // Poll every 3 seconds
+        // Poll every 5 seconds (increased from 3 to reduce load)
         pollingIntervalRef.current = setInterval(async () => {
             const now = Date.now()
             const idsToRemove: string[] = []
@@ -261,6 +262,15 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                     idsToRemove.push(requestId)
                     continue
                 }
+
+                // Throttle: Only poll if at least 2 seconds have passed since last poll
+                const lastPollTime = lastPollTimeRef.current.get(requestId) || 0
+                if (now - lastPollTime < 2000) {
+                    continue
+                }
+
+                // Update last poll time
+                lastPollTimeRef.current.set(requestId, now)
 
                 // Check PDF status
                 const updatedRequest = await checkPDFStatus(requestId)
@@ -287,11 +297,12 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                     idsToRemove.forEach(id => {
                         newSet.delete(id)
                         pollingStartTimeRef.current.delete(id)
+                        lastPollTimeRef.current.delete(id)
                     })
                     return newSet
                 })
             }
-        }, 3000)
+        }, 5000) // Increased from 3000 to 5000ms
 
         // Cleanup on unmount
         return () => {
@@ -302,15 +313,30 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         }
     }, [pollingRequestIds, checkPDFStatus])
 
-    // Auto-refresh when window gains focus
+    // Auto-refresh when window gains focus (with debounce to prevent multiple calls)
     useEffect(() => {
+        let focusTimeout: NodeJS.Timeout | null = null
+
         const handleFocus = () => {
-            console.log('🔄 Window focused, refreshing data...')
-            loadAllRequests()
+            // Clear any pending refresh
+            if (focusTimeout) {
+                clearTimeout(focusTimeout)
+            }
+
+            // Debounce the refresh by 1 second
+            focusTimeout = setTimeout(() => {
+                console.log('🔄 Window focused, refreshing data...')
+                loadAllRequests()
+            }, 1000)
         }
 
         window.addEventListener('focus', handleFocus)
-        return () => window.removeEventListener('focus', handleFocus)
+        return () => {
+            window.removeEventListener('focus', handleFocus)
+            if (focusTimeout) {
+                clearTimeout(focusTimeout)
+            }
+        }
     }, [loadAllRequests])
 
     // Start polling for completed requests without final PDF
@@ -336,7 +362,8 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                 setPollingRequestIds(newPollingIds)
             }
         }
-    }, [requests, pollingRequestIds, isRequestCompleted])
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [requests.length, isRequestCompleted]) // Only re-run when requests count changes, not on every request update
 
     // Manual refresh function
     const handleManualRefresh = useCallback(async () => {
