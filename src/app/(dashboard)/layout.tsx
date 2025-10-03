@@ -1,8 +1,9 @@
 'use client'
 
 import { useAuth } from '@/components/providers/secure-auth-provider'
-import { Header } from '@/components/layout/header'
 import { Sidebar } from '@/components/layout/sidebar'
+import { TopNavigation } from '@/components/layout/top-navigation'
+import { SidebarProvider } from '@/contexts/sidebar-context'
 import { useRouter } from 'next/navigation'
 import { useEffect } from 'react'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
@@ -34,17 +35,25 @@ export default function DashboardLayout({
   return (
     <ClientOnly fallback={<LoadingPage message="Initializing dashboard..." />}>
       <ErrorBoundary>
-        <div className="flex h-screen bg-gray-50">
-          <Sidebar />
-          <div className="flex-1 flex flex-col overflow-hidden">
-            <Header />
-            <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
-              <ErrorBoundary>
-                {children}
-              </ErrorBoundary>
-            </main>
+        <SidebarProvider>
+          <div className="flex h-screen flex-col bg-gray-50">
+            {/* Top Navigation Bar */}
+            <TopNavigation />
+
+            {/* Main Content Area */}
+            <div className="flex flex-1 overflow-hidden">
+              {/* Collapsible Sidebar */}
+              <Sidebar />
+
+              {/* Page Content */}
+              <main className="flex-1 overflow-y-auto bg-gray-50 p-6">
+                <ErrorBoundary>
+                  {children}
+                </ErrorBoundary>
+              </main>
+            </div>
           </div>
-        </div>
+        </SidebarProvider>
       </ErrorBoundary>
     </ClientOnly>
   )

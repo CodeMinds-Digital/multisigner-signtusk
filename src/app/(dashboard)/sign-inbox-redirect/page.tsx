@@ -4,13 +4,13 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { LoadingPage } from '@/components/ui/loading'
 
-export default function DashboardRedirect() {
+export default function SignInboxRedirect() {
   const router = useRouter()
 
   useEffect(() => {
-    // Redirect /dashboard to /sign for consistency
-    router.replace('/sign')
+    router.replace('/sign/inbox')
   }, [router])
 
-  return <LoadingPage message="Redirecting to Sign..." />
+  return <LoadingPage message="Redirecting to Sign Inbox..." />
 }
+
