@@ -155,7 +155,8 @@ export async function GET(request: NextRequest) {
       }
 
       // For received requests, use the user's signer status if available
-      if (isReceived && request.user_signer_status) {
+      // BUT: If document is completed or declined, keep that status (don't override with individual status)
+      if (isReceived && request.user_signer_status && document_status !== 'completed' && document_status !== 'declined') {
         const userSigner = request.signers?.find((s: any) => s.signer_email === userEmail)
         if (userSigner) {
           switch (userSigner.signer_status) {
