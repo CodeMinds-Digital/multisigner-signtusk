@@ -6,7 +6,9 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useRouter } from 'next/navigation'
-import { Notification } from '@/lib/notification-service'
+import type { Notification } from '@/lib/notification-service'
+import { supabase } from '@/lib/supabase'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 interface NotificationBellProps {
   className?: string
@@ -19,6 +21,8 @@ export function NotificationBell({ className }: NotificationBellProps) {
   const [loading, setLoading] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  const [realtimeEnabled, setRealtimeEnabled] = useState(false)
 
   // Fetch notifications and unread count
   const fetchNotifications = async () => {
@@ -185,25 +189,129 @@ export function NotificationBell({ className }: NotificationBellProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  // Initial load and polling
+  // ✅ REALTIME: Setup real-time subscription for notifications
+  useEffect(() => {
+    let userId: string | null = null
+
+    const setupRealtime = async () => {
+      try {
+        // Get current user
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session?.user) {
+          console.log('⏭️ No user session, skipping realtime setup')
+          return
+        }
+
+        userId = session.user.id
+        console.log('🔄 Setting up realtime notifications for user:', userId)
+
+        // Subscribe to notifications table changes
+        const channel = supabase
+          .channel(`notifications_${userId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'INSERT',
+              schema: 'public',
+              table: 'notifications',
+              filter: `user_id=eq.${userId}`
+            },
+            (payload: any) => {
+              console.log('🔔 New notification received via realtime:', payload.new)
+
+              // Add new notification to the list
+              setNotifications(prev => [payload.new, ...prev])
+              setUnreadCount(prev => prev + 1)
+
+              // Optional: Show browser notification
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(payload.new.title, {
+                  body: payload.new.message,
+                  icon: '/logo.png'
+                })
+              }
+
+              setRealtimeEnabled(true)
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'notifications',
+              filter: `user_id=eq.${userId}`
+            },
+            (payload: any) => {
+              console.log('🔔 Notification updated via realtime:', payload.new)
+
+              // Update notification in the list
+              setNotifications(prev =>
+                prev.map(n => n.id === payload.new.id ? payload.new : n)
+              )
+
+              // Update unread count if read status changed
+              if (payload.new.is_read && payload.old && !payload.old.is_read) {
+                setUnreadCount(prev => Math.max(0, prev - 1))
+              }
+
+              setRealtimeEnabled(true)
+            }
+          )
+          .subscribe((status: string) => {
+            console.log('📡 Notification realtime subscription status:', status)
+            if (status === 'SUBSCRIBED') {
+              console.log('✅ Realtime notifications enabled')
+              setRealtimeEnabled(true)
+            }
+          })
+
+        channelRef.current = channel
+      } catch (error) {
+        console.error('❌ Error setting up realtime notifications:', error)
+      }
+    }
+
+    setupRealtime()
+
+    return () => {
+      if (channelRef.current) {
+        console.log('🔄 Cleaning up realtime notification subscription')
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+    }
+  }, [])
+
+  // Initial load and polling (FALLBACK - reduced frequency since realtime is primary)
   useEffect(() => {
     // Add a small delay to ensure user is authenticated
     const timer = setTimeout(() => {
       fetchNotifications()
     }, 1000) // 1 second delay
 
-    // ✅ PERFORMANCE FIX: Reduced polling frequency
-    const interval = setInterval(fetchUnreadCount, 30000) // Every 30 seconds (reduced from 10s)
+    // ✅ FALLBACK POLLING: Only as backup when realtime fails
+    // Reduced frequency since realtime handles most updates
+    const interval = setInterval(() => {
+      if (!realtimeEnabled) {
+        // Only poll if realtime is not working
+        fetchUnreadCount()
+      }
+    }, 60000) // Every 60 seconds (reduced from 30s)
 
-    // Also refresh full notifications periodically
-    const fullRefreshInterval = setInterval(fetchNotifications, 120000) // Every 2 minutes (reduced from 1m)
+    // Also refresh full notifications periodically as backup
+    const fullRefreshInterval = setInterval(() => {
+      if (!realtimeEnabled) {
+        fetchNotifications()
+      }
+    }, 180000) // Every 3 minutes (reduced from 2m)
 
     return () => {
       clearTimeout(timer)
       clearInterval(interval)
       clearInterval(fullRefreshInterval)
     }
-  }, [])
+  }, [realtimeEnabled])
 
   // Fetch notifications when dropdown opens
   useEffect(() => {

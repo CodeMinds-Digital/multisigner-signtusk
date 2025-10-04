@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   FileText,
@@ -21,6 +21,8 @@ import { getEnhancedDashboardStats, type EnhancedDashboardStats } from '@/lib/en
 import { ResponsiveStatsCards, type StatCardData } from '@/components/ui/responsive-stats-cards'
 import { UploadDocument } from '@/components/features/documents/upload-document'
 import { getStatusConfig } from '@/utils/document-status'
+import { supabase } from '@/lib/supabase'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 
 
@@ -31,6 +33,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false)
   const [activeFilter, setActiveFilter] = useState<string>('all')
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  const [realtimeEnabled, setRealtimeEnabled] = useState(false)
 
   const loadDashboardData = useCallback(async () => {
     if (!user) return
@@ -105,14 +109,82 @@ export default function DashboardPage() {
     loadDashboardData()
   }, [loadDashboardData])
 
-  // Auto-refresh every 30 seconds
+  // ✅ REALTIME: Setup real-time subscription for dashboard stats
+  useEffect(() => {
+    if (!user) return
+
+    const setupRealtime = async () => {
+      try {
+        console.log('🔄 Setting up realtime dashboard stats for user:', user.id)
+
+        // Subscribe to documents and signing_requests changes
+        const channel = supabase
+          .channel(`dashboard_stats_${user.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'documents',
+              filter: `user_id=eq.${user.id}`
+            },
+            (payload: any) => {
+              console.log('📊 Document changed, refreshing stats...', payload)
+              loadDashboardData()
+              setRealtimeEnabled(true)
+            }
+          )
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'signing_requests',
+              filter: `initiated_by=eq.${user.id}`
+            },
+            (payload: any) => {
+              console.log('📊 Signing request changed, refreshing stats...', payload)
+              loadDashboardData()
+              setRealtimeEnabled(true)
+            }
+          )
+          .subscribe((status: string) => {
+            console.log('📡 Dashboard realtime subscription status:', status)
+            if (status === 'SUBSCRIBED') {
+              console.log('✅ Realtime dashboard stats enabled')
+              setRealtimeEnabled(true)
+            }
+          })
+
+        channelRef.current = channel
+      } catch (error) {
+        console.error('❌ Error setting up realtime dashboard:', error)
+      }
+    }
+
+    setupRealtime()
+
+    return () => {
+      if (channelRef.current) {
+        console.log('🔄 Cleaning up realtime dashboard subscription')
+        supabase.removeChannel(channelRef.current)
+        channelRef.current = null
+      }
+    }
+  }, [user, loadDashboardData])
+
+  // Auto-refresh every 60 seconds (FALLBACK - reduced since realtime is primary)
   useEffect(() => {
     const interval = setInterval(() => {
-      loadDashboardData()
-    }, 30000)
+      if (!realtimeEnabled) {
+        // Only poll if realtime is not working
+        console.log('⏰ Fallback polling dashboard stats (realtime not active)')
+        loadDashboardData()
+      }
+    }, 60000) // Increased from 30s to 60s
 
     return () => clearInterval(interval)
-  }, [loadDashboardData])
+  }, [loadDashboardData, realtimeEnabled])
 
   // Create stats cards configuration
   const createStatsCards = useCallback((): StatCardData[] => {
