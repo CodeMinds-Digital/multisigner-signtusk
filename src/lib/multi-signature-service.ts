@@ -89,7 +89,7 @@ export class MultiSignatureService {
           settings: JSON.stringify(settings),
           expires_at: (() => {
             const expiry = new Date(Date.now() + (settings.expiresInDays || 7) * 24 * 60 * 60 * 1000)
-            expiry.setHours(23, 59, 59, 999)
+            expiry.setHours(23, 59, 59, 999) // Use local timezone so it shows as 11:59 PM for the user
             return expiry.toISOString()
           })()
         }])

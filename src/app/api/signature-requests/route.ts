@@ -373,15 +373,25 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate expiration date
+    // Client sends the expiration datetime already calculated in their local timezone
+    // We just need to parse it and store it
     let expiresAt: Date
     if (dueDate) {
-      // Set expiry to 11:59 PM (23:59:59) of the selected date
+      // Client sends ISO datetime string (e.g., "2025-10-05T23:59:59.999Z")
+      // This represents 11:59 PM in the user's local timezone, converted to UTC
       expiresAt = new Date(dueDate)
-      expiresAt.setHours(23, 59, 59, 999)
+
+      // Ensure it's valid
+      if (isNaN(expiresAt.getTime())) {
+        // Fallback: if invalid, treat as date string and set to end of day in user's timezone
+        const localExpiry = new Date(dueDate + 'T23:59:59.999')
+        expiresAt = localExpiry
+      }
     } else {
-      // Default: 30 days from now at 11:59 PM
-      expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-      expiresAt.setHours(23, 59, 59, 999)
+      // Default: 30 days from now at 11:59 PM in user's local timezone
+      expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + 30)
+      expiresAt.setHours(23, 59, 59, 999) // Use local hours since no specific timezone provided
     }
 
     // Handle mock document IDs by creating a real document record first
