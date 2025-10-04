@@ -42,9 +42,10 @@ export class SignatureRequestService {
     requestData: CreateSignatureRequestData
   ): Promise<SignatureRequest | null> {
     try {
-      // Calculate expiration date (default 30 days)
+      // Calculate expiration date (default 30 days) - set to 11:59 PM (23:59:59)
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + (requestData.expiresInDays || 30))
+      expiresAt.setHours(23, 59, 59, 999)
 
       // Create the signature request
       const { data: signatureRequest, error: requestError } = await supabase
@@ -225,7 +226,7 @@ export class SignatureRequestService {
   }> {
     try {
       const requests = await this.getSignatureRequests(userId)
-      
+
       const counts = {
         total: requests.length,
         pending: requests.filter(r => r.status === 'pending').length,

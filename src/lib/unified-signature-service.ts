@@ -108,9 +108,10 @@ export class UnifiedSignatureService {
         return { success: false, error: 'Document not found' }
       }
 
-      // Calculate expiry date
+      // Calculate expiry date - set to 11:59 PM (23:59:59) of the expiry day
       const expires_at = new Date()
       expires_at.setDate(expires_at.getDate() + expires_in_days)
+      expires_at.setHours(23, 59, 59, 999)
 
       // Create signature request
       const { data: signatureRequest, error: requestError } = await this.supabase
