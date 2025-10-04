@@ -48,16 +48,22 @@ export function EmailPreferencesSettings() {
   }
 
   const handleToggle = async (key: keyof NotificationPreferences) => {
-    if (!user) return
+    if (!user) {
+      toast.error('Please login to update preferences')
+      return
+    }
 
-    const newValue = !preferences[key]
-    const newPreferences = { ...preferences, [key]: newValue }
+    const previousValue = preferences[key]
+    const newValue = !previousValue
+    const previousPreferences = { ...preferences }
 
     // Optimistic update
-    setPreferences(newPreferences)
+    setPreferences({ ...preferences, [key]: newValue })
 
     try {
       setSaving(true)
+      console.log('📧 Updating preference:', key, '→', newValue)
+
       const response = await fetch('/api/user/notification-preferences', {
         method: 'PUT',
         headers: {
@@ -68,24 +74,45 @@ export function EmailPreferencesSettings() {
         })
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to update preferences')
-      }
-
       const result = await response.json()
 
+      if (!response.ok) {
+        console.error('❌ API error:', response.status, result)
+
+        // Revert on failure
+        setPreferences(previousPreferences)
+
+        // Show specific error message from API
+        if (response.status === 401) {
+          toast.error(result.error || 'Session expired. Please re-login to update preferences.')
+        } else {
+          toast.error(result.error || 'Unable to save your preference. Please try again later.')
+        }
+        return
+      }
+
       if (result.success) {
+        console.log('✅ Preference updated successfully')
         toast.success('Email preferences updated')
       } else {
+        console.error('❌ Update failed:', result)
+
         // Revert on failure
-        setPreferences(preferences)
-        toast.error('Failed to update preferences')
+        setPreferences(previousPreferences)
+        toast.error(result.error || 'Unable to save your preference. Please try again later.')
       }
-    } catch (error) {
-      console.error('Error updating preferences:', error)
+    } catch (error: any) {
+      console.error('❌ Exception updating preferences:', error)
+
       // Revert on error
-      setPreferences(preferences)
-      toast.error('Failed to update preferences')
+      setPreferences(previousPreferences)
+
+      // Check if it's a network error
+      if (error.message === 'Failed to fetch' || !navigator.onLine) {
+        toast.error('Network error. Please check your connection and try again.')
+      } else {
+        toast.error('Unable to save your preference. Please try again later.')
+      }
     } finally {
       setSaving(false)
     }
