@@ -331,6 +331,16 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
         setError('')
 
         try {
+            // Calculate expiration datetime in user's local timezone
+            // If user selects Oct 5, 2025, we want it to expire at 11:59 PM on Oct 5 in THEIR timezone
+            let expirationDateTime = dueDate
+            if (dueDate) {
+                // Create a date object for the selected date at 11:59 PM in user's local timezone
+                const localExpiry = new Date(dueDate + 'T23:59:59.999')
+                // Convert to ISO string (this will be in UTC but represents 11:59 PM local time)
+                expirationDateTime = localExpiry.toISOString()
+            }
+
             const requestData: any = {
                 documentId: selectedDocument.id,
                 documentTitle: selectedDocument.name,
@@ -339,7 +349,7 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
                     email: signer.email
                 })),
                 message,
-                dueDate,
+                dueDate: expirationDateTime, // Send the calculated datetime instead of just the date
                 requireTOTP
             }
 

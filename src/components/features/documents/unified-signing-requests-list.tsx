@@ -446,11 +446,12 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
         if (!expiresAt) return 'No expiry'
 
         const now = new Date()
+        // Parse the UTC date string and convert to local timezone for display
         const expiry = new Date(expiresAt)
         const diffTime = expiry.getTime() - now.getTime()
         const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
 
-        // Format the full date and time
+        // Format the full date and time in user's local timezone
         const fullDateTime = expiry.toLocaleDateString('en-US', {
             month: 'short',
             day: 'numeric',

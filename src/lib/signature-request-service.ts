@@ -42,10 +42,10 @@ export class SignatureRequestService {
     requestData: CreateSignatureRequestData
   ): Promise<SignatureRequest | null> {
     try {
-      // Calculate expiration date (default 30 days) - set to 11:59 PM (23:59:59)
+      // Calculate expiration date (default 30 days) - set to 11:59 PM (23:59:59) in user's local timezone
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + (requestData.expiresInDays || 30))
-      expiresAt.setHours(23, 59, 59, 999)
+      expiresAt.setHours(23, 59, 59, 999) // Use local timezone so it shows as 11:59 PM for the user
 
       // Create the signature request
       const { data: signatureRequest, error: requestError } = await supabase
