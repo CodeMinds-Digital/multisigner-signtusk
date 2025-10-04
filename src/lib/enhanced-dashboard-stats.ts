@@ -1,6 +1,10 @@
 'use client'
 
 import { supabase } from '@/lib/supabase'
+import { RedisUtils } from '@/lib/upstash-config'
+
+// Feature flag for performance optimizations
+const USE_OPTIMIZED_QUERIES = process.env.NEXT_PUBLIC_USE_OPTIMIZED_STATS !== 'false' // Default: enabled
 
 export interface EnhancedDashboardStats {
   // Core document counts
@@ -35,6 +39,11 @@ export interface EnhancedDashboardStats {
     signatures: number
     completion: number
   }
+
+  // Performance metadata (optional)
+  cached?: boolean
+  queryTime?: number
+  optimized?: boolean
 }
 
 export interface DriveStats {
@@ -64,6 +73,8 @@ export interface DriveStats {
 
 // Enhanced dashboard stats with real-time data
 export async function getEnhancedDashboardStats(): Promise<EnhancedDashboardStats> {
+  const startTime = Date.now()
+
   try {
     console.log('🔍 Fetching enhanced dashboard stats...')
 
@@ -76,6 +87,24 @@ export async function getEnhancedDashboardStats(): Promise<EnhancedDashboardStat
 
     const userId = session.user.id
     console.log('👤 User ID:', userId)
+
+    // ✅ PERFORMANCE OPTIMIZATION: Try optimized path first (with fallback)
+    if (USE_OPTIMIZED_QUERIES) {
+      try {
+        console.log('⚡ Attempting optimized query path...')
+        const optimizedStats = await getOptimizedStats(userId, startTime)
+        if (optimizedStats) {
+          console.log('✅ Optimized stats loaded successfully in', Date.now() - startTime, 'ms')
+          return optimizedStats
+        }
+      } catch (optimizedError) {
+        console.warn('⚠️ Optimized query failed, falling back to legacy method:', optimizedError)
+        // Continue to legacy method below
+      }
+    }
+
+    // ✅ LEGACY METHOD: Original implementation (always works as fallback)
+    console.log('📊 Using legacy stats method...')
 
     // Fetch documents data (simplified query first)
     const { data: documents, error: docsError } = await supabase
@@ -372,5 +401,124 @@ function getFallbackDriveStats(): DriveStats {
     averageSigningTime: 0,
     documentTypes: {},
     recentDocuments: []
+  }
+}
+
+/**
+ * ⚡ OPTIMIZED STATS FUNCTION
+ * Uses database aggregation functions + Redis caching
+ * Falls back gracefully if database functions don't exist
+ */
+async function getOptimizedStats(userId: string, startTime: number): Promise<EnhancedDashboardStats | null> {
+  try {
+    // Try cache first (30 second TTL)
+    const cacheKey = `dashboard_stats:${userId}`
+    const cached = await RedisUtils.get<EnhancedDashboardStats>(cacheKey)
+
+    if (cached) {
+      console.log('✅ Dashboard stats cache hit!')
+      return {
+        ...cached,
+        cached: true,
+        queryTime: Date.now() - startTime,
+        optimized: true
+      }
+    }
+
+    console.log('📊 Cache miss, fetching from database with optimized functions...')
+
+    // Execute all queries in parallel for maximum performance
+    const [statsResult, metricsResult, recentResult] = await Promise.all([
+      // 1. Get basic stats using optimized database function
+      supabase.rpc('get_dashboard_stats', { p_user_id: userId }),
+
+      // 2. Get signature metrics using optimized database function
+      supabase.rpc('get_signature_metrics', { p_user_id: userId }),
+
+      // 3. Get recent documents (limited to 5)
+      supabase.rpc('get_recent_documents', { p_user_id: userId, p_limit: 5 })
+    ])
+
+    // Check if database functions exist
+    if (statsResult.error) {
+      // If error is "function does not exist", return null to trigger fallback
+      if (statsResult.error.message?.includes('does not exist') ||
+        statsResult.error.message?.includes('function')) {
+        console.warn('⚠️ Database functions not found, falling back to legacy method')
+        return null
+      }
+      throw statsResult.error
+    }
+
+    // Parse results (metrics and recent are optional)
+    const stats = statsResult.data || {}
+    const metrics = metricsResult.data || {}
+    const recent = recentResult.data || []
+
+    const result: EnhancedDashboardStats = {
+      // Core counts
+      totalDocuments: stats.totalDocuments || 0,
+      draftDocuments: stats.draftDocuments || 0,
+      pendingSignatures: stats.pendingSignatures || 0,
+      completedDocuments: stats.completedDocuments || 0,
+      expiredDocuments: stats.expiredDocuments || 0,
+
+      // Activity metrics
+      todayActivity: stats.todayActivity || 0,
+      weekActivity: stats.weekActivity || 0,
+      monthActivity: stats.monthActivity || 0,
+
+      // Signature metrics
+      totalSignatures: metrics.totalSignatures || 0,
+      averageCompletionTime: metrics.averageCompletionTime || 0,
+      successRate: metrics.successRate || 0,
+
+      // Recent documents
+      recentDocuments: recent.map((doc: any) => ({
+        id: doc.id,
+        title: doc.title || 'Untitled Document',
+        status: doc.status,
+        created_at: doc.created_at,
+        updated_at: doc.updated_at
+      })),
+
+      // Trends (simplified for now)
+      trends: {
+        documents: 0,
+        signatures: 0,
+        completion: 0
+      },
+
+      // Performance metadata
+      cached: false,
+      queryTime: Date.now() - startTime,
+      optimized: true
+    }
+
+    // Cache for 30 seconds
+    try {
+      await RedisUtils.setWithTTL(cacheKey, result, 30)
+      console.log('✅ Dashboard stats cached for 30 seconds')
+    } catch (cacheError) {
+      console.warn('⚠️ Failed to cache stats (non-critical):', cacheError)
+    }
+
+    return result
+
+  } catch (error) {
+    console.error('❌ Error in optimized stats:', error)
+    return null // Trigger fallback to legacy method
+  }
+}
+
+/**
+ * Invalidate dashboard stats cache (call after document changes)
+ */
+export async function invalidateDashboardStatsCache(userId: string) {
+  try {
+    await RedisUtils.del(`dashboard_stats:${userId}`)
+    console.log('✅ Dashboard stats cache invalidated for user:', userId)
+  } catch (error) {
+    console.warn('⚠️ Failed to invalidate cache (non-critical):', error)
   }
 }

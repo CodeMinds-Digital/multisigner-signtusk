@@ -465,15 +465,21 @@ export function PDFSigningScreen({
   }
 
   return (
-    <div className="fixed inset-0 z-50 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white rounded-lg shadow-xl w-full max-w-7xl h-[98vh] sm:h-[95vh] flex flex-col">
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-7xl h-[98vh] sm:h-[95vh] flex flex-col border-2 border-gray-300">
         {/* Header */}
-        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0">
+        <div className="flex items-center justify-between p-4 sm:p-6 border-b border-gray-200 flex-shrink-0 bg-gradient-to-r from-blue-50 to-white">
           <div>
             <h2 className="text-xl font-semibold text-gray-900">{request.title}</h2>
             <p className="text-sm text-gray-600">Review and sign the document</p>
           </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onClose}
+            disabled={isSigning}
+            className="disabled:opacity-50 disabled:cursor-not-allowed"
+          >
             <X className="w-5 h-5" />
           </Button>
         </div>
@@ -691,9 +697,14 @@ export function PDFSigningScreen({
 
         {/* Decline Modal */}
         {showDeclineModal && (
-          <div className="fixed inset-0 flex items-center justify-center z-60">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-              <h3 className="text-lg font-semibold mb-4">Decline Document</h3>
+          <div className="fixed inset-0 flex items-center justify-center z-60 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 mx-4 border-2 border-red-200">
+              <div className="flex items-center mb-4">
+                <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center mr-3">
+                  <XCircle className="w-6 h-6 text-red-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Decline Document</h3>
+              </div>
               <p className="text-sm text-gray-600 mb-4">
                 Please provide a reason for declining this document:
               </p>
@@ -712,6 +723,7 @@ export function PDFSigningScreen({
                   className="bg-red-600 hover:bg-red-700"
                   onClick={handleDecline}
                 >
+                  <XCircle className="w-4 h-4 mr-2" />
                   Decline Document
                 </Button>
               </div>
@@ -721,9 +733,14 @@ export function PDFSigningScreen({
 
         {/* Profile Validation Modal */}
         {showProfileValidation && (
-          <div className="fixed inset-0 flex items-center justify-center z-60">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 max-h-[80vh] overflow-y-auto">
-              <h3 className="text-lg font-semibold mb-4">Complete Your Profile</h3>
+          <div className="fixed inset-0 flex items-center justify-center z-60 bg-black/60 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6 mx-4 max-h-[80vh] overflow-y-auto border-2 border-blue-200">
+              <div className="flex items-center mb-4">
+                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                  <User className="w-6 h-6 text-blue-600" />
+                </div>
+                <h3 className="text-lg font-semibold text-gray-900">Complete Your Profile</h3>
+              </div>
               <p className="text-sm text-gray-600 mb-4">
                 Please complete your profile information before signing:
               </p>
@@ -819,6 +836,54 @@ export function PDFSigningScreen({
         title="Signing Verification Required"
         description="Enter your TOTP code to complete document signing"
       />
+
+      {/* Signing Progress Overlay - Prevents all interaction */}
+      {isSigning && (
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-md flex items-center justify-center z-[60] rounded-lg">
+          <div className="bg-white rounded-xl shadow-2xl p-8 max-w-md mx-4 border-2 border-blue-500">
+            <div className="text-center">
+              {/* Animated Spinner */}
+              <div className="relative mx-auto w-20 h-20 mb-6">
+                <div className="absolute inset-0 border-4 border-blue-200 rounded-full"></div>
+                <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+                <div className="absolute inset-2 border-4 border-blue-400 rounded-full border-t-transparent animate-spin" style={{ animationDirection: 'reverse', animationDuration: '1s' }}></div>
+              </div>
+
+              {/* Status Text */}
+              <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                Signing Document...
+              </h3>
+              <p className="text-sm text-gray-600 mb-4">
+                Please wait while we process your signature
+              </p>
+
+              {/* Progress Steps */}
+              <div className="space-y-2 text-left bg-blue-50 rounded-lg p-4">
+                <div className="flex items-center text-sm text-blue-700">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full mr-2 animate-pulse"></div>
+                  Verifying signature data...
+                </div>
+                <div className="flex items-center text-sm text-blue-700">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full mr-2 animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                  Applying signature to document...
+                </div>
+                <div className="flex items-center text-sm text-blue-700">
+                  <div className="w-2 h-2 bg-blue-600 rounded-full mr-2 animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+                  Finalizing signature...
+                </div>
+              </div>
+
+              {/* Warning */}
+              <div className="mt-6 flex items-start bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                <AlertCircle className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
+                <p className="text-xs text-yellow-800 text-left">
+                  <strong>Please do not close this window or navigate away.</strong> Your signature is being processed and this may take a few moments.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
