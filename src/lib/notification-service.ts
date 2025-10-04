@@ -323,13 +323,16 @@ export class NotificationService {
    */
   static async getNotificationPreferences(userId: string): Promise<NotificationPreferences> {
     try {
-      const { data, error } = await supabase
+      console.log('📧 Fetching notification preferences for user:', userId)
+
+      const { data, error } = await supabaseAdmin
         .from(this.PREFERENCES_TABLE)
         .select('*')
         .eq('user_id', userId)
         .single()
 
-      if (error || !data) {
+      if (error) {
+        console.log('⚠️ No preferences found, returning defaults:', error.message)
         // Return default preferences
         return {
           email_notifications: true,
@@ -345,6 +348,22 @@ export class NotificationService {
         }
       }
 
+      if (!data) {
+        console.log('⚠️ No data returned, using defaults')
+        return {
+          email_notifications: true,
+          push_notifications: true,
+          signature_requests: true,
+          document_updates: true,
+          reminders: true,
+          marketing: false,
+          progress_updates: true,
+          document_viewed_emails: false,
+          other_signer_notifications: false
+        }
+      }
+
+      console.log('✅ Notification preferences fetched successfully')
       return {
         ...data,
         // Ensure new preferences have defaults if not set
@@ -353,7 +372,7 @@ export class NotificationService {
         other_signer_notifications: data.other_signer_notifications ?? false
       }
     } catch (error) {
-      console.error('Error getting notification preferences:', error)
+      console.error('❌ Exception getting notification preferences:', error)
       return {
         email_notifications: true,
         push_notifications: true,
@@ -377,17 +396,28 @@ export class NotificationService {
     preferences: Partial<NotificationPreferences>
   ): Promise<boolean> {
     try {
-      const { error } = await supabase
+      console.log('📧 Updating notification preferences:', { userId, preferences })
+
+      const { data, error } = await supabaseAdmin
         .from(this.PREFERENCES_TABLE)
         .upsert([{
           user_id: userId,
           ...preferences,
           updated_at: new Date().toISOString()
-        }])
+        }], {
+          onConflict: 'user_id'
+        })
+        .select()
 
-      return !error
+      if (error) {
+        console.error('❌ Error updating notification preferences:', error)
+        return false
+      }
+
+      console.log('✅ Notification preferences updated successfully:', data)
+      return true
     } catch (error) {
-      console.error('Error updating notification preferences:', error)
+      console.error('❌ Exception updating notification preferences:', error)
       return false
     }
   }

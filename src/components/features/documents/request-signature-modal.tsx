@@ -43,6 +43,7 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
     const [showCustomIdField, setShowCustomIdField] = useState(false) // NEW: Show custom ID field
     const [idValidationError, setIdValidationError] = useState('') // NEW: Real-time ID validation error
     const [isValidatingId, setIsValidatingId] = useState(false) // NEW: ID validation loading state
+    const [signerErrors, setSignerErrors] = useState<Map<string, string>>(new Map()) // NEW: Individual signer validation errors
     const { user } = useAuth()
 
     const fetchReadyDocuments = useCallback(async () => {
@@ -152,6 +153,7 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
             setShowCustomIdField(false) // NEW: Reset custom ID field visibility
             setIdValidationError('') // NEW: Reset validation error
             setIsValidatingId(false) // NEW: Reset validation loading state
+            setSignerErrors(new Map()) // NEW: Reset signer validation errors
         }
     }, [isOpen])
 
@@ -197,19 +199,119 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
         }
     }
 
+    // Validate individual signer email in real-time
+    const validateSignerEmail = (signerId: string, email: string) => {
+        const newErrors = new Map(signerErrors)
+
+        if (!email.trim()) {
+            newErrors.delete(signerId)
+        } else if (!isValidEmail(email)) {
+            newErrors.set(signerId, 'Invalid email format')
+        } else if (user?.email && email.trim().toLowerCase() === user.email.trim().toLowerCase()) {
+            newErrors.set(signerId, 'Cannot use your own email')
+        } else {
+            // Check for duplicates
+            const duplicateExists = signers.some(s =>
+                s.id !== signerId &&
+                s.email.trim().toLowerCase() === email.trim().toLowerCase()
+            )
+            if (duplicateExists) {
+                newErrors.set(signerId, 'Duplicate email')
+            } else {
+                newErrors.delete(signerId)
+            }
+        }
+
+        setSignerErrors(newErrors)
+    }
+
     const updateSigner = (id: string, field: keyof Signer, value: string) => {
         setSigners(signers.map(signer =>
             signer.id === id ? { ...signer, [field]: value } : signer
         ))
+
+        // Validate email in real-time
+        if (field === 'email') {
+            validateSignerEmail(id, value)
+        }
+
+        // Clear global error when user starts typing
+        setError('')
     }
 
-    const validateSigners = () => {
-        return signers.every(signer => signer.email.trim() !== '' && signer.email.includes('@'))
+    // Enhanced email validation function
+    const isValidEmail = (email: string): boolean => {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+        return emailRegex.test(email.trim())
+    }
+
+    // Comprehensive signer validation
+    const validateSigners = (): { isValid: boolean; error?: string } => {
+        // Check if all signers have email addresses
+        const emptyEmails = signers.filter(s => !s.email.trim())
+        if (emptyEmails.length > 0) {
+            return { isValid: false, error: 'All signers must have an email address.' }
+        }
+
+        // Check for invalid email formats
+        const invalidEmails = signers.filter(s => !isValidEmail(s.email))
+        if (invalidEmails.length > 0) {
+            const invalidEmail = invalidEmails[0].email
+            return {
+                isValid: false,
+                error: `Invalid email format: "${invalidEmail}". Please enter a valid email address.`
+            }
+        }
+
+        // Check for duplicate emails across signers
+        const emailCounts = new Map<string, number>()
+        signers.forEach(signer => {
+            const email = signer.email.trim().toLowerCase()
+            emailCounts.set(email, (emailCounts.get(email) || 0) + 1)
+        })
+
+        const duplicateEmail = Array.from(emailCounts.entries()).find(([_, count]) => count > 1)
+        if (duplicateEmail) {
+            return {
+                isValid: false,
+                error: `Duplicate email detected: "${duplicateEmail[0]}". Each signer must have a unique email address.`
+            }
+        }
+
+        // Check if requester's email is in the signer list
+        if (user?.email) {
+            const requesterEmail = user.email.trim().toLowerCase()
+            const hasRequesterEmail = signers.some(s => s.email.trim().toLowerCase() === requesterEmail)
+
+            if (hasRequesterEmail) {
+                return {
+                    isValid: false,
+                    error: "You cannot send a signature request to your own email. Requester's email cannot be used as a signer."
+                }
+            }
+        }
+
+        // All validations passed
+        return { isValid: true }
     }
 
     const sendSignatureRequest = async () => {
-        if (!selectedDocument || !validateSigners()) {
-            setError('Please fill in all required fields with valid email addresses.')
+        if (!selectedDocument) {
+            setError('Please select a document first.')
+            return
+        }
+
+        // Enhanced signer validation
+        const validation = validateSigners()
+        if (!validation.isValid) {
+            setError(validation.error || 'Invalid signer information.')
+            return
+        }
+
+        // Check if all signers have names
+        const emptyNames = signers.filter(s => !s.name.trim())
+        if (emptyNames.length > 0) {
+            setError('All signers must have a name.')
             return
         }
 
@@ -505,42 +607,58 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
                                 </div>
 
                                 <div className="space-y-3">
-                                    {signers.map((signer, index) => (
-                                        <div key={signer.id} className="flex items-center space-x-3 p-3 border rounded-lg">
-                                            <div className="flex-shrink-0">
-                                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${selectedDocument.signature_type === 'multi' && signingOrder === 'sequential'
-                                                    ? 'bg-blue-100 border-2 border-blue-300'
-                                                    : 'bg-gray-100'
-                                                    }`}>
-                                                    <span className={`text-sm font-medium ${selectedDocument.signature_type === 'multi' && signingOrder === 'sequential'
-                                                        ? 'text-blue-700'
-                                                        : 'text-gray-600'
-                                                        }`}>
-                                                        {index + 1}
-                                                    </span>
+                                    {signers.map((signer, index) => {
+                                        const emailError = signerErrors.get(signer.id)
+                                        const hasError = !!emailError
+
+                                        return (
+                                            <div key={signer.id} className="space-y-2">
+                                                <div className={`flex items-center space-x-3 p-3 border rounded-lg ${hasError ? 'border-red-300 bg-red-50' : ''}`}>
+                                                    <div className="flex-shrink-0">
+                                                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${selectedDocument.signature_type === 'multi' && signingOrder === 'sequential'
+                                                            ? 'bg-blue-100 border-2 border-blue-300'
+                                                            : 'bg-gray-100'
+                                                            }`}>
+                                                            <span className={`text-sm font-medium ${selectedDocument.signature_type === 'multi' && signingOrder === 'sequential'
+                                                                ? 'text-blue-700'
+                                                                : 'text-gray-600'
+                                                                }`}>
+                                                                {index + 1}
+                                                            </span>
+                                                        </div>
+                                                        {selectedDocument.signature_type === 'multi' && signingOrder === 'sequential' && (
+                                                            <div className="text-xs text-blue-600 mt-1 text-center">
+                                                                Order
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex-1 grid grid-cols-2 gap-3">
+                                                        <Input
+                                                            placeholder="Signer name"
+                                                            value={signer.name}
+                                                            onChange={(e) => updateSigner(signer.id, 'name', e.target.value)}
+                                                        />
+                                                        <div className="relative">
+                                                            <Input
+                                                                type="email"
+                                                                placeholder="Email address"
+                                                                value={signer.email}
+                                                                onChange={(e) => updateSigner(signer.id, 'email', e.target.value)}
+                                                                required
+                                                                className={hasError ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}
+                                                            />
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                {selectedDocument.signature_type === 'multi' && signingOrder === 'sequential' && (
-                                                    <div className="text-xs text-blue-600 mt-1 text-center">
-                                                        Order
+                                                {hasError && (
+                                                    <div className="flex items-center text-xs text-red-600 ml-11 pl-3">
+                                                        <span className="mr-1">⚠️</span>
+                                                        {emailError}
                                                     </div>
                                                 )}
                                             </div>
-                                            <div className="flex-1 grid grid-cols-2 gap-3">
-                                                <Input
-                                                    placeholder="Signer name"
-                                                    value={signer.name}
-                                                    onChange={(e) => updateSigner(signer.id, 'name', e.target.value)}
-                                                />
-                                                <Input
-                                                    type="email"
-                                                    placeholder="Email address"
-                                                    value={signer.email}
-                                                    onChange={(e) => updateSigner(signer.id, 'email', e.target.value)}
-                                                    required
-                                                />
-                                            </div>
-                                        </div>
-                                    ))}
+                                        )
+                                    })}
                                 </div>
                             </div>
 
@@ -617,7 +735,7 @@ export function RequestSignatureModal({ isOpen, onClose, onSuccess }: RequestSig
                                 </Button>
                                 <Button
                                     onClick={sendSignatureRequest}
-                                    disabled={!validateSigners() || isSending}
+                                    disabled={!validateSigners().isValid || isSending}
                                 >
                                     {isSending ? (
                                         <>
