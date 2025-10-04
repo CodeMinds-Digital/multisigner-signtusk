@@ -330,8 +330,10 @@ export function PDFSigningScreen({
 
       if (!response.ok) {
         if (result.requiresTOTP) {
-          // TOTP verification required
+          // TOTP verification required - hide loader and show TOTP popup
           console.log('🔐 TOTP verification required for signing')
+          console.log(`🎯 [${callId}] Resetting isSigning to false (TOTP required)`)
+          setIsSigning(false) // ✅ FIX: Reset loader before showing TOTP popup
           setPendingSignatureData(signatureData)
           setShowTOTPPopup(true)
           return
@@ -358,8 +360,13 @@ export function PDFSigningScreen({
     console.log(`🔐 [${callId}] handleTOTPVerified called, isSigning: ${isSigning}`)
 
     setShowTOTPPopup(false)
+
     if (pendingSignatureData) {
       console.log(`✅ [${callId}] TOTP verified, now completing signature`)
+
+      // ✅ FIX: Show loader when actually signing after TOTP verification
+      console.log(`🎯 [${callId}] Setting isSigning to true (signing with TOTP)`)
+      setIsSigning(true)
 
       // Now that TOTP is verified, try signing again
       try {
