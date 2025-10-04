@@ -87,7 +87,11 @@ export class MultiSignatureService {
           status: 'draft',
           created_by: createdBy,
           settings: JSON.stringify(settings),
-          expires_at: new Date(Date.now() + (settings.expiresInDays || 7) * 24 * 60 * 60 * 1000).toISOString()
+          expires_at: (() => {
+            const expiry = new Date(Date.now() + (settings.expiresInDays || 7) * 24 * 60 * 60 * 1000)
+            expiry.setHours(23, 59, 59, 999)
+            return expiry.toISOString()
+          })()
         }])
         .select()
         .single()

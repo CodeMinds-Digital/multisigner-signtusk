@@ -372,7 +372,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Calculate expiration date
-    const expiresAt = dueDate ? new Date(dueDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days default
+    let expiresAt: Date
+    if (dueDate) {
+      // Set expiry to 11:59 PM (23:59:59) of the selected date
+      expiresAt = new Date(dueDate)
+      expiresAt.setHours(23, 59, 59, 999)
+    } else {
+      // Default: 30 days from now at 11:59 PM
+      expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+      expiresAt.setHours(23, 59, 59, 999)
+    }
 
     // Handle mock document IDs by creating a real document record first
     let realDocumentId = documentId
