@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { memo } from 'react'
 import { Calendar, Clock, User, FileText, Eye, Info, CheckCircle, Download, MoreHorizontal, Send, Inbox, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -60,7 +60,7 @@ interface RequestCardProps {
     isPolling?: boolean
 }
 
-export function RequestCard({
+const RequestCardComponent = ({
     request,
     showType,
     getStatusBadge,
@@ -76,7 +76,7 @@ export function RequestCard({
     isRequestCompleted,
     setShowActionsSheet,
     isPolling = false
-}: RequestCardProps) {
+}: RequestCardProps) => {
     const timeRemaining = getTimeRemaining(request.expires_at, request)
     const isExpired = timeRemaining === 'Expired'
     const isCompleted = timeRemaining === 'Completed'
@@ -268,3 +268,16 @@ export function RequestCard({
     )
 }
 
+// Memoize the component to prevent unnecessary re-renders
+export const RequestCard = memo(RequestCardComponent, (prevProps, nextProps) => {
+    // Only re-render if request data or polling state changes
+    return (
+        prevProps.request.id === nextProps.request.id &&
+        prevProps.request.status === nextProps.request.status &&
+        prevProps.request.document_status === nextProps.request.document_status &&
+        prevProps.isPolling === nextProps.isPolling &&
+        JSON.stringify(prevProps.request.progress) === JSON.stringify(nextProps.request.progress)
+    )
+})
+
+RequestCard.displayName = 'RequestCard'

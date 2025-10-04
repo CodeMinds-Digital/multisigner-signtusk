@@ -2,11 +2,22 @@
 const nextConfig = {
   images: {
     domains: ['gzxfsojbbfipzvjxucci.supabase.co'],
+    formats: ['image/webp', 'image/avif'],
+    deviceSizes: [640, 750, 828, 1080, 1200, 1920],
+    imageSizes: [16, 32, 48, 64, 96, 128, 256],
   },
   experimental: {
     serverActions: {
       allowedOrigins: ['localhost:3001', 'localhost:3000'],
     },
+    // optimizeCss: true, // Disabled - requires 'critters' package
+  },
+
+  // Performance optimizations
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
   },
 
   // Remove standalone output for Netlify compatibility
@@ -46,6 +57,46 @@ const nextConfig = {
   webpack: (config, { isServer }) => {
     // Handle canvas package issues
     config.resolve.alias.canvas = false;
+
+    // Performance: Code splitting optimization
+    if (!isServer) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          chunks: 'all',
+          cacheGroups: {
+            // Separate PDF libraries (heavy)
+            pdf: {
+              test: /[\\/]node_modules[\\/](pdfjs-dist|pdf-lib|@react-pdf-viewer|@codeminds-digital)[\\/]/,
+              name: 'pdf-libs',
+              priority: 10,
+              reuseExistingChunk: true,
+            },
+            // Separate UI libraries
+            ui: {
+              test: /[\\/]node_modules[\\/](@radix-ui|lucide-react)[\\/]/,
+              name: 'ui-libs',
+              priority: 9,
+              reuseExistingChunk: true,
+            },
+            // Separate Supabase
+            supabase: {
+              test: /[\\/]node_modules[\\/](@supabase)[\\/]/,
+              name: 'supabase',
+              priority: 8,
+              reuseExistingChunk: true,
+            },
+            // Default vendor chunk
+            vendor: {
+              test: /[\\/]node_modules[\\/]/,
+              name: 'vendor',
+              priority: 5,
+              reuseExistingChunk: true,
+            },
+          },
+        },
+      }
+    }
 
     // Externalize canvas for server-side rendering
     if (isServer) {
