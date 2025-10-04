@@ -241,7 +241,8 @@ export async function GET(request: NextRequest) {
         document_id: request.document?.id, // Document ID for reference
         final_pdf_url: request.final_pdf_url, // Final signed PDF if completed
         document_type: 'Document', // Default type - will be enhanced later
-        document_category: 'General' // Default category - will be enhanced later
+        document_category: 'General', // Default category - will be enhanced later
+        metadata: request.metadata // ✅ FIX: Include metadata with signing_mode
       }
     }
 
