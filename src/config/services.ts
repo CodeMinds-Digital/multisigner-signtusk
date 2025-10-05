@@ -148,14 +148,14 @@ export const SERVICES: Service[] = [
         route: '/send'
       },
       {
-        id: 'shared',
+        id: 'shared-documents',
         label: 'Shared Documents',
-        icon: Share2,
-        route: '/send/shared'
+        icon: FileText,
+        route: '/send/documents'
       },
       {
-        id: 'links',
-        label: 'Share Links',
+        id: 'shared-links',
+        label: 'Shared Links',
         icon: Share2,
         route: '/send/links'
       },
@@ -164,6 +164,25 @@ export const SERVICES: Service[] = [
         label: 'Analytics',
         icon: TrendingUp,
         route: '/send/analytics'
+      },
+      {
+        id: 'send-teams',
+        label: 'Teams',
+        icon: Users,
+        route: '/send/teams'
+      },
+      // Settings section
+      {
+        id: 'send-integrations',
+        label: 'Integrations',
+        icon: Activity,
+        route: '/send/settings/integrations'
+      },
+      {
+        id: 'send-branding',
+        label: 'Branding',
+        icon: PieChart,
+        route: '/send/settings/branding'
       }
     ]
   },
