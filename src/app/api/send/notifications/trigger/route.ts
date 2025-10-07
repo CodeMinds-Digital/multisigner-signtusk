@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     // Get user info
     const { data: user } = await supabaseAdmin
       .from('users')
-      .select('email')
+      .select('email, first_name, last_name, full_name')
       .eq('id', document.user_id)
       .single()
 
@@ -75,10 +75,14 @@ export async function POST(request: NextRequest) {
       metadata
     }
 
+    // Get user name
+    const userName = user.full_name || `${user.first_name || ''} ${user.last_name || ''}`.trim() || user.email
+
     // Send notification through all enabled channels
     await SendNotifications.notify(
       document.user_id,
       user.email,
+      userName,
       notification
     )
 

@@ -20,7 +20,7 @@ const supabaseAdmin = createClient(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { fingerprint: string } }
+  { params }: { params: Promise<{ fingerprint: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
@@ -35,7 +35,7 @@ export async function GET(
       )
     }
 
-    const { fingerprint } = params
+    const { fingerprint } = await params
     const { searchParams } = new URL(request.url)
     const documentId = searchParams.get('documentId')
     const linkId = searchParams.get('linkId')
@@ -57,7 +57,7 @@ export async function GET(
 
       if (link) {
         query = query.eq('link_id', link.id)
-        
+
         // Verify ownership
         const { data: document } = await supabaseAdmin
           .from('send_shared_documents')

@@ -45,7 +45,7 @@ export class SendVisitorTracking {
     }
 
     const deviceInfo = await this.getDeviceInfo()
-    
+
     // Create fingerprint from device characteristics
     const fingerprintData = [
       deviceInfo.userAgent,
@@ -97,13 +97,13 @@ export class SendVisitorTracking {
    */
   private static getPlugins(): string[] {
     const plugins: string[] = []
-    
+
     if (navigator.plugins) {
       for (let i = 0; i < navigator.plugins.length; i++) {
         plugins.push(navigator.plugins[i].name)
       }
     }
-    
+
     return plugins
   }
 
@@ -114,12 +114,12 @@ export class SendVisitorTracking {
     try {
       const canvas = document.createElement('canvas')
       const ctx = canvas.getContext('2d')
-      
+
       if (!ctx) return 'no-canvas'
-      
+
       canvas.width = 200
       canvas.height = 50
-      
+
       // Draw text with various styles
       ctx.textBaseline = 'top'
       ctx.font = '14px Arial'
@@ -129,7 +129,7 @@ export class SendVisitorTracking {
       ctx.fillText('SendTusk', 2, 15)
       ctx.fillStyle = 'rgba(102, 204, 0, 0.7)'
       ctx.fillText('Fingerprint', 4, 17)
-      
+
       return canvas.toDataURL()
     } catch (error) {
       return 'canvas-error'
@@ -143,16 +143,16 @@ export class SendVisitorTracking {
     try {
       const canvas = document.createElement('canvas')
       const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl')
-      
+
       if (!gl) return 'no-webgl'
-      
+
       const debugInfo = (gl as any).getExtension('WEBGL_debug_renderer_info')
       if (debugInfo) {
-        const vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)
-        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
+        const vendor = (gl as any).getParameter(debugInfo.UNMASKED_VENDOR_WEBGL)
+        const renderer = (gl as any).getParameter(debugInfo.UNMASKED_RENDERER_WEBGL)
         return `${vendor}|${renderer}`
       }
-      
+
       return 'webgl-available'
     } catch (error) {
       return 'webgl-error'
@@ -169,16 +169,16 @@ export class SendVisitorTracking {
       'Georgia', 'Palatino', 'Garamond', 'Bookman',
       'Comic Sans MS', 'Trebuchet MS', 'Impact'
     ]
-    
+
     const detectedFonts: string[] = []
-    
+
     // Simple font detection (in production, use a more robust method)
     for (const font of testFonts) {
       if (this.isFontAvailable(font, baseFonts)) {
         detectedFonts.push(font)
       }
     }
-    
+
     return detectedFonts
   }
 
@@ -188,18 +188,18 @@ export class SendVisitorTracking {
   private static isFontAvailable(font: string, baseFonts: string[]): boolean {
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
-    
+
     if (!ctx) return false
-    
+
     const text = 'mmmmmmmmmmlli'
     const baselineSize = 72
-    
+
     ctx.font = `${baselineSize}px ${baseFonts[0]}`
     const baselineWidth = ctx.measureText(text).width
-    
+
     ctx.font = `${baselineSize}px ${font}, ${baseFonts[0]}`
     const testWidth = ctx.measureText(text).width
-    
+
     return testWidth !== baselineWidth
   }
 
@@ -219,7 +219,7 @@ export class SendVisitorTracking {
         // Fallback to simple hash
       }
     }
-    
+
     // Fallback: simple hash function
     let hash = 0
     for (let i = 0; i < str.length; i++) {
@@ -236,16 +236,16 @@ export class SendVisitorTracking {
   static async initSession(linkId: string, documentId: string, email?: string): Promise<VisitorSession> {
     const fingerprint = await this.generateFingerprint()
     const deviceInfo = await this.getDeviceInfo()
-    
+
     // Generate session ID
     this.sessionId = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`
-    
+
     // Get IP and location (from API)
     const locationData = await this.getLocationData()
-    
+
     // Check if returning visitor
     const visitorData = await this.checkReturningVisitor(fingerprint, linkId)
-    
+
     const session: VisitorSession = {
       sessionId: this.sessionId,
       fingerprint,
@@ -258,10 +258,10 @@ export class SendVisitorTracking {
       firstVisitAt: visitorData.firstVisitAt,
       lastVisitAt: visitorData.lastVisitAt
     }
-    
+
     // Create session in database
     await this.createSession(session, linkId, documentId, email)
-    
+
     return session
   }
 
@@ -291,9 +291,9 @@ export class SendVisitorTracking {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fingerprint, linkId })
       })
-      
+
       const data = await response.json()
-      
+
       if (data.success && data.visitor) {
         return {
           isReturning: true,
@@ -302,7 +302,7 @@ export class SendVisitorTracking {
           lastVisitAt: data.visitor.lastVisitAt
         }
       }
-      
+
       return { isReturning: false, previousVisits: 0 }
     } catch (error) {
       return { isReturning: false, previousVisits: 0 }

@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
       .from('send_document_links')
       .select('*, send_shared_documents!inner(user_id)', { count: 'exact', head: true })
       .eq('send_shared_documents.user_id', userId)
-      .eq('enabled', true)
+      .eq('is_active', true)
       .or('expires_at.is.null,expires_at.gt.' + new Date().toISOString())
 
     // Get total views
@@ -51,14 +51,14 @@ export async function GET(request: NextRequest) {
     // Get unique visitors
     const { data: visitorsData } = await supabaseAdmin
       .from('send_visitor_sessions')
-      .select('fingerprint, send_document_links!inner(send_shared_documents!inner(user_id))')
+      .select('session_id, send_document_links!inner(send_shared_documents!inner(user_id))')
       .eq('send_document_links.send_shared_documents.user_id', userId)
 
-    const uniqueVisitors = new Set(visitorsData?.map(v => v.fingerprint) || []).size
+    const uniqueVisitors = new Set(visitorsData?.map(v => v.session_id) || []).size
 
-    // Calculate average engagement
+    // Calculate average engagement - using views data since sessions might not have engagement_score
     const { data: engagementData } = await supabaseAdmin
-      .from('send_visitor_sessions')
+      .from('send_document_views')
       .select('engagement_score, send_document_links!inner(send_shared_documents!inner(user_id))')
       .eq('send_document_links.send_shared_documents.user_id', userId)
       .not('engagement_score', 'is', null)

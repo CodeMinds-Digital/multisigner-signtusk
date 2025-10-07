@@ -5,15 +5,11 @@ import { useRouter } from 'next/navigation'
 import {
   FileText,
   Search,
-  Filter,
-  Download,
+  Upload,
   Share2,
   Trash2,
   Archive,
   MoreVertical,
-  Eye,
-  Link as LinkIcon,
-  Calendar,
   ArrowUpDown,
   BarChart3
 } from 'lucide-react'
@@ -28,6 +24,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { CreateLinkModal } from '@/components/features/send/create-link-modal'
+import { BulkSelectionToolbar, useBulkSelection, BulkSelectionCheckbox } from '@/components/features/send/bulk-operations/bulk-selection-toolbar'
+import { BulkUploadModal } from '@/components/features/send/bulk-operations/bulk-upload-modal'
+import { BulkShareModal } from '@/components/features/send/bulk-operations/bulk-share-modal'
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import {
   Table,
@@ -78,6 +77,11 @@ export default function DocumentLibraryPage() {
   // Pagination
   const [currentPage, setCurrentPage] = useState(1)
   const [itemsPerPage] = useState(10)
+
+  // Bulk operations
+  const [showBulkUpload, setShowBulkUpload] = useState(false)
+  const [showBulkShare, setShowBulkShare] = useState(false)
+  const bulkSelection = useBulkSelection(filteredDocuments)
 
   useEffect(() => {
     if (user) {
@@ -215,6 +219,95 @@ export default function DocumentLibraryPage() {
     })
   }
 
+  // Bulk operation handlers
+  const handleBulkDelete = async (documentIds: string[]) => {
+    try {
+      const response = await fetch('/api/send/documents/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operation: 'delete',
+          documentIds
+        })
+      })
+
+      if (response.ok) {
+        loadDocuments()
+        bulkSelection.selectNone()
+      }
+    } catch (error) {
+      console.error('Bulk delete failed:', error)
+      throw error
+    }
+  }
+
+  const handleBulkArchive = async (documentIds: string[]) => {
+    try {
+      const response = await fetch('/api/send/documents/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operation: 'archive',
+          documentIds
+        })
+      })
+
+      if (response.ok) {
+        loadDocuments()
+        bulkSelection.selectNone()
+      }
+    } catch (error) {
+      console.error('Bulk archive failed:', error)
+      throw error
+    }
+  }
+
+  const handleBulkShare = async (documentIds: string[]) => {
+    const selectedDocs = documents.filter(doc => documentIds.includes(doc.id))
+    setShowBulkShare(true)
+  }
+
+  const handleBulkUploadComplete = (results: any) => {
+    loadDocuments()
+    setShowBulkUpload(false)
+  }
+
+  const handleBulkShareComplete = (results: any) => {
+    setShowBulkShare(false)
+    bulkSelection.selectNone()
+  }
+
+  const handleBulkExport = async (documentIds: string[]) => {
+    try {
+      const response = await fetch('/api/send/analytics/bulk-export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentIds,
+          format: 'csv'
+        })
+      })
+
+      if (response.ok) {
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `document-analytics-${new Date().toISOString().split('T')[0]}.csv`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+        bulkSelection.selectNone()
+      } else {
+        throw new Error('Export failed')
+      }
+    } catch (error) {
+      console.error('Bulk export failed:', error)
+      throw error
+    }
+  }
+
   const getStatusBadge = (status: string) => {
     const styles = {
       active: 'bg-green-100 text-green-700',
@@ -255,13 +348,22 @@ export default function DocumentLibraryPage() {
             <h1 className="text-3xl font-bold text-gray-900">Document Library</h1>
             <p className="text-gray-600 mt-1">Manage all your shared documents</p>
           </div>
-          <Button
-            className="bg-green-600 hover:bg-green-700"
-            onClick={() => router.push('/send')}
-          >
-            <FileText className="w-4 h-4 mr-2" />
-            Back to Dashboard
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowBulkUpload(true)}
+            >
+              <Upload className="w-4 h-4 mr-2" />
+              Bulk Upload
+            </Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700"
+              onClick={() => router.push('/send')}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Back to Dashboard
+            </Button>
+          </div>
         </div>
 
         {/* Filters and Search */}
@@ -310,6 +412,20 @@ export default function DocumentLibraryPage() {
           </CardHeader>
 
           <CardContent>
+            {/* Bulk Selection Toolbar */}
+            <BulkSelectionToolbar
+              selectedItems={bulkSelection.selectedItems}
+              totalItems={bulkSelection.totalCount}
+              onSelectAll={bulkSelection.selectAll}
+              onSelectNone={bulkSelection.selectNone}
+              onBulkDelete={handleBulkDelete}
+              onBulkArchive={handleBulkArchive}
+              onBulkShare={handleBulkShare}
+              onBulkExport={handleBulkExport}
+              itemType="documents"
+              className="mb-4"
+            />
+
             {loading ? (
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
@@ -340,6 +456,13 @@ export default function DocumentLibraryPage() {
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-[50px]">
+                        <BulkSelectionCheckbox
+                          itemId="all"
+                          isSelected={bulkSelection.isAllSelected}
+                          onToggle={bulkSelection.isAllSelected ? bulkSelection.selectNone : bulkSelection.selectAll}
+                        />
+                      </TableHead>
                       <TableHead className="w-[50px]">Type</TableHead>
                       <TableHead>
                         <button
@@ -383,6 +506,13 @@ export default function DocumentLibraryPage() {
                   <TableBody>
                     {currentDocuments.map((doc) => (
                       <TableRow key={doc.id}>
+                        <TableCell>
+                          <BulkSelectionCheckbox
+                            itemId={doc.id}
+                            isSelected={bulkSelection.isSelected(doc.id)}
+                            onToggle={bulkSelection.selectItem}
+                          />
+                        </TableCell>
                         <TableCell>
                           <span className="text-2xl">{getFileTypeIcon(doc.file_type)}</span>
                         </TableCell>
@@ -528,6 +658,21 @@ export default function DocumentLibraryPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Bulk Upload Modal */}
+      <BulkUploadModal
+        isOpen={showBulkUpload}
+        onClose={() => setShowBulkUpload(false)}
+        onUploadComplete={handleBulkUploadComplete}
+      />
+
+      {/* Bulk Share Modal */}
+      <BulkShareModal
+        isOpen={showBulkShare}
+        onClose={() => setShowBulkShare(false)}
+        selectedDocuments={documents.filter(doc => bulkSelection.selectedItems.includes(doc.id))}
+        onShareComplete={handleBulkShareComplete}
+      />
     </>
   )
 }

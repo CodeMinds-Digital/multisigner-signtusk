@@ -227,6 +227,7 @@ CREATE TABLE IF NOT EXISTS public.send_data_rooms (
     name TEXT NOT NULL,
     description TEXT,
     folder_structure JSONB DEFAULT '{}',
+    settings JSONB DEFAULT '{}',
     is_active BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()

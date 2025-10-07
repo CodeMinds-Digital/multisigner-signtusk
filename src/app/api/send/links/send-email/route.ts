@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { sendDocumentShareEmail } from '@/lib/send-document-email-service'
 
 export async function POST(request: NextRequest) {
   try {
@@ -36,6 +37,17 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get user information for sender name
+    const { data: userData } = await supabaseAdmin
+      .from('users')
+      .select('first_name, last_name, email, full_name')
+      .eq('id', userId)
+      .single()
+
+    const senderName = userData
+      ? userData.full_name || `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.email
+      : 'Document Owner'
+
     // Validate email format
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     if (!emailRegex.test(recipientEmail)) {
@@ -60,107 +72,67 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get user info for sender name
-    const { data: userData } = await supabaseAdmin
-      .from('users')
-      .select('full_name, email')
-      .eq('id', userId)
+    // Get user's branding settings
+    const { data: brandingData } = await supabaseAdmin
+      .from('send_branding_settings')
+      .select('*')
+      .eq('user_id', userId)
       .single()
 
-    const senderName = userData?.full_name || userData?.email || 'Someone'
-
-    // Compose email
-    const emailSubject = `${senderName} shared a document with you: ${documentTitle}`
-    
-    let emailBody = `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); padding: 30px; text-align: center;">
-          <h1 style="color: white; margin: 0; font-size: 28px;">📄 Document Shared</h1>
-        </div>
-        
-        <div style="background: #f9fafb; padding: 30px; border: 1px solid #e5e7eb;">
-          <p style="font-size: 16px; color: #374151; margin-bottom: 20px;">
-            <strong>${senderName}</strong> has shared a document with you:
-          </p>
-          
-          <div style="background: white; padding: 20px; border-radius: 8px; border: 1px solid #d1d5db; margin-bottom: 20px;">
-            <h2 style="color: #111827; margin: 0 0 10px 0; font-size: 20px;">
-              ${documentTitle}
-            </h2>
-    `
-
-    if (message) {
-      emailBody += `
-            <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 15px 0;">
-              <p style="margin: 0; color: #1e40af; font-style: italic;">
-                "${message}"
-              </p>
-            </div>
-      `
-    }
-
-    if (password) {
-      emailBody += `
-            <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 15px 0;">
-              <p style="margin: 0; color: #92400e;">
-                <strong>🔒 Password Required:</strong> ${password}
-              </p>
-            </div>
-      `
-    }
-
-    emailBody += `
-          </div>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${shareUrl}" 
-               style="display: inline-block; background: #10b981; color: white; padding: 14px 32px; text-decoration: none; border-radius: 6px; font-weight: 600; font-size: 16px;">
-              View Document
-            </a>
-          </div>
-          
-          <div style="background: #f3f4f6; padding: 15px; border-radius: 6px; margin-top: 20px;">
-            <p style="margin: 0; font-size: 14px; color: #6b7280;">
-              <strong>Share URL:</strong><br>
-              <a href="${shareUrl}" style="color: #3b82f6; word-break: break-all;">${shareUrl}</a>
-            </p>
-          </div>
-        </div>
-        
-        <div style="background: #f9fafb; padding: 20px; text-align: center; border-top: 1px solid #e5e7eb;">
-          <p style="margin: 0; font-size: 12px; color: #9ca3af;">
-            This document was shared using SignTusk Send
-          </p>
-        </div>
-      </div>
-    `
-
-    // TODO: Integrate with your email service (SendGrid, AWS SES, etc.)
-    // For now, we'll log the email and return success
-    console.log('📧 Email to send:', {
+    // Prepare email data for the new service
+    const emailData = {
       to: recipientEmail,
-      subject: emailSubject,
-      html: emailBody
-    })
+      documentTitle: documentTitle || 'Document',
+      shareUrl,
+      senderName,
+      message,
+      password,
+      expiresAt: link.expires_at,
+      viewLimit: link.max_views,
+      requiresEmail: link.require_email,
+      requiresNda: link.require_nda,
+      customBranding: brandingData ? {
+        logoUrl: brandingData.logo_url,
+        brandColor: brandingData.brand_color,
+        companyName: brandingData.company_name
+      } : undefined
+    }
 
-    // Log the email send in database (optional)
-    await supabaseAdmin
-      .from('send_link_emails')
-      .insert({
-        link_id: linkId,
-        recipient_email: recipientEmail,
-        sender_id: userId,
-        message: message || null,
-        sent_at: new Date().toISOString()
-      })
-      .catch(err => {
-        // Table might not exist yet, that's okay
-        console.log('Note: send_link_emails table not found (optional feature)')
-      })
+    // Send email using the comprehensive email service
+    const emailResult = await sendDocumentShareEmail(emailData)
+
+    // Log the email send in database
+    const emailLogData = {
+      link_id: linkId,
+      recipient_email: recipientEmail,
+      sender_id: userId,
+      message: message || null,
+      sent_at: new Date().toISOString(),
+      status: emailResult.success ? 'sent' : 'failed',
+      message_id: emailResult.messageId || null,
+      error_message: emailResult.error || null
+    }
+
+    try {
+      await supabaseAdmin
+        .from('send_link_emails')
+        .insert(emailLogData)
+    } catch (dbError) {
+      console.error('Failed to log email in database:', dbError)
+      // Don't fail the request if logging fails
+    }
+
+    if (!emailResult.success) {
+      return NextResponse.json({
+        success: false,
+        error: emailResult.error || 'Failed to send email'
+      }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: true,
-      message: 'Email sent successfully'
+      message: 'Email sent successfully',
+      messageId: emailResult.messageId
     })
 
   } catch (error: any) {

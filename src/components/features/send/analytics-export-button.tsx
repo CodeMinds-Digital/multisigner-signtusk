@@ -20,7 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Download, FileText, Table, Loader2 } from 'lucide-react'
-import { useToast } from '@/components/ui/toast'
+import { toast } from 'sonner'
 
 interface AnalyticsExportButtonProps {
   documentId: string
@@ -38,7 +38,7 @@ export default function AnalyticsExportButton({
   const [format, setFormat] = useState<'csv' | 'pdf'>('csv')
   const [includeVisitors, setIncludeVisitors] = useState(true)
   const [includeEvents, setIncludeEvents] = useState(true)
-  const { toast } = useToast()
+
 
   const handleExport = async (selectedFormat: 'csv' | 'pdf') => {
     try {
@@ -85,17 +85,10 @@ export default function AnalyticsExportButton({
       document.body.removeChild(link)
       URL.revokeObjectURL(url)
 
-      toast({
-        title: 'Export successful',
-        description: `Analytics exported as ${selectedFormat.toUpperCase()}`,
-      })
+      toast.success(`Analytics exported as ${selectedFormat.toUpperCase()}`)
     } catch (error) {
       console.error('Export error:', error)
-      toast({
-        title: 'Export failed',
-        description: 'Failed to export analytics. Please try again.',
-        variant: 'destructive',
-      })
+      toast.error('Failed to export analytics. Please try again.')
     } finally {
       setLoading(false)
       setShowDialog(false)

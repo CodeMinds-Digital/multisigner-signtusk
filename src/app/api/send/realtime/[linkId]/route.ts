@@ -7,14 +7,14 @@ import { SendRealtimeAnalytics } from '@/lib/send-realtime-analytics'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { linkId: string } }
+  { params }: { params: Promise<{ linkId: string }> }
 ) {
   try {
-    const { linkId } = params
+    const { linkId } = await params
 
     // Get real-time metrics
     const metrics = await SendRealtimeAnalytics.getRealtimeMetrics(linkId)
-    
+
     // Get active viewers
     const activeViewers = await SendRealtimeAnalytics.getActiveViewers(linkId)
 
@@ -45,10 +45,10 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { linkId: string } }
+  { params }: { params: Promise<{ linkId: string }> }
 ) {
   try {
-    const { linkId } = params
+    const { linkId } = await params
     const body = await request.json()
     const { action, sessionId, fingerprint, email, currentPage, duration } = body
 

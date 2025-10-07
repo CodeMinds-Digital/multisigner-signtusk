@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Switch } from '@/components/ui/switch'
+import { CustomSwitch } from '@/components/ui/custom-switch'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Webhook, Key, Slack, Mail, Zap, Copy, Eye, EyeOff, Trash2, Plus, CheckCircle2 } from 'lucide-react'
@@ -415,7 +415,7 @@ export default function IntegrationsPage() {
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Switch
+                        <CustomSwitch
                           checked={webhook.enabled}
                           onCheckedChange={(checked) => toggleWebhook(webhook.id, checked)}
                         />

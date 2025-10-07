@@ -10,7 +10,7 @@ import { SendAPIKeyService } from '@/lib/send-api-key-service'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { keyId: string } }
+  { params }: { params: Promise<{ keyId: string }> }
 ) {
   try {
     // Get access token from cookies
@@ -27,7 +27,7 @@ export async function GET(
     const { data: key, error } = await supabaseAdmin
       .from('send_api_keys')
       .select('id, name, key_prefix, scopes, last_used_at, expires_at, created_at')
-      .eq('id', params.keyId)
+      .eq('id', (await params).keyId)
       .eq('user_id', userId)
       .single()
 
@@ -36,7 +36,7 @@ export async function GET(
     }
 
     // Get usage stats
-    const stats = await SendAPIKeyService.getUsageStats(params.keyId)
+    const stats = await SendAPIKeyService.getUsageStats((await params).keyId)
 
     return NextResponse.json({
       success: true,
@@ -54,7 +54,7 @@ export async function GET(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { keyId: string } }
+  { params }: { params: Promise<{ keyId: string }> }
 ) {
   try {
     // Get access token from cookies
@@ -72,7 +72,7 @@ export async function DELETE(
     const { data: key } = await supabaseAdmin
       .from('send_api_keys')
       .select('id')
-      .eq('id', params.keyId)
+      .eq('id', (await params).keyId)
       .eq('user_id', userId)
       .single()
 
@@ -80,7 +80,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'API key not found' }, { status: 404 })
     }
 
-    const result = await SendAPIKeyService.revokeAPIKey(params.keyId)
+    const result = await SendAPIKeyService.revokeAPIKey((await params).keyId)
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 500 })

@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import { Switch } from '@/components/ui/switch'
+import { CustomSwitch } from '@/components/ui/custom-switch'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Palette, Upload, Globe, Mail, Eye, Save } from 'lucide-react'
@@ -47,6 +47,10 @@ export default function BrandingPage() {
   const [saving, setSaving] = useState(false)
   const [logoFile, setLogoFile] = useState<File | null>(null)
   const [faviconFile, setFaviconFile] = useState<File | null>(null)
+  const [newDomainInput, setNewDomainInput] = useState('')
+  const [verifying, setVerifying] = useState(false)
+  const [dnsInstructions, setDnsInstructions] = useState<any>(null)
+  const [verificationResult, setVerificationResult] = useState<any>(null)
 
   const supabase = createClientComponentClient()
 
@@ -184,26 +188,27 @@ export default function BrandingPage() {
 
   async function addCustomDomain(domain: string) {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
 
-      const verificationToken = Math.random().toString(36).substring(2, 15)
+      const response = await fetch('/api/send/domains', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ domain })
+      })
 
-      const { data, error } = await supabase
-        .from('send_custom_domains')
-        .insert({
-          user_id: user.id,
-          domain,
-          verified: false,
-          verification_token: verificationToken
-        })
-        .select()
-        .single()
+      const data = await response.json()
 
-      if (error) throw error
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to add domain')
+      }
 
-      setCustomDomain(data)
-      toast.success('Custom domain added. Please verify DNS records.')
+      setCustomDomain(data.domain)
+      setDnsInstructions(data.instructions)
+      toast.success('Custom domain added. Please configure DNS records to verify ownership.')
     } catch (error: any) {
       toast.error(error.message || 'Failed to add custom domain')
     }
@@ -213,18 +218,37 @@ export default function BrandingPage() {
     if (!customDomain) return
 
     try {
-      // In production, this would check DNS records
-      const { error } = await supabase
-        .from('send_custom_domains')
-        .update({ verified: true })
-        .eq('id', customDomain.id)
+      setVerifying(true)
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session?.access_token) return
 
-      if (error) throw error
+      const response = await fetch(`/api/send/domains/${customDomain.id}/verify`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
 
-      setCustomDomain({ ...customDomain, verified: true })
-      toast.success('Domain verified successfully')
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to verify domain')
+      }
+
+      setCustomDomain(data.domain)
+      setVerificationResult(data.verification)
+
+      if (data.verification.ownershipVerified && data.verification.dnsConfigured) {
+        toast.success('Domain verified successfully!')
+      } else if (data.verification.ownershipVerified) {
+        toast.warning('Domain ownership verified, but DNS configuration is incomplete')
+      } else {
+        toast.error('Domain verification failed. Please check your DNS records.')
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to verify domain')
+    } finally {
+      setVerifying(false)
     }
   }
 
@@ -418,8 +442,7 @@ export default function BrandingPage() {
                     Hide "Powered by SendTusk" from shared documents
                   </p>
                 </div>
-                <Switch
-                  id="remove-branding"
+                <CustomSwitch
                   checked={settings.remove_branding}
                   onCheckedChange={(checked) => setSettings({ ...settings, remove_branding: checked })}
                 />
@@ -484,17 +507,19 @@ export default function BrandingPage() {
                     <div className="flex gap-2 mt-2">
                       <Input
                         id="domain"
+                        value={newDomainInput}
+                        onChange={(e) => setNewDomainInput(e.target.value)}
                         placeholder="docs.yourdomain.com"
                         onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            addCustomDomain((e.target as HTMLInputElement).value)
+                          if (e.key === 'Enter' && newDomainInput.trim()) {
+                            addCustomDomain(newDomainInput.trim())
                           }
                         }}
                       />
-                      <Button onClick={() => {
-                        const input = document.getElementById('domain') as HTMLInputElement
-                        addCustomDomain(input.value)
-                      }}>
+                      <Button
+                        onClick={() => addCustomDomain(newDomainInput.trim())}
+                        disabled={!newDomainInput.trim()}
+                      >
                         Add Domain
                       </Button>
                     </div>
@@ -506,27 +531,103 @@ export default function BrandingPage() {
                     <div className="flex items-center justify-between mb-4">
                       <div>
                         <p className="font-medium">{customDomain.domain}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {customDomain.verified ? '✓ Verified' : '⚠️ Pending verification'}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          {customDomain.verified ? (
+                            <span className="text-sm text-green-600 flex items-center gap-1">
+                              ✓ Verified and Active
+                            </span>
+                          ) : (
+                            <span className="text-sm text-orange-600 flex items-center gap-1">
+                              ⚠️ Pending Verification
+                            </span>
+                          )}
+                          {verificationResult && (
+                            <div className="text-xs text-gray-500">
+                              {verificationResult.ownershipVerified ? '✓ Ownership' : '✗ Ownership'} |
+                              {verificationResult.dnsConfigured ? '✓ DNS' : '✗ DNS'}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      {!customDomain.verified && (
-                        <Button onClick={verifyDomain}>Verify Domain</Button>
-                      )}
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={verifyDomain}
+                          disabled={verifying}
+                          variant="outline"
+                          size="sm"
+                        >
+                          {verifying ? 'Verifying...' : 'Check Status'}
+                        </Button>
+                        <Button
+                          onClick={() => {
+                            setCustomDomain(null)
+                            setDnsInstructions(null)
+                            setVerificationResult(null)
+                          }}
+                          variant="destructive"
+                          size="sm"
+                        >
+                          Remove
+                        </Button>
+                      </div>
                     </div>
-                    {!customDomain.verified && (
-                      <div className="space-y-2 text-sm">
-                        <p className="font-medium">DNS Configuration:</p>
-                        <div className="p-3 bg-muted rounded font-mono text-xs">
-                          <p>Type: CNAME</p>
-                          <p>Name: {customDomain.domain.split('.')[0]}</p>
-                          <p>Value: send.signtusk.com</p>
+
+                    {dnsInstructions && !customDomain.verified && (
+                      <div className="space-y-4 text-sm">
+                        <div>
+                          <p className="font-medium mb-2">Step 1: Verify Domain Ownership</p>
+                          <div className="p-3 bg-blue-50 border border-blue-200 rounded font-mono text-xs">
+                            <p><strong>Type:</strong> {dnsInstructions.ownership.type}</p>
+                            <p><strong>Name:</strong> {dnsInstructions.ownership.name}</p>
+                            <p><strong>Value:</strong> {dnsInstructions.ownership.value}</p>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-1">{dnsInstructions.ownership.description}</p>
                         </div>
-                        <div className="p-3 bg-muted rounded font-mono text-xs mt-2">
-                          <p>Type: TXT</p>
-                          <p>Name: _signtusk-verification</p>
-                          <p>Value: {customDomain.verification_token}</p>
+
+                        <div>
+                          <p className="font-medium mb-2">Step 2: Configure Domain Routing (Choose One)</p>
+                          {dnsInstructions.routing.map((record: any, index: number) => (
+                            <div key={index} className="p-3 bg-gray-50 border rounded font-mono text-xs mb-2">
+                              <p><strong>Type:</strong> {record.type}</p>
+                              <p><strong>Name:</strong> {record.name}</p>
+                              <p><strong>Value:</strong> {record.value}</p>
+                              <p className="text-gray-600 mt-1 font-sans">{record.description}</p>
+                            </div>
+                          ))}
                         </div>
+
+                        <div className="p-3 bg-yellow-50 border border-yellow-200 rounded text-xs">
+                          <p className="font-medium text-yellow-800">⚠️ Important Notes:</p>
+                          <ul className="list-disc list-inside mt-1 text-yellow-700 space-y-1">
+                            <li>DNS changes can take up to 24 hours to propagate</li>
+                            <li>Both ownership verification and routing must be configured</li>
+                            <li>Use the "Check Status" button to verify your configuration</li>
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    {verificationResult && (
+                      <div className="mt-4 p-3 border rounded text-sm">
+                        <p className="font-medium mb-2">Verification Status:</p>
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            {verificationResult.ownershipVerified ? '✅' : '❌'}
+                            <span>Domain Ownership: {verificationResult.ownershipVerified ? 'Verified' : 'Not Verified'}</span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {verificationResult.dnsConfigured ? '✅' : '❌'}
+                            <span>DNS Configuration: {verificationResult.dnsConfigured ? 'Configured' : 'Not Configured'}</span>
+                          </div>
+                        </div>
+                        {verificationResult.details && (
+                          <details className="mt-2">
+                            <summary className="cursor-pointer text-xs text-gray-600">View Technical Details</summary>
+                            <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto">
+                              {JSON.stringify(verificationResult.details, null, 2)}
+                            </pre>
+                          </details>
+                        )}
                       </div>
                     )}
                   </div>

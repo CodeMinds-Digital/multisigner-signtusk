@@ -20,50 +20,64 @@ export async function GET(request: NextRequest) {
     const payload = await verifyAccessToken(accessToken)
     const userId = payload.userId
 
-    // Get documents with their stats
+    // Get documents with their links
     const { data: documents } = await supabaseAdmin
       .from('send_shared_documents')
       .select(`
         id,
         title,
-        send_document_links(
+        created_at,
+        send_document_links (
           id,
-          view_count,
-          send_visitor_sessions(
-            fingerprint,
-            engagement_score
-          )
+          current_views
         )
       `)
       .eq('user_id', userId)
+      .eq('status', 'active')
       .order('created_at', { ascending: false })
 
-    // Calculate stats for each document
-    const documentsWithStats = (documents || []).map((doc: any) => {
-      const links = doc.send_document_links || []
-      const totalViews = links.reduce((sum: number, link: any) => sum + (link.view_count || 0), 0)
+    if (!documents) {
+      return NextResponse.json({
+        success: true,
+        documents: []
+      })
+    }
 
-      // Get unique visitors across all links
-      const allSessions = links.flatMap((link: any) => link.send_visitor_sessions || [])
-      const uniqueVisitors = new Set(allSessions.map((s: any) => s.fingerprint)).size
+    // Calculate metrics for each document
+    const documentsWithStats = await Promise.all(
+      documents.map(async (doc: any) => {
+        const linkIds = doc.send_document_links?.map((link: any) => link.id) || []
 
-      // Calculate average engagement
-      const engagementScores = allSessions
-        .map((s: any) => s.engagement_score)
-        .filter((score: any) => score !== null && score !== undefined)
+        // Get total views from current_views in links
+        const totalViews = doc.send_document_links?.reduce((sum: number, link: any) => sum + (link.current_views || 0), 0) || 0
 
-      const avgEngagement = engagementScores.length > 0
-        ? Math.round(engagementScores.reduce((sum: number, score: number) => sum + score, 0) / engagementScores.length)
-        : 0
+        // Get download events
+        const { data: downloads } = await supabaseAdmin
+          .from('send_analytics_events')
+          .select('id')
+          .in('link_id', linkIds)
+          .eq('event_type', 'download')
 
-      return {
-        id: doc.id,
-        title: doc.title,
-        views: totalViews,
-        visitors: uniqueVisitors,
-        engagement: avgEngagement
-      }
-    })
+        // Get engagement scores from views
+        const { data: views } = await supabaseAdmin
+          .from('send_document_views')
+          .select('engagement_score')
+          .in('link_id', linkIds)
+          .not('engagement_score', 'is', null)
+
+        const avgEngagement = views && views.length > 0
+          ? Math.round(views.reduce((sum, v) => sum + (v.engagement_score || 0), 0) / views.length)
+          : 0
+
+        return {
+          id: doc.id,
+          title: doc.title,
+          views: totalViews,
+          downloads: downloads?.length || 0,
+          engagement: avgEngagement
+        }
+      })
+    )
 
     // Sort by views and take top 10
     const topDocuments = documentsWithStats

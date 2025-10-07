@@ -9,7 +9,7 @@ import { SendWebhookService } from '@/lib/send-webhook-service'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { webhookId: string } }
+  { params }: { params: Promise<{ webhookId: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
@@ -26,7 +26,7 @@ export async function GET(
     const { data: webhook, error } = await supabase
       .from('send_webhooks')
       .select('*')
-      .eq('id', params.webhookId)
+      .eq('id', (await params).webhookId)
       .eq('user_id', user.id)
       .single()
 
@@ -52,7 +52,7 @@ export async function GET(
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { webhookId: string } }
+  { params }: { params: Promise<{ webhookId: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
@@ -70,7 +70,7 @@ export async function PATCH(
     const { data: webhook } = await supabase
       .from('send_webhooks')
       .select('id')
-      .eq('id', params.webhookId)
+      .eq('id', (await params).webhookId)
       .eq('user_id', user.id)
       .single()
 
@@ -86,7 +86,7 @@ export async function PATCH(
     if (events !== undefined) updates.events = events
     if (enabled !== undefined) updates.enabled = enabled
 
-    const result = await SendWebhookService.updateWebhook(params.webhookId, updates)
+    const result = await SendWebhookService.updateWebhook((await params).webhookId, updates)
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 500 })
@@ -104,7 +104,7 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { webhookId: string } }
+  { params }: { params: Promise<{ webhookId: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
@@ -122,7 +122,7 @@ export async function DELETE(
     const { data: webhook } = await supabase
       .from('send_webhooks')
       .select('id')
-      .eq('id', params.webhookId)
+      .eq('id', (await params).webhookId)
       .eq('user_id', user.id)
       .single()
 
@@ -130,7 +130,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Webhook not found' }, { status: 404 })
     }
 
-    const result = await SendWebhookService.deleteWebhook(params.webhookId)
+    const result = await SendWebhookService.deleteWebhook((await params).webhookId)
 
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 500 })

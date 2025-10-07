@@ -18,6 +18,7 @@ import {
   Users,
   Share2,
   TrendingUp,
+  Folder,
   Activity,
   PieChart
 } from 'lucide-react'
@@ -170,6 +171,12 @@ export const SERVICES: Service[] = [
         label: 'Teams',
         icon: Users,
         route: '/send/teams'
+      },
+      {
+        id: 'send-data-rooms',
+        label: 'Data Rooms',
+        icon: Folder,
+        route: '/send/data-rooms'
       },
       // Settings section
       {

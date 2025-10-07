@@ -81,13 +81,13 @@ export default function PublicDocumentViewerPage() {
           )
 
           // Check if returning visitor and notify
-          if (session.isReturning) {
+          if (session.isReturningVisitor) {
             await notifyReturningVisitor(
               linkData.document.id,
               email || undefined,
               fingerprint,
               undefined,
-              session.visitCount
+              session.previousVisits
             )
           }
         } catch (error) {

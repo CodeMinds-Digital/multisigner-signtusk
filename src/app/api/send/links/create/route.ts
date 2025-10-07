@@ -7,15 +7,31 @@ import { SendPasswordService } from '@/lib/send-password-service'
 export interface CreateLinkRequest {
   documentId: string
   name?: string
+  accountName?: string
+  customUrl?: string
   password?: string
   expiresAt?: string
+  viewLimit?: number
   allowDownload?: boolean
   allowPrinting?: boolean
   requireEmail?: boolean
   requireNda?: boolean
   enableNotifications?: boolean
-  viewLimit?: number
-  customSlug?: string
+  enableWatermark?: boolean
+  watermarkText?: string
+  welcomeMessage?: string
+  welcomeDisplayName?: string
+  customButtonText?: string
+  accessControls?: {
+    allowedEmails?: string[]
+    blockedEmails?: string[]
+    allowedDomains?: string[]
+    blockedDomains?: string[]
+    allowedCountries?: string[]
+    blockedCountries?: string[]
+    allowedIPs?: string[]
+    blockedIPs?: string[]
+  }
 }
 
 /**
@@ -53,15 +69,22 @@ export async function POST(request: NextRequest) {
     const {
       documentId,
       name,
+      accountName,
+      customUrl,
       password,
       expiresAt,
+      viewLimit,
       allowDownload = true,
       allowPrinting = true,
       requireEmail = false,
       requireNda = false,
       enableNotifications = true,
-      viewLimit,
-      customSlug
+      enableWatermark = false,
+      watermarkText,
+      welcomeMessage,
+      welcomeDisplayName,
+      customButtonText,
+      accessControls
     } = body
 
     if (!documentId) {
@@ -87,7 +110,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate unique link ID
-    let linkId = customSlug || generateLinkId()
+    let linkId = customUrl || generateLinkId()
 
     // Check if link ID already exists
     let attempts = 0
@@ -142,15 +165,22 @@ export async function POST(request: NextRequest) {
         document_id: documentId,
         link_id: linkId,
         title: name || `${document.title} - Share Link`,
-        custom_slug: customSlug || null,
+        account_name: accountName || null,
+        custom_slug: customUrl || null,
         password_hash: passwordHash,
         expires_at: expiresAt || null,
         max_views: viewLimit || null,
         current_views: 0,
         allow_download: allowDownload,
+        allow_printing: allowPrinting,
         require_email: requireEmail,
         require_nda: requireNda,
         require_totp: false,
+        enable_watermark: enableWatermark,
+        watermark_text: enableWatermark ? watermarkText : null,
+        welcome_message: welcomeMessage || null,
+        welcome_display_name: welcomeDisplayName || null,
+        custom_button_text: customButtonText || null,
         is_active: true,
         created_by: userId
       })
@@ -163,6 +193,40 @@ export async function POST(request: NextRequest) {
         { error: 'Failed to create share link' },
         { status: 500 }
       )
+    }
+
+    // Create access controls if specified
+    if (accessControls && (
+      accessControls.allowedEmails?.length ||
+      accessControls.blockedEmails?.length ||
+      accessControls.allowedDomains?.length ||
+      accessControls.blockedDomains?.length ||
+      accessControls.allowedCountries?.length ||
+      accessControls.blockedCountries?.length ||
+      accessControls.allowedIPs?.length ||
+      accessControls.blockedIPs?.length
+    )) {
+      const accessControlData = {
+        link_id: link.id,
+        allowed_emails: accessControls.allowedEmails || [],
+        blocked_emails: accessControls.blockedEmails || [],
+        allowed_domains: accessControls.allowedDomains || [],
+        blocked_domains: accessControls.blockedDomains || [],
+        allowed_countries: accessControls.allowedCountries || [],
+        blocked_countries: accessControls.blockedCountries || [],
+        allowed_ips: accessControls.allowedIPs || [],
+        blocked_ips: accessControls.blockedIPs || [],
+        created_at: new Date().toISOString()
+      }
+
+      const { error: accessError } = await supabaseAdmin
+        .from('send_link_access_controls')
+        .insert(accessControlData)
+
+      if (accessError) {
+        console.error('Access control creation error:', accessError)
+        // Don't fail the entire request, just log the error
+      }
     }
 
     // Generate share URL

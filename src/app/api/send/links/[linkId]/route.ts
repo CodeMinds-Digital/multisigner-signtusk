@@ -20,10 +20,10 @@ const supabaseAdmin = createClient(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { linkId: string } }
+  { params }: { params: Promise<{ linkId: string }> }
 ) {
   try {
-    const { linkId } = params
+    const { linkId } = await params
     const { searchParams } = new URL(request.url)
     const password = searchParams.get('password')
     const email = searchParams.get('email')
@@ -192,10 +192,10 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { linkId: string } }
+  { params }: { params: Promise<{ linkId: string }> }
 ) {
   try {
-    const { linkId } = params
+    const { linkId } = await params
     const body = await request.json()
     const { email, action } = body
 

@@ -20,7 +20,7 @@ const supabaseAdmin = createClient(
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { documentId: string } }
+  { params }: { params: Promise<{ documentId: string }> }
 ) {
   try {
     const supabase = createRouteHandlerClient({ cookies })
@@ -35,7 +35,7 @@ export async function GET(
       )
     }
 
-    const { documentId } = params
+    const { documentId } = await params
 
     // Verify ownership
     const { data: document } = await supabaseAdmin
@@ -52,32 +52,41 @@ export async function GET(
       )
     }
 
-    // Get all views
+    // Get document links for this document
+    const { data: links } = await supabaseAdmin
+      .from('send_document_links')
+      .select('id')
+      .eq('document_id', documentId)
+
+    const linkIds = links?.map(l => l.id) || []
+
+    // Get all views for these links
     const { data: views } = await supabaseAdmin
       .from('send_document_views')
       .select('*')
-      .eq('document_id', documentId)
+      .in('link_id', linkIds)
       .order('created_at', { ascending: false })
 
-    // Get all page views
+    // Get all page views for these views
+    const viewIds = views?.map(v => v.id) || []
     const { data: pageViews } = await supabaseAdmin
       .from('send_page_views')
       .select('*')
-      .eq('document_id', documentId)
+      .in('view_id', viewIds)
       .order('created_at', { ascending: false })
 
-    // Get all sessions
+    // Get all sessions for these links
     const { data: sessions } = await supabaseAdmin
       .from('send_visitor_sessions')
       .select('*')
-      .in('id', views?.map(v => v.session_id) || [])
+      .in('link_id', linkIds)
 
-    // Get all analytics events
+    // Get all analytics events for these links
     const { data: events } = await supabaseAdmin
       .from('send_analytics_events')
       .select('*')
-      .eq('document_id', documentId)
-      .order('created_at', { ascending: false })
+      .in('link_id', linkIds)
+      .order('timestamp', { ascending: false })
 
     // Calculate metrics
     const totalViews = views?.length || 0
@@ -106,7 +115,7 @@ export async function GET(
     // Views over time (last 30 days)
     const thirtyDaysAgo = new Date()
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-    
+
     const viewsByDate = views?.reduce((acc: Record<string, number>, view) => {
       const date = new Date(view.created_at).toISOString().split('T')[0]
       acc[date] = (acc[date] || 0) + 1
@@ -119,8 +128,8 @@ export async function GET(
       if (!acc[page]) {
         acc[page] = { duration: 0, scrollDepth: 0, count: 0 }
       }
-      acc[page].duration += pv.duration_seconds || 0
-      acc[page].scrollDepth += pv.scroll_depth || 0
+      acc[page].duration += pv.time_spent_seconds || 0
+      acc[page].scrollDepth += pv.scroll_depth_percentage || 0
       acc[page].count += 1
       return acc
     }, {})

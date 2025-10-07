@@ -5,10 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Bell, Mail, MessageSquare, Webhook, Save } from 'lucide-react'
-import { useToast } from '@/components/ui/toast'
+import { toast } from 'sonner'
 
 export default function NotificationPreferences() {
-  const { toast } = useToast()
+
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [preferences, setPreferences] = useState({
@@ -56,19 +56,12 @@ export default function NotificationPreferences() {
       const data = await response.json()
 
       if (data.success) {
-        toast({
-          title: 'Preferences saved',
-          description: 'Your notification preferences have been updated'
-        })
+        toast.success('Your notification preferences have been updated')
       } else {
         throw new Error(data.error)
       }
     } catch (error) {
-      toast({
-        title: 'Failed to save',
-        description: 'Could not save notification preferences',
-        variant: 'destructive'
-      })
+      toast.error('Could not save notification preferences')
     } finally {
       setSaving(false)
     }

@@ -120,7 +120,7 @@ export default function VisitorProfilePage() {
 
   const engagementScoreData = SendEngagementScoring.calculateScore(engagementFactors)
   const engagementScore = engagementScoreData.total
-  const engagementLevel = engagementScoreData.level
+  const engagementLevel = getEngagementLevel(engagementScore)
 
   return (
     <div className="space-y-6 p-6">

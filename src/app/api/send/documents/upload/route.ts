@@ -43,6 +43,8 @@ export async function POST(request: NextRequest) {
     // Parse form data
     const formData = await request.formData()
     const file = formData.get('file') as File
+    const documentId = formData.get('documentId') as string // For versioning
+    const versionNotes = formData.get('versionNotes') as string
 
     if (!file) {
       return NextResponse.json(
@@ -118,18 +120,47 @@ export async function POST(request: NextRequest) {
     }
 
     // Create document record in send_shared_documents table (Send module table)
+    let documentData: any = {
+      user_id: userId,
+      title: file.name,
+      file_name: file.name,
+      file_url: fileUrl,
+      file_size: file.size,
+      file_type: file.type,
+      status: 'active',
+      created_by: userId
+    }
+
+    // If this is a new version of an existing document
+    if (documentId) {
+      // Verify user owns the original document
+      const { data: originalDoc, error: verifyError } = await supabaseAdmin
+        .from('send_shared_documents')
+        .select('id, title, parent_document_id')
+        .eq('id', documentId)
+        .eq('user_id', userId)
+        .single()
+
+      if (verifyError || !originalDoc) {
+        return NextResponse.json(
+          { error: 'Original document not found or access denied' },
+          { status: 404 }
+        )
+      }
+
+      // Set up versioning data
+      documentData.parent_document_id = originalDoc.parent_document_id || documentId
+      documentData.title = originalDoc.title // Keep original title
+      documentData.version_notes = versionNotes
+    } else {
+      // New document (not a version)
+      documentData.version_number = 1
+      documentData.is_primary = true
+    }
+
     const { data: document, error: dbError } = await supabaseAdmin
       .from('send_shared_documents')
-      .insert({
-        user_id: userId,
-        title: file.name,
-        file_name: file.name,
-        file_url: fileUrl,
-        file_size: file.size,
-        file_type: file.type,
-        status: 'active',
-        version_number: 1
-      })
+      .insert(documentData)
       .select()
       .single()
 
@@ -153,6 +184,25 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Document created:', document.id)
 
+    // Create version history record
+    const { error: historyError } = await supabaseAdmin
+      .from('send_document_versions')
+      .insert({
+        document_id: document.id,
+        version_number: document.version_number,
+        file_url: fileUrl,
+        file_name: file.name,
+        file_size: file.size,
+        file_type: file.type,
+        version_notes: versionNotes || (documentId ? 'New version uploaded' : 'Initial version'),
+        created_by: userId
+      })
+
+    if (historyError) {
+      console.error('Version history creation error:', historyError)
+      // Don't fail the request, just log the error
+    }
+
     return NextResponse.json({
       success: true,
       document: {
@@ -162,8 +212,11 @@ export async function POST(request: NextRequest) {
         file_type: document.file_type,
         file_size: document.file_size,
         file_url: document.file_url,
+        version_number: document.version_number,
+        is_primary: document.is_primary,
         created_at: document.created_at
-      }
+      },
+      fileUrl // Return fileUrl for version creation API
     })
 
   } catch (error: any) {
@@ -198,12 +251,21 @@ export async function GET(request: NextRequest) {
     const offset = parseInt(searchParams.get('offset') || '0')
     const status = searchParams.get('status') || 'active'
 
-    // Fetch documents
-    const { data: documents, error: fetchError } = await supabaseAdmin
+    // Fetch documents (only primary versions by default)
+    const showAllVersions = searchParams.get('all_versions') === 'true'
+
+    let query = supabaseAdmin
       .from('send_shared_documents')
       .select('*')
       .eq('user_id', userId)
       .eq('status', status)
+
+    // Only show primary versions unless explicitly requested
+    if (!showAllVersions) {
+      query = query.eq('is_primary', true)
+    }
+
+    const { data: documents, error: fetchError } = await query
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1)
 

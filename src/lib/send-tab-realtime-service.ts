@@ -21,7 +21,7 @@ export class SendTabRealtimeService {
     callback: (view: any) => void
   ): RealtimeChannel {
     const channelName = `link:${linkId}:views`
-    
+
     // Remove existing channel if any
     this.unsubscribe(channelName)
 
@@ -35,7 +35,7 @@ export class SendTabRealtimeService {
           table: 'document_views',
           filter: `link_id=eq.${linkId}`,
         },
-        (payload) => {
+        (payload: any) => {
           callback(payload.new)
         }
       )
@@ -53,7 +53,7 @@ export class SendTabRealtimeService {
     callback: (view: any) => void
   ): RealtimeChannel {
     const channelName = `link:${linkId}:view-updates`
-    
+
     this.unsubscribe(channelName)
 
     const channel = supabase
@@ -66,7 +66,7 @@ export class SendTabRealtimeService {
           table: 'document_views',
           filter: `link_id=eq.${linkId}`,
         },
-        (payload) => {
+        (payload: any) => {
           callback(payload.new)
         }
       )
@@ -93,7 +93,7 @@ export class SendTabRealtimeService {
     onPresenceChange: (state: any) => void
   ): RealtimeChannel {
     const channelName = `link:${linkId}:presence`
-    
+
     this.unsubscribe(channelName)
 
     const channel = supabase.channel(channelName)
@@ -103,13 +103,13 @@ export class SendTabRealtimeService {
         const state = channel.presenceState()
         onPresenceChange(state)
       })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+      .on('presence', { event: 'join' }, ({ key, newPresences }: any) => {
         console.log('Viewer joined:', key, newPresences)
       })
-      .on('presence', { event: 'leave' }, ({ key, leftPresences }) => {
+      .on('presence', { event: 'leave' }, ({ key, leftPresences }: any) => {
         console.log('Viewer left:', key, leftPresences)
       })
-      .subscribe(async (status) => {
+      .subscribe(async (status: any) => {
         if (status === 'SUBSCRIBED') {
           await channel.track({
             session_id: viewerData.sessionId,
@@ -161,7 +161,7 @@ export class SendTabRealtimeService {
     callback: (document: any) => void
   ): RealtimeChannel {
     const channelName = `user:${userId}:documents`
-    
+
     this.unsubscribe(channelName)
 
     const channel = supabase
@@ -174,7 +174,7 @@ export class SendTabRealtimeService {
           table: 'shared_documents',
           filter: `user_id=eq.${userId}`,
         },
-        (payload) => {
+        (payload: any) => {
           callback(payload.new)
         }
       )
@@ -192,7 +192,7 @@ export class SendTabRealtimeService {
     callback: (link: any) => void
   ): RealtimeChannel {
     const channelName = `user:${userId}:links`
-    
+
     this.unsubscribe(channelName)
 
     const channel = supabase
@@ -205,7 +205,7 @@ export class SendTabRealtimeService {
           table: 'document_links',
           filter: `created_by=eq.${userId}`,
         },
-        (payload) => {
+        (payload: any) => {
           callback(payload.new || payload.old)
         }
       )
@@ -227,7 +227,7 @@ export class SendTabRealtimeService {
     callback: (event: any) => void
   ): RealtimeChannel {
     const channelName = `link:${linkId}:analytics`
-    
+
     this.unsubscribe(channelName)
 
     const channel = supabase
@@ -240,7 +240,7 @@ export class SendTabRealtimeService {
           table: 'link_analytics_events',
           filter: `link_id=eq.${linkId}`,
         },
-        (payload) => {
+        (payload: any) => {
           callback(payload.new)
         }
       )
@@ -262,7 +262,7 @@ export class SendTabRealtimeService {
     callback: (nda: any) => void
   ): RealtimeChannel {
     const channelName = `link:${linkId}:ndas`
-    
+
     this.unsubscribe(channelName)
 
     const channel = supabase
@@ -275,7 +275,7 @@ export class SendTabRealtimeService {
           table: 'document_ndas',
           filter: `link_id=eq.${linkId}`,
         },
-        (payload) => {
+        (payload: any) => {
           callback(payload.new)
         }
       )
@@ -297,7 +297,7 @@ export class SendTabRealtimeService {
     callback: (feedback: any) => void
   ): RealtimeChannel {
     const channelName = `document:${documentId}:feedback`
-    
+
     this.unsubscribe(channelName)
 
     const channel = supabase
@@ -310,7 +310,7 @@ export class SendTabRealtimeService {
           table: 'document_feedback',
           filter: `document_id=eq.${documentId}`,
         },
-        (payload) => {
+        (payload: any) => {
           callback(payload.new)
         }
       )
@@ -332,7 +332,7 @@ export class SendTabRealtimeService {
     callback: (activity: any) => void
   ): RealtimeChannel {
     const channelName = `team:${teamId}:activity`
-    
+
     this.unsubscribe(channelName)
 
     const channel = supabase
@@ -345,7 +345,7 @@ export class SendTabRealtimeService {
           table: 'shared_documents',
           filter: `team_id=eq.${teamId}`,
         },
-        (payload) => {
+        (payload: any) => {
           callback({
             type: payload.eventType,
             data: payload.new || payload.old,

@@ -8,19 +8,16 @@ import { Badge } from '@/components/ui/badge'
 
 interface ShareLink {
   id: string
-  title: string
-  link_id: string
-  custom_slug: string | null
-  document_id: string
+  link_name: string
+  document_title: string
   created_at: string
   expires_at: string | null
-  current_views: number
-  max_views: number | null
+  password_protected: boolean
+  view_limit: number | null
   is_active: boolean
-  send_shared_documents: {
-    title: string
-    file_name: string
-  }
+  total_views: number
+  total_downloads: number
+  current_views: number
 }
 
 export default function ShareLinksPage() {
@@ -35,14 +32,18 @@ export default function ShareLinksPage() {
   const loadShareLinks = async () => {
     try {
       setLoading(true)
-      const response = await fetch('/api/send/links/create')
+      const response = await fetch('/api/send/links')
 
       if (!response.ok) {
         throw new Error('Failed to load share links')
       }
 
       const data = await response.json()
-      setShareLinks(data.links || [])
+      if (data.success) {
+        setShareLinks(data.links || [])
+      } else {
+        throw new Error(data.error || 'Failed to load share links')
+      }
     } catch (err: any) {
       console.error('Load links error:', err)
       setError(err.message || 'Failed to load share links')
@@ -58,9 +59,8 @@ export default function ShareLinksPage() {
 
   const getShareUrl = (link: ShareLink) => {
     const baseUrl = window.location.origin
-    return link.custom_slug
-      ? `${baseUrl}/v/${link.custom_slug}`
-      : `${baseUrl}/v/${link.link_id}`
+    // For now, we'll use the link ID since we don't have custom_slug in the response
+    return `${baseUrl}/v/${link.id}`
   }
 
   const isExpired = (link: ShareLink) => {
@@ -69,8 +69,8 @@ export default function ShareLinksPage() {
   }
 
   const isViewLimitReached = (link: ShareLink) => {
-    if (!link.max_views) return false
-    return link.current_views >= link.max_views
+    if (!link.view_limit) return false
+    return link.current_views >= link.view_limit
   }
 
   const getStatus = (link: ShareLink) => {
@@ -98,7 +98,7 @@ export default function ShareLinksPage() {
   }
 
   const activeLinksCount = shareLinks.filter(link => getStatus(link) === 'active').length
-  const totalViews = shareLinks.reduce((sum, link) => sum + link.current_views, 0)
+  const totalViews = shareLinks.reduce((sum, link) => sum + link.total_views, 0)
 
   if (loading) {
     return (
@@ -194,7 +194,6 @@ export default function ShareLinksPage() {
             <div className="space-y-4">
               {shareLinks.map((link) => {
                 const shareUrl = getShareUrl(link)
-                const documentName = link.send_shared_documents?.title || link.send_shared_documents?.file_name || 'Unknown Document'
 
                 return (
                   <div
@@ -206,8 +205,8 @@ export default function ShareLinksPage() {
                         <LinkIcon className="w-6 h-6 text-green-600" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-gray-900">{link.title}</h4>
-                        <p className="text-sm text-gray-600 mt-1">{documentName}</p>
+                        <h4 className="font-medium text-gray-900">{link.link_name}</h4>
+                        <p className="text-sm text-gray-600 mt-1">{link.document_title}</p>
                         <div className="flex items-center gap-2 mt-2">
                           <code className="text-xs bg-gray-100 px-2 py-1 rounded text-gray-700 truncate max-w-md">
                             {shareUrl}
@@ -228,9 +227,9 @@ export default function ShareLinksPage() {
                       <div className="text-center">
                         <div className="flex items-center gap-1 text-gray-600">
                           <Eye className="w-4 h-4" />
-                          <span className="text-sm font-medium">{link.current_views}</span>
-                          {link.max_views && (
-                            <span className="text-xs text-gray-500">/ {link.max_views}</span>
+                          <span className="text-sm font-medium">{link.total_views}</span>
+                          {link.view_limit && (
+                            <span className="text-xs text-gray-500">/ {link.view_limit}</span>
                           )}
                         </div>
                         <p className="text-xs text-gray-500">Views</p>
