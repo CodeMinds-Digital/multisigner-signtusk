@@ -122,8 +122,8 @@ export async function POST(request: NextRequest) {
     // Create document record in send_shared_documents table (Send module table)
     let documentData: any = {
       user_id: userId,
-      title: file.name,
-      file_name: file.name,
+      title: file.name, // Keep original filename as title for display
+      file_name: uniqueFileName, // Store unique filename for storage reference
       file_url: fileUrl,
       file_size: file.size,
       file_type: file.type,

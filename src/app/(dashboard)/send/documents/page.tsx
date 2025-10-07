@@ -445,7 +445,7 @@ export default function DocumentLibraryPage() {
                     : 'Upload your first document to get started'}
                 </p>
                 {!searchQuery && statusFilter === 'all' && typeFilter === 'all' && (
-                  <Button onClick={() => router.push('/send')}>
+                  <Button onClick={() => router.push('/send/upload')}>
                     <FileText className="w-4 h-4 mr-2" />
                     Upload Document
                   </Button>

@@ -9,53 +9,154 @@ import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
 export function VerifyEmail() {
     const [message, setMessage] = useState('')
     const [isResending, setIsResending] = useState(false)
+    const [verificationStatus, setVerificationStatus] = useState<'loading' | 'success' | 'error' | 'instructions'>('instructions')
+    const [email, setEmail] = useState('')
     const router = useRouter()
     const searchParams = useSearchParams()
 
-    // Check if user is waiting for approval
+    // Check if this is a token verification or just instructions
+    const token = searchParams.get('token')
+    const emailParam = searchParams.get('email')
     const status = searchParams.get('status')
     const isVerified = searchParams.get('verified') === 'true'
     const isPendingApproval = status === 'pending_approval'
 
     useEffect(() => {
-        // Listen for auth state changes to handle verification
-        const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event: AuthChangeEvent, session: Session | null) => {
-                if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
-                    // Check if user needs approval before redirecting
-                    if (!isPendingApproval) {
-                        router.push('/dashboard')
+        // If we have a token and email, this is a verification attempt
+        if (token && emailParam) {
+            verifyEmailToken(emailParam, token)
+        } else {
+            // Listen for auth state changes to handle verification
+            const { data: { subscription } } = supabase.auth.onAuthStateChange(
+                async (event: AuthChangeEvent, session: Session | null) => {
+                    if (event === 'SIGNED_IN' && session?.user?.email_confirmed_at) {
+                        // Check if user needs approval before redirecting
+                        if (!isPendingApproval) {
+                            router.push('/dashboard')
+                        }
                     }
                 }
+            )
+
+            return () => subscription.unsubscribe()
+        }
+    }, [router, isPendingApproval, token, emailParam])
+
+    const verifyEmailToken = async (email: string, token: string) => {
+        setVerificationStatus('loading')
+        try {
+            const response = await fetch('/api/auth/verify-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, token })
+            })
+
+            const data = await response.json()
+
+            if (response.ok) {
+                setVerificationStatus('success')
+                setMessage(data.message)
+                // Redirect to login after 3 seconds
+                setTimeout(() => {
+                    router.push('/login?verified=true')
+                }, 3000)
+            } else {
+                setVerificationStatus('error')
+                setMessage(data.error || 'Verification failed')
             }
-        )
+        } catch (error) {
+            console.error('Verification error:', error)
+            setVerificationStatus('error')
+            setMessage('An error occurred during verification. Please try again.')
+        }
+    }
 
-        return () => subscription.unsubscribe()
-    }, [router, isPendingApproval])
+    const handleResendEmail = async (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!email) return
 
-    const handleResendEmail = async () => {
         setIsResending(true)
         setMessage('')
 
         try {
-            const { data: { user } } = await supabase.auth.getUser()
-            if (user?.email) {
-                const { error } = await supabase.auth.resend({
-                    type: 'signup',
-                    email: user.email,
-                })
+            const response = await fetch('/api/auth/resend-verification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email })
+            })
 
-                if (error) {
-                    setMessage(`Error: ${error.message}`)
-                } else {
-                    setMessage('Verification email sent! Please check your inbox.')
-                }
+            const data = await response.json()
+
+            if (response.ok) {
+                setMessage(data.message)
+            } else {
+                setMessage(data.error || 'Failed to send verification email')
             }
-        } catch {
-            setMessage('Failed to resend verification email.')
+        } catch (error) {
+            console.error('Error:', error)
+            setMessage('An error occurred. Please try again.')
         } finally {
             setIsResending(false)
         }
+    }
+
+    // Show token verification UI if we have a token
+    if (token && emailParam) {
+        return (
+            <div className="min-h-screen bg-gray-100 flex items-center justify-center p-4">
+                <div className="max-w-md w-full bg-white rounded-lg shadow-md p-8">
+                    <div className="text-center">
+                        {verificationStatus === 'loading' && (
+                            <>
+                                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                                <h1 className="text-2xl font-bold text-gray-900 mb-2">Verifying Email</h1>
+                                <p className="text-gray-600">Please wait while we verify your email address...</p>
+                            </>
+                        )}
+
+                        {verificationStatus === 'success' && (
+                            <>
+                                <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                    </svg>
+                                </div>
+                                <h1 className="text-2xl font-bold text-gray-900 mb-2">Email Verified!</h1>
+                                <p className="text-gray-600 mb-4">{message}</p>
+                                <p className="text-sm text-gray-500">Redirecting to login page in 3 seconds...</p>
+                            </>
+                        )}
+
+                        {verificationStatus === 'error' && (
+                            <>
+                                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                                    <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                    </svg>
+                                </div>
+                                <h1 className="text-2xl font-bold text-gray-900 mb-2">Verification Failed</h1>
+                                <p className="text-gray-600 mb-6">{message}</p>
+
+                                <div className="space-y-3">
+                                    <Link
+                                        href="/resend-verification"
+                                        className="block w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+                                    >
+                                        Request New Verification Email
+                                    </Link>
+                                    <Link
+                                        href="/login"
+                                        className="block w-full bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors"
+                                    >
+                                        Back to Login
+                                    </Link>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </div>
+            </div>
+        )
     }
 
     // Show different UI for pending approval
@@ -130,8 +231,18 @@ export function VerifyEmail() {
                         We&apos;ve sent a verification link to your email address. Please click the link to verify your account and complete the registration process.
                     </p>
 
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4 mb-6">
+                        <h3 className="text-sm font-medium text-yellow-800 mb-2">For Gmail users:</h3>
+                        <ul className="text-sm text-yellow-700 space-y-1">
+                            <li>• Check your <strong>spam/junk folder</strong></li>
+                            <li>• Look for emails from <strong>"SignTusk"</strong></li>
+                            <li>• Add <strong>noreply@notifications.signtusk.com</strong> to your contacts</li>
+                            <li>• Wait a few minutes as emails may take time to arrive</li>
+                        </ul>
+                    </div>
+
                     {message && (
-                        <div className={`mb-4 p-3 rounded-lg text-sm ${message.includes('Error')
+                        <div className={`mb-4 p-3 rounded-lg text-sm ${message.includes('Error') || message.includes('Failed')
                             ? 'bg-red-100 text-red-600'
                             : 'bg-green-100 text-green-600'
                             }`}>
@@ -140,13 +251,29 @@ export function VerifyEmail() {
                     )}
 
                     <div className="space-y-4">
-                        <button
-                            onClick={handleResendEmail}
-                            disabled={isResending}
-                            className="w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isResending ? 'Sending...' : 'Resend verification email'}
-                        </button>
+                        <div className="text-center">
+                            <p className="text-sm text-gray-600 mb-4">
+                                Didn&apos;t receive the email? Enter your email address to resend:
+                            </p>
+
+                            <form onSubmit={handleResendEmail} className="space-y-3">
+                                <input
+                                    type="email"
+                                    value={email}
+                                    onChange={(e) => setEmail(e.target.value)}
+                                    placeholder="Enter your email address"
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm"
+                                />
+
+                                <button
+                                    type="submit"
+                                    disabled={isResending || !email}
+                                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+                                >
+                                    {isResending ? 'Sending...' : 'Resend Verification Email'}
+                                </button>
+                            </form>
+                        </div>
 
                         <p className="text-sm text-gray-600">
                             Already verified?{' '}

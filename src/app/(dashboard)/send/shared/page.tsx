@@ -96,10 +96,10 @@ export default function SharedDocumentsPage() {
         </div>
         <Button
           className="bg-green-600 hover:bg-green-700"
-          onClick={() => router.push('/send/documents')}
+          onClick={() => router.push('/send/upload')}
         >
           <Plus className="w-4 h-4 mr-2" />
-          Create Share Link
+          Upload Document
         </Button>
       </div>
 
@@ -166,11 +166,11 @@ export default function SharedDocumentsPage() {
               Create your first share link to start tracking document views and engagement
             </p>
             <Button
-              onClick={() => router.push('/send/documents')}
+              onClick={() => router.push('/send/upload')}
               className="bg-green-600 hover:bg-green-700"
             >
               <Plus className="w-4 h-4 mr-2" />
-              Create Your First Link
+              Upload Your First Document
             </Button>
           </CardContent>
         </Card>

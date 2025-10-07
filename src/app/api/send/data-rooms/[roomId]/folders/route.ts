@@ -202,3 +202,260 @@ export async function GET(
     )
   }
 }
+
+/**
+ * PATCH /api/send/data-rooms/[roomId]/folders
+ * Rename a folder in a data room
+ */
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ roomId: string }> }
+) {
+  try {
+    const { roomId } = await params
+    const { accessToken } = getAuthTokensFromRequest(request)
+
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    const payload = await verifyAccessToken(accessToken)
+    const userId = payload.userId
+
+    const body = await request.json()
+    const { folder_path, new_name } = body
+
+    if (!folder_path || !new_name) {
+      return NextResponse.json(
+        { error: 'Folder path and new name are required' },
+        { status: 400 }
+      )
+    }
+
+    // Validate folder name
+    if (new_name.includes('/') || new_name.trim() === '') {
+      return NextResponse.json(
+        { error: 'Invalid folder name' },
+        { status: 400 }
+      )
+    }
+
+    // Verify data room exists and user has access
+    const { data: dataRoom, error: dataRoomError } = await supabaseAdmin
+      .from('send_data_rooms')
+      .select('id, user_id, folder_structure')
+      .eq('id', roomId)
+      .eq('user_id', userId)
+      .single()
+
+    if (dataRoomError || !dataRoom) {
+      return NextResponse.json(
+        { error: 'Data room not found or access denied' },
+        { status: 404 }
+      )
+    }
+
+    const folderStructure = dataRoom.folder_structure || {}
+
+    // Check if folder exists
+    if (!folderStructure[folder_path]) {
+      return NextResponse.json(
+        { error: 'Folder not found' },
+        { status: 404 }
+      )
+    }
+
+    // Generate new path
+    const pathParts = folder_path.split('/')
+    pathParts[pathParts.length - 1] = new_name
+    const new_path = pathParts.join('/')
+
+    // Check if new path already exists
+    if (folderStructure[new_path]) {
+      return NextResponse.json(
+        { error: 'A folder with this name already exists' },
+        { status: 409 }
+      )
+    }
+
+    // Update folder structure
+    const updatedFolderStructure = { ...folderStructure }
+
+    // Copy folder to new path with updated name
+    updatedFolderStructure[new_path] = {
+      ...updatedFolderStructure[folder_path],
+      name: new_name
+    }
+
+    // Remove old folder
+    delete updatedFolderStructure[folder_path]
+
+    // Update all subfolders and their parent references
+    Object.keys(updatedFolderStructure).forEach(path => {
+      if (path.startsWith(folder_path + '/')) {
+        const newSubPath = path.replace(folder_path, new_path)
+        updatedFolderStructure[newSubPath] = updatedFolderStructure[path]
+        delete updatedFolderStructure[path]
+      }
+
+      // Update parent folder references
+      if (updatedFolderStructure[path].subfolders) {
+        updatedFolderStructure[path].subfolders = updatedFolderStructure[path].subfolders.map((subPath: string) =>
+          subPath === folder_path ? new_path : subPath.startsWith(folder_path + '/') ? subPath.replace(folder_path, new_path) : subPath
+        )
+      }
+    })
+
+    // Update parent folder's subfolder reference
+    const parentPath = folder_path.substring(0, folder_path.lastIndexOf('/')) || '/'
+    if (parentPath !== '/' && updatedFolderStructure[parentPath]) {
+      updatedFolderStructure[parentPath].subfolders = updatedFolderStructure[parentPath].subfolders?.map((subPath: string) =>
+        subPath === folder_path ? new_path : subPath
+      ) || []
+    }
+
+    // Save updated folder structure
+    const { error: updateError } = await supabaseAdmin
+      .from('send_data_rooms')
+      .update({ folder_structure: updatedFolderStructure })
+      .eq('id', roomId)
+
+    if (updateError) {
+      console.error('Update folder structure error:', updateError)
+      return NextResponse.json(
+        { error: 'Failed to rename folder' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Folder renamed successfully',
+      old_path: folder_path,
+      new_path: new_path
+    })
+
+  } catch (error) {
+    console.error('Rename folder error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
+/**
+ * DELETE /api/send/data-rooms/[roomId]/folders
+ * Delete a folder in a data room
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ roomId: string }> }
+) {
+  try {
+    const { roomId } = await params
+    const { accessToken } = getAuthTokensFromRequest(request)
+
+    if (!accessToken) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    const payload = await verifyAccessToken(accessToken)
+    const userId = payload.userId
+
+    const body = await request.json()
+    const { folder_path } = body
+
+    if (!folder_path) {
+      return NextResponse.json(
+        { error: 'Folder path is required' },
+        { status: 400 }
+      )
+    }
+
+    // Verify data room exists and user has access
+    const { data: dataRoom, error: dataRoomError } = await supabaseAdmin
+      .from('send_data_rooms')
+      .select('id, user_id, folder_structure')
+      .eq('id', roomId)
+      .eq('user_id', userId)
+      .single()
+
+    if (dataRoomError || !dataRoom) {
+      return NextResponse.json(
+        { error: 'Data room not found or access denied' },
+        { status: 404 }
+      )
+    }
+
+    const folderStructure = dataRoom.folder_structure || {}
+
+    // Check if folder exists
+    if (!folderStructure[folder_path]) {
+      return NextResponse.json(
+        { error: 'Folder not found' },
+        { status: 404 }
+      )
+    }
+
+    // Update folder structure
+    const updatedFolderStructure = { ...folderStructure }
+
+    // Remove the folder and all its subfolders
+    Object.keys(updatedFolderStructure).forEach(path => {
+      if (path === folder_path || path.startsWith(folder_path + '/')) {
+        delete updatedFolderStructure[path]
+      }
+    })
+
+    // Update parent folder's subfolder reference
+    const parentPath = folder_path.substring(0, folder_path.lastIndexOf('/')) || '/'
+    if (parentPath !== '/' && updatedFolderStructure[parentPath]) {
+      updatedFolderStructure[parentPath].subfolders = updatedFolderStructure[parentPath].subfolders?.filter((subPath: string) =>
+        subPath !== folder_path && !subPath.startsWith(folder_path + '/')
+      ) || []
+    }
+
+    // Update all other folders' subfolder references
+    Object.keys(updatedFolderStructure).forEach(path => {
+      if (updatedFolderStructure[path].subfolders) {
+        updatedFolderStructure[path].subfolders = updatedFolderStructure[path].subfolders.filter((subPath: string) =>
+          subPath !== folder_path && !subPath.startsWith(folder_path + '/')
+        )
+      }
+    })
+
+    // Save updated folder structure
+    const { error: updateError } = await supabaseAdmin
+      .from('send_data_rooms')
+      .update({ folder_structure: updatedFolderStructure })
+      .eq('id', roomId)
+
+    if (updateError) {
+      console.error('Update folder structure error:', updateError)
+      return NextResponse.json(
+        { error: 'Failed to delete folder' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Folder deleted successfully',
+      deleted_path: folder_path
+    })
+
+  } catch (error) {
+    console.error('Delete folder error:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}

@@ -74,18 +74,7 @@ export async function POST(request: NextRequest) {
       console.log('ℹ️ TOTP not required for this user, proceeding with normal login')
     }
 
-    // Check if email is verified
-    if (!user.email_confirmed_at) {
-      return new Response(
-        JSON.stringify({
-          error: 'Please verify your email before logging in. Check your inbox for the verification link.',
-          requiresEmailVerification: true
-        }),
-        { status: 403, headers: { 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Fetch full user profile from user_profiles table using admin client
+    // Fetch full user profile from user_profiles table using admin client first
     const profileResult = await supabaseAdmin
       .from('user_profiles')
       .select('*')
@@ -144,6 +133,19 @@ export async function POST(request: NextRequest) {
       return new Response(
         JSON.stringify({ error: 'Failed to fetch user profile' }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Check if email is verified using our custom verification system
+    // We check both Supabase's email_confirmed_at and our custom email_verified field
+    const isEmailVerified = user.email_confirmed_at || profile.email_verified
+    if (!isEmailVerified) {
+      return new Response(
+        JSON.stringify({
+          error: 'Please verify your email before logging in. Check your inbox for the verification link.',
+          requiresEmailVerification: true
+        }),
+        { status: 403, headers: { 'Content-Type': 'application/json' } }
       )
     }
 

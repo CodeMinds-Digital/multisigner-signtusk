@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useAuth } from '@/components/providers/secure-auth-provider'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -32,13 +33,14 @@ interface TeamMember {
 }
 
 export default function TeamsPage() {
+  const { user } = useAuth()
   const [teams, setTeams] = useState<Team[]>([])
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null)
   const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
   const [createDialogOpen, setCreateDialogOpen] = useState(false)
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false)
-  
+
   const [newTeamName, setNewTeamName] = useState('')
   const [inviteEmail, setInviteEmail] = useState('')
   const [inviteRole, setInviteRole] = useState('member')
@@ -46,8 +48,10 @@ export default function TeamsPage() {
   const supabase = createClientComponentClient()
 
   useEffect(() => {
-    loadTeams()
-  }, [])
+    if (user) {
+      loadTeams()
+    }
+  }, [user])
 
   useEffect(() => {
     if (selectedTeam) {
@@ -57,32 +61,23 @@ export default function TeamsPage() {
 
   async function loadTeams() {
     try {
-      const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
 
-      // Get teams where user is owner or member
-      const { data: ownedTeams } = await supabase
-        .from('send_teams')
-        .select('*')
-        .eq('owner_id', user.id)
+      const response = await fetch('/api/send/teams')
+      const data = await response.json()
 
-      const { data: memberTeams } = await supabase
-        .from('send_team_members')
-        .select('team_id, send_teams(*)')
-        .eq('user_id', user.id)
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load teams')
+      }
 
-      const allTeams = [
-        ...(ownedTeams || []),
-        ...(memberTeams?.map(m => m.send_teams).filter(Boolean) || [])
-      ]
-
+      const allTeams = data.teams || []
       setTeams(allTeams as Team[])
       if (allTeams.length > 0 && !selectedTeam) {
         setSelectedTeam(allTeams[0] as Team)
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error loading teams:', error)
-      toast.error('Failed to load teams')
+      toast.error(error.message || 'Failed to load teams')
     } finally {
       setLoading(false)
     }
@@ -90,36 +85,70 @@ export default function TeamsPage() {
 
   async function loadTeamMembers(teamId: string) {
     try {
+      // Get team members with user profile data
       const { data: members } = await supabase
         .from('send_team_members')
-        .select('*')
+        .select(`
+          id,
+          user_id,
+          role,
+          permissions,
+          created_at
+        `)
         .eq('team_id', teamId)
 
-      setMembers(members || [])
+      // Get user profiles for the members
+      if (members && members.length > 0) {
+        const userIds = members.map(m => m.user_id)
+        const { data: profiles } = await supabase
+          .from('user_profiles')
+          .select('id, email, full_name')
+          .in('id', userIds)
+
+        // Combine member data with profile data
+        const membersWithProfiles = members.map(member => ({
+          ...member,
+          email: profiles?.find(p => p.id === member.user_id)?.email || 'Unknown',
+          full_name: profiles?.find(p => p.id === member.user_id)?.full_name || 'Unknown User'
+        }))
+
+        setMembers(membersWithProfiles as TeamMember[])
+      } else {
+        setMembers([])
+      }
     } catch (error) {
       console.error('Error loading members:', error)
     }
   }
 
   async function createTeam() {
+    if (!newTeamName.trim()) {
+      toast.error('Please enter a team name')
+      return
+    }
+
+    if (!user) {
+      toast.error('You must be logged in to create a team')
+      return
+    }
+
     try {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-
-      const slug = newTeamName.toLowerCase().replace(/\s+/g, '-')
-
-      const { data: team, error } = await supabase
-        .from('send_teams')
-        .insert({
+      const response = await fetch('/api/send/teams', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           name: newTeamName,
-          slug,
-          owner_id: user.id,
           plan: 'free'
-        })
-        .select()
-        .single()
+        }),
+      })
 
-      if (error) throw error
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create team')
+      }
 
       toast.success('Team created successfully')
       setCreateDialogOpen(false)
@@ -234,6 +263,12 @@ export default function TeamsPage() {
                   id="team-name"
                   value={newTeamName}
                   onChange={(e) => setNewTeamName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && newTeamName.trim()) {
+                      e.preventDefault()
+                      createTeam()
+                    }
+                  }}
                   placeholder="Acme Inc."
                 />
               </div>
@@ -242,7 +277,10 @@ export default function TeamsPage() {
               <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button onClick={createTeam} disabled={!newTeamName}>
+              <Button
+                onClick={createTeam}
+                disabled={!newTeamName.trim()}
+              >
                 Create Team
               </Button>
             </DialogFooter>
@@ -267,11 +305,10 @@ export default function TeamsPage() {
                 <button
                   key={team.id}
                   onClick={() => setSelectedTeam(team)}
-                  className={`w-full text-left p-3 rounded-lg border transition-colors ${
-                    selectedTeam?.id === team.id
-                      ? 'bg-primary text-primary-foreground border-primary'
-                      : 'hover:bg-muted border-transparent'
-                  }`}
+                  className={`w-full text-left p-3 rounded-lg border transition-colors ${selectedTeam?.id === team.id
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'hover:bg-muted border-transparent'
+                    }`}
                 >
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">

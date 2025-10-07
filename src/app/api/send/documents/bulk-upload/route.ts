@@ -19,7 +19,7 @@ interface BulkUploadResult {
 export async function POST(request: NextRequest) {
   try {
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     // Process each file
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
-      
+
       try {
         // Validate file
         if (!file.name || file.size === 0) {
@@ -95,15 +95,15 @@ export async function POST(request: NextRequest) {
         // Create document record
         const documentData = {
           user_id: userId,
-          title: file.name.replace(/\.[^/.]+$/, ''), // Remove extension
-          file_name: file.name,
+          title: file.name, // Keep original filename as title for display
+          file_name: fileName, // Store unique filename for storage reference
           file_url: publicUrl,
           file_size: file.size,
           file_type: file.type,
           folder_id: folderId,
           status: 'active',
           version_number: 1,
-          is_primary_version: true,
+          is_primary: true, // Fix column name to match schema
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },

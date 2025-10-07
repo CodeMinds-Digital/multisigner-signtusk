@@ -13,6 +13,9 @@ import {
   Search,
   FileText,
   Folder,
+  FolderOpen,
+  FolderLock,
+  FolderCheck,
   MoreHorizontal,
   Eye,
   Download,
@@ -23,7 +26,9 @@ import {
   Grid,
   List,
   SortAsc,
-  Filter
+  Filter,
+  Home,
+  ChevronRight
 } from 'lucide-react'
 import { toast } from 'sonner'
 // import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
@@ -65,13 +70,33 @@ export function DataRoomDocumentManager({
   const [loading, setLoading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedDocuments, setSelectedDocuments] = useState<string[]>([])
+  const [selectedFolders, setSelectedFolders] = useState<string[]>([])
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('list')
   const [currentFolder, setCurrentFolder] = useState('/')
   const [folders, setFolders] = useState<Folder[]>([])
   const [showAddDocuments, setShowAddDocuments] = useState(false)
   const [showCreateFolder, setShowCreateFolder] = useState(false)
+  const [showRenameFolder, setShowRenameFolder] = useState(false)
+  const [showDeleteFolder, setShowDeleteFolder] = useState(false)
+  const [showBulkDeleteFolders, setShowBulkDeleteFolders] = useState(false)
   const [newFolderName, setNewFolderName] = useState('')
+  const [renameFolderName, setRenameFolderName] = useState('')
+  const [selectedFolder, setSelectedFolder] = useState<any>(null)
   const [availableDocuments, setAvailableDocuments] = useState<any[]>([])
+
+  // Get folder icon based on folder properties
+  const getFolderIcon = (folder: any) => {
+    // If folder has documents, show FolderCheck
+    if (folder.document_count > 0) {
+      return FolderCheck
+    }
+    // If folder has subfolders, show FolderOpen
+    if (folder.subfolder_count > 0) {
+      return FolderOpen
+    }
+    // Default folder icon
+    return Folder
+  }
 
   // Fetch folders
   const fetchFolders = async () => {
@@ -134,6 +159,122 @@ export function DataRoomDocumentManager({
     } catch (error) {
       console.error('Error creating folder:', error)
       toast.error('Failed to create folder')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Rename folder
+  const renameFolder = async () => {
+    if (!renameFolderName.trim() || !selectedFolder) return
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/send/data-rooms/${dataRoomId}/folders`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          folder_path: selectedFolder.path,
+          new_name: renameFolderName.trim()
+        }),
+      })
+
+      if (response.ok) {
+        toast.success('Folder renamed successfully')
+        setRenameFolderName('')
+        setShowRenameFolder(false)
+        setSelectedFolder(null)
+        fetchFolders()
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to rename folder')
+      }
+    } catch (error) {
+      console.error('Rename folder error:', error)
+      toast.error('Failed to rename folder')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Delete folder
+  const deleteFolder = async () => {
+    if (!selectedFolder) return
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/send/data-rooms/${dataRoomId}/folders`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          folder_path: selectedFolder.path
+        }),
+      })
+
+      if (response.ok) {
+        toast.success('Folder deleted successfully')
+        setShowDeleteFolder(false)
+        setSelectedFolder(null)
+        // Navigate to parent folder if we're currently in the deleted folder
+        if (currentFolder.startsWith(selectedFolder.path)) {
+          const parentPath = selectedFolder.path.substring(0, selectedFolder.path.lastIndexOf('/')) || '/'
+          setCurrentFolder(parentPath)
+        }
+        fetchFolders()
+      } else {
+        const error = await response.json()
+        toast.error(error.error || 'Failed to delete folder')
+      }
+    } catch (error) {
+      console.error('Delete folder error:', error)
+      toast.error('Failed to delete folder')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Bulk delete folders
+  const bulkDeleteFolders = async () => {
+    if (selectedFolders.length === 0) return
+
+    setLoading(true)
+    try {
+      // Delete folders one by one
+      for (const folderPath of selectedFolders) {
+        const response = await fetch(`/api/send/data-rooms/${dataRoomId}/folders`, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            folder_path: folderPath
+          }),
+        })
+
+        if (!response.ok) {
+          const error = await response.json()
+          toast.error(`Failed to delete folder: ${error.error}`)
+          break
+        }
+      }
+
+      toast.success(`${selectedFolders.length} folder(s) deleted successfully`)
+      setSelectedFolders([])
+      setShowBulkDeleteFolders(false)
+
+      // Navigate to root if current folder was deleted
+      if (selectedFolders.some(path => currentFolder.startsWith(path))) {
+        setCurrentFolder('/')
+      }
+
+      fetchFolders()
+    } catch (error) {
+      console.error('Bulk delete folders error:', error)
+      toast.error('Failed to delete folders')
     } finally {
       setLoading(false)
     }
@@ -410,27 +551,27 @@ export function DataRoomDocumentManager({
         </div>
       </div>
 
-      {/* Breadcrumb */}
-      <div className="flex items-center gap-2 text-sm">
+      {/* Breadcrumb Navigation */}
+      <div className="flex items-center gap-1 text-sm bg-gray-50 p-3 rounded-lg">
+        <Home className="h-4 w-4 text-gray-500" />
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setCurrentFolder('/')}
-          className={currentFolder === '/' ? 'bg-gray-100' : ''}
+          className={`h-8 px-2 ${currentFolder === '/' ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-200'}`}
         >
-          <Folder className="h-4 w-4 mr-1" />
-          Root
+          Data Room
         </Button>
         {currentFolder !== '/' && currentFolder.split('/').filter(Boolean).map((folder, index, arr) => {
           const path = '/' + arr.slice(0, index + 1).join('/')
           return (
-            <div key={path} className="flex items-center gap-2">
-              <span>/</span>
+            <div key={path} className="flex items-center">
+              <ChevronRight className="h-4 w-4 text-gray-400 mx-1" />
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={() => setCurrentFolder(path)}
-                className={path === currentFolder ? 'bg-gray-100' : ''}
+                className={`h-8 px-2 ${path === currentFolder ? 'bg-blue-100 text-blue-700' : 'hover:bg-gray-200'}`}
               >
                 {folder}
               </Button>
@@ -439,121 +580,398 @@ export function DataRoomDocumentManager({
         })}
       </div>
 
-      {/* Folders */}
-      {currentFolderDocuments.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
-          {currentFolderDocuments.map((folder) => (
-            <Button
-              key={folder.path}
-              variant="outline"
-              className="h-auto p-4 flex flex-col items-center gap-2"
-              onClick={() => setCurrentFolder(folder.path)}
-            >
-              <Folder className="h-8 w-8 text-blue-600" />
-              <span className="text-sm font-medium truncate w-full">{folder.name}</span>
-              <span className="text-xs text-gray-500">{folder.document_count} docs</span>
-            </Button>
-          ))}
-        </div>
-      )}
-
-      {/* Documents */}
+      {/* File Explorer View */}
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Documents</CardTitle>
+              <CardTitle className="flex items-center gap-2">
+                <Folder className="h-5 w-5 text-blue-600" />
+                {currentFolder === '/' ? 'Data Room Contents' : `Contents of ${currentFolder.split('/').pop()}`}
+              </CardTitle>
               <CardDescription>
-                {filteredDocuments.length} document{filteredDocuments.length !== 1 ? 's' : ''} in {currentFolder}
+                {currentFolderDocuments.length} folder{currentFolderDocuments.length !== 1 ? 's' : ''} • {filteredDocuments.length} document{filteredDocuments.length !== 1 ? 's' : ''}
               </CardDescription>
             </div>
-            {selectedDocuments.length > 0 && (
-              <div className="flex gap-2">
+            <div className="flex gap-2">
+              {selectedFolders.length > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowBulkDeleteFolders(true)}
+                >
+                  <Trash2 className="h-4 w-4 mr-1" />
+                  Delete Folders ({selectedFolders.length})
+                </Button>
+              )}
+              {selectedDocuments.length > 0 && (
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => removeDocuments(selectedDocuments)}
                 >
                   <Trash2 className="h-4 w-4 mr-1" />
-                  Remove ({selectedDocuments.length})
+                  Remove Documents ({selectedDocuments.length})
                 </Button>
-              </div>
-            )}
-          </div>
-        </CardHeader>
-        <CardContent>
-          {filteredDocuments.length === 0 ? (
-            <div className="text-center py-8">
-              <FileText className="h-12 w-12 text-gray-400 mx-auto mb-3" />
-              <h4 className="font-medium mb-1">No documents in this folder</h4>
-              <p className="text-sm text-gray-600 mb-4">
-                Add documents to get started
-              </p>
-              <Button onClick={() => setShowAddDocuments(true)}>
-                <Plus className="h-4 w-4 mr-2" />
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAddDocuments(true)}
+              >
+                <Upload className="h-4 w-4 mr-1" />
                 Add Documents
               </Button>
             </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {currentFolderDocuments.length === 0 && filteredDocuments.length === 0 ? (
+            <div className="text-center py-12">
+              <Folder className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h4 className="font-medium text-gray-900 mb-2">This folder is empty</h4>
+              <p className="text-sm text-gray-600 mb-6">
+                Create folders to organize your documents or add documents directly
+              </p>
+              <div className="flex gap-3 justify-center">
+                <Button onClick={() => setShowCreateFolder(true)}>
+                  <FolderPlus className="h-4 w-4 mr-2" />
+                  New Folder
+                </Button>
+                <Button variant="outline" onClick={() => setShowAddDocuments(true)}>
+                  <Upload className="h-4 w-4 mr-2" />
+                  Add Documents
+                </Button>
+              </div>
+            </div>
           ) : (
-            <div className="space-y-2">
-              {filteredDocuments.map((doc, index) => (
-                <div
-                  key={doc.id}
-                  className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
-                >
-                  <div className="flex items-center gap-3">
-                    <Checkbox
-                      checked={selectedDocuments.includes(doc.document_id)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedDocuments([...selectedDocuments, doc.document_id])
-                        } else {
-                          setSelectedDocuments(selectedDocuments.filter(id => id !== doc.document_id))
-                        }
-                      }}
-                    />
-                    <FileText className="h-5 w-5 text-gray-500" />
-                    <div>
-                      <p className="font-medium">{doc.document.title}</p>
-                      <p className="text-sm text-gray-600">
-                        {formatFileSize(doc.document.file_size)} • {doc.document.file_type}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Button variant="ghost" size="sm">
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="sm">
-                      <Download className="h-4 w-4" />
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm">
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem>
-                          <Move className="h-4 w-4 mr-2" />
-                          Move to Folder
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          onClick={() => removeDocuments([doc.document_id])}
-                          className="text-red-600"
-                        >
-                          <Trash2 className="h-4 w-4 mr-2" />
-                          Remove from Data Room
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
+            <div className="space-y-4">
+              {/* Folders Section */}
+              {currentFolderDocuments.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <Folder className="h-4 w-4" />
+                    Folders ({currentFolderDocuments.length})
+                  </h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+                    {currentFolderDocuments.map((folder) => (
+                      <div
+                        key={folder.path}
+                        className="group relative p-3 border border-gray-200 rounded-lg hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer"
+                        onClick={() => setCurrentFolder(folder.path)}
+                      >
+                        <Checkbox
+                          checked={selectedFolders.includes(folder.path)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setSelectedFolders([...selectedFolders, folder.path])
+                            } else {
+                              setSelectedFolders(selectedFolders.filter(path => path !== folder.path))
+                            }
+                          }}
+                          onClick={(e) => e.stopPropagation()}
+                          className="absolute top-2 left-2 z-10"
+                        />
+                        <div className="flex flex-col items-center text-center">
+                          {(() => {
+                            const IconComponent = getFolderIcon(folder)
+                            return <IconComponent className="h-8 w-8 text-blue-500 mb-2 group-hover:text-blue-600" />
+                          })()}
+                          <span className="text-sm font-medium text-gray-900 truncate w-full">{folder.name}</span>
+                          <span className="text-xs text-gray-500 mt-1">
+                            {folder.document_count} docs • {folder.subfolder_count} folders
+                          </span>
+                        </div>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="absolute top-1 right-1 h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <MoreHorizontal className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation()
+                              setCurrentFolder(folder.path)
+                              setShowCreateFolder(true)
+                            }}>
+                              <FolderPlus className="h-4 w-4 mr-2" />
+                              New Subfolder
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={(e) => {
+                              e.stopPropagation()
+                              setSelectedFolder(folder)
+                              setRenameFolderName(folder.name)
+                              setShowRenameFolder(true)
+                            }}>
+                              <FileText className="h-4 w-4 mr-2" />
+                              Rename
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              className="text-red-600"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedFolder(folder)
+                                setShowDeleteFolder(true)
+                              }}
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    ))}
                   </div>
                 </div>
-              ))}
+              )}
+
+              {/* Documents Section */}
+              {filteredDocuments.length > 0 && (
+                <div>
+                  <h4 className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+                    <FileText className="h-4 w-4" />
+                    Documents ({filteredDocuments.length})
+                  </h4>
+                  <div className="space-y-2">
+                    {filteredDocuments.map((doc, index) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+                      >
+                        <div className="flex items-center gap-3">
+                          <Checkbox
+                            checked={selectedDocuments.includes(doc.document_id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedDocuments([...selectedDocuments, doc.document_id])
+                              } else {
+                                setSelectedDocuments(selectedDocuments.filter(id => id !== doc.document_id))
+                              }
+                            }}
+                          />
+                          <FileText className="h-5 w-5 text-gray-500" />
+                          <div>
+                            <p className="font-medium">{doc.document.title}</p>
+                            <p className="text-sm text-gray-600">
+                              {formatFileSize(doc.document.file_size)} • {doc.document.file_type}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button variant="ghost" size="sm">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm">
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem>
+                                <Move className="h-4 w-4 mr-2" />
+                                Move to Folder
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                onClick={() => removeDocuments([doc.document_id])}
+                                className="text-red-600"
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Remove from Data Room
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Create Folder Dialog */}
+      <Dialog open={showCreateFolder} onOpenChange={setShowCreateFolder}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create New Folder</DialogTitle>
+            <DialogDescription>
+              Create a new folder in {currentFolder === '/' ? 'Data Room' : currentFolder}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              placeholder="Folder name"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && newFolderName.trim()) {
+                  createFolder()
+                }
+              }}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowCreateFolder(false)}>
+                Cancel
+              </Button>
+              <Button onClick={createFolder} disabled={loading || !newFolderName.trim()}>
+                Create Folder
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Documents Dialog */}
+      <Dialog open={showAddDocuments} onOpenChange={setShowAddDocuments}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add Documents to Data Room</DialogTitle>
+            <DialogDescription>
+              Select documents to add to {currentFolder === '/' ? 'the data room' : currentFolder}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 max-h-96 overflow-y-auto">
+            {availableDocuments.length === 0 ? (
+              <p className="text-center text-gray-500 py-8">
+                No available documents to add
+              </p>
+            ) : (
+              availableDocuments.map((doc) => (
+                <div key={doc.id} className="flex items-center gap-3 p-3 border rounded-lg">
+                  <Checkbox
+                    checked={selectedDocuments.includes(doc.id)}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedDocuments([...selectedDocuments, doc.id])
+                      } else {
+                        setSelectedDocuments(selectedDocuments.filter(id => id !== doc.id))
+                      }
+                    }}
+                  />
+                  <FileText className="h-5 w-5 text-gray-500" />
+                  <div>
+                    <p className="font-medium">{doc.title}</p>
+                    <p className="text-sm text-gray-600">
+                      {formatFileSize(doc.file_size)} • {doc.file_type}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setShowAddDocuments(false)}>
+              Cancel
+            </Button>
+            <Button
+              onClick={() => addDocuments(selectedDocuments)}
+              disabled={selectedDocuments.length === 0 || loading}
+            >
+              Add {selectedDocuments.length} Document{selectedDocuments.length !== 1 ? 's' : ''}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Rename Folder Dialog */}
+      <Dialog open={showRenameFolder} onOpenChange={setShowRenameFolder}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Rename Folder</DialogTitle>
+            <DialogDescription>
+              Enter a new name for "{selectedFolder?.name}"
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <Input
+              value={renameFolderName}
+              onChange={(e) => setRenameFolderName(e.target.value)}
+              placeholder="Folder name"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && renameFolderName.trim()) {
+                  renameFolder()
+                }
+              }}
+            />
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => {
+                setShowRenameFolder(false)
+                setSelectedFolder(null)
+                setRenameFolderName('')
+              }}>
+                Cancel
+              </Button>
+              <Button onClick={renameFolder} disabled={loading || !renameFolderName.trim()}>
+                Rename Folder
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Folder Dialog */}
+      <Dialog open={showDeleteFolder} onOpenChange={setShowDeleteFolder}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Folder</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete "{selectedFolder?.name}"? This action cannot be undone and will also delete all subfolders and documents within this folder.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => {
+              setShowDeleteFolder(false)
+              setSelectedFolder(null)
+            }}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={deleteFolder} disabled={loading}>
+              Delete Folder
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Bulk Delete Folders Dialog */}
+      <Dialog open={showBulkDeleteFolders} onOpenChange={setShowBulkDeleteFolders}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Multiple Folders</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete {selectedFolders.length} folder(s)? This action cannot be undone and will also delete all subfolders and documents within these folders.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="max-h-40 overflow-y-auto mb-4">
+            <ul className="text-sm text-gray-600">
+              {selectedFolders.map(path => (
+                <li key={path} className="py-1">• {path.split('/').pop()}</li>
+              ))}
+            </ul>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => {
+              setShowBulkDeleteFolders(false)
+              setSelectedFolders([])
+            }}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={bulkDeleteFolders} disabled={loading}>
+              Delete {selectedFolders.length} Folder(s)
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
