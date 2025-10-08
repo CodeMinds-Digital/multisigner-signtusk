@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { IoPersonSharp } from 'react-icons/io5'
@@ -77,6 +77,55 @@ export function SignUpForm() {
     canSignup?: boolean
   } | null>(null)
   const [checkingDomain, setCheckingDomain] = useState(false)
+  const [emailExistsError, setEmailExistsError] = useState('')
+  const [checkingEmail, setCheckingEmail] = useState(false)
+
+  // Debounced email existence check for individual accounts
+  const checkEmailExists = useCallback(async (email: string) => {
+    if (!email || accountType === 'Enterprise') return
+
+    setCheckingEmail(true)
+    setEmailExistsError('')
+
+    try {
+      const response = await fetch('/api/auth/check-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+
+      const result = await response.json()
+
+      if (result.exists) {
+        if (result.emailConfirmed) {
+          setEmailExistsError('An account with this email already exists. Please try logging in instead.')
+        } else {
+          setEmailExistsError('An account with this email exists but is not verified. Please check your email for verification instructions.')
+        }
+      } else {
+        setEmailExistsError('')
+      }
+    } catch (error) {
+      console.error('Error checking email:', error)
+      // Don't show error to user for this check
+    } finally {
+      setCheckingEmail(false)
+    }
+  }, [accountType])
+
+  // Debounce email check
+  useEffect(() => {
+    if (!formData.email || accountType === 'Enterprise') {
+      setEmailExistsError('')
+      return
+    }
+
+    const timer = setTimeout(() => {
+      checkEmailExists(formData.email)
+    }, 1000) // 1 second delay
+
+    return () => clearTimeout(timer)
+  }, [formData.email, checkEmailExists, accountType])
 
   // Check domain when email changes (for enterprise accounts)
   const checkDomain = async (email: string) => {
@@ -272,18 +321,60 @@ export function SignUpForm() {
       })
 
       if (signUpError) {
-        setError(signUpError.message)
+        // Handle specific error cases with better user messaging
+        if (signUpError.message.includes('User already registered') ||
+          signUpError.message.includes('already been registered')) {
+          setError('An account with this email already exists. Please try logging in instead or use a different email address.')
+        } else if (signUpError.message.includes('Database error') ||
+          signUpError.message.includes('saving new user')) {
+          setError('There was an issue creating your account. Please try again in a moment.')
+        } else if (signUpError.message.includes('Invalid email')) {
+          setError('Please enter a valid email address.')
+        } else if (signUpError.message.includes('Password')) {
+          setError('Password must be at least 6 characters long.')
+        } else {
+          setError(signUpError.message)
+        }
         console.error('Sign-up error:', signUpError)
         setLoading(false)
         return
       }
 
       if (data.user) {
+        // Send custom verification email
+        try {
+          const response = await fetch('/api/auth/resend-verification', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: formData.email })
+          })
+
+          if (response.ok) {
+            console.log('Verification email sent successfully')
+          } else {
+            console.warn('Failed to send verification email, but signup was successful')
+          }
+        } catch (error) {
+          console.warn('Error sending verification email:', error)
+        }
+
         navigate.push('/verify-email')
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : 'An error occurred')
       console.error('General error:', error)
+      if (error instanceof Error) {
+        if (error.message.includes('User already registered') ||
+          error.message.includes('already been registered')) {
+          setError('An account with this email already exists. Please try logging in instead or use a different email address.')
+        } else if (error.message.includes('Database error') ||
+          error.message.includes('saving new user')) {
+          setError('There was an issue creating your account. Please try again in a moment.')
+        } else {
+          setError(error.message)
+        }
+      } else {
+        setError('An unexpected error occurred. Please try again.')
+      }
     } finally {
       setLoading(false)
     }
@@ -421,12 +512,38 @@ export function SignUpForm() {
             {error && (
               <div className="mb-4 p-2 bg-red-100 text-red-600 rounded text-sm">
                 {error}
+                {error.includes('account with this email already exists') && (
+                  <div className="mt-2">
+                    <a
+                      href="/login"
+                      className="text-blue-600 hover:text-blue-800 underline font-medium"
+                    >
+                      Go to Login Page
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 
             {emailError && (
               <div className="mb-4 p-2 bg-yellow-100 text-yellow-700 rounded text-sm">
                 {emailError}
+              </div>
+            )}
+
+            {emailExistsError && (
+              <div className="mb-4 p-2 bg-red-100 text-red-600 rounded text-sm">
+                {emailExistsError}
+                {emailExistsError.includes('try logging in instead') && (
+                  <div className="mt-2">
+                    <a
+                      href="/login"
+                      className="text-blue-600 hover:text-blue-800 underline font-medium"
+                    >
+                      Go to Login Page
+                    </a>
+                  </div>
+                )}
               </div>
             )}
 
@@ -465,14 +582,19 @@ export function SignUpForm() {
                   </div>
                 </div>
                 <div className="mb-4">
-                  <label className="block text-xs font-semibold mb-1">Email Address *</label>
+                  <label className="block text-xs font-semibold mb-1">
+                    Email Address *
+                    {checkingEmail && (
+                      <span className="ml-2 text-blue-500 text-xs">Checking...</span>
+                    )}
+                  </label>
                   <input
                     type="email"
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
                     placeholder="Enter your email address"
-                    className={`w-full p-2.5 text-sm rounded-md border ${validationErrors.email ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
+                    className={`w-full p-2.5 text-sm rounded-md border ${validationErrors.email || emailExistsError ? 'border-red-500' : 'border-gray-300'} focus:ring-2 focus:ring-blue-500 focus:border-blue-500`}
                     required
                   />
                   {validationErrors.email && (
@@ -715,7 +837,7 @@ export function SignUpForm() {
             <button
               type="submit"
               className="flex items-center justify-center bg-blue-600 text-white w-full py-3 rounded-md hover:bg-blue-700 transition-colors duration-200 mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={loading || (accountType === 'Enterprise' && !!emailError)}
+              disabled={loading || (accountType === 'Enterprise' && !!emailError) || !!emailExistsError}
             >
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>

@@ -1,16 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@supabase/supabase-js'
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
-)
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { EmailVerificationService } from '@/lib/email-verification-service'
 
 // Rate limiting: Track last resend time per email (in-memory for now)
 const resendAttempts = new Map<string, number>()
@@ -85,17 +75,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Generate new verification link with 15-minute expiry
-    const { error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: emailLower,
-      options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/auth/callback`
-      }
-    })
+    // Get user's first name for personalized email
+    const firstName = user.user_metadata?.first_name || user.email?.split('@')[0] || 'User'
 
-    if (linkError) {
-      console.error('Error generating verification link:', linkError)
+    // Send verification email using our custom service
+    const emailResult = await EmailVerificationService.sendVerificationEmail(emailLower, firstName)
+
+    if (!emailResult.success) {
+      console.error('Error sending verification email:', emailResult.error)
       return NextResponse.json(
         { error: 'Failed to send verification email. Please try again later.' },
         { status: 500 }

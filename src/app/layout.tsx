@@ -5,6 +5,7 @@ import "./globals.css";
 import { SecureAuthProvider } from "@/components/providers/secure-auth-provider";
 import { ConsoleFilterProvider } from "@/components/providers/console-filter-provider";
 import { ToastProvider } from "@/components/ui/toast";
+import { Toaster } from "@/components/ui/sonner";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -39,6 +40,7 @@ export default function RootLayout({
             <SecureAuthProvider>
               <ToastProvider>
                 {children}
+                <Toaster />
               </ToastProvider>
             </SecureAuthProvider>
           </ConsoleFilterProvider>

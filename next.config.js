@@ -20,6 +20,8 @@ const nextConfig = {
     } : false,
   },
 
+
+
   // Remove standalone output for Netlify compatibility
   // output: 'standalone',
 
