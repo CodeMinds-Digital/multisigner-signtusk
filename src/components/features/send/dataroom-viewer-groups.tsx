@@ -9,19 +9,19 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { 
-  Users, 
-  UserPlus, 
-  MoreHorizontal, 
-  Edit, 
-  Trash2, 
+import {
+  Users,
+  UserPlus,
+  MoreHorizontal,
+  Edit,
+  Trash2,
   Mail,
   Building,
   Calendar,
   Shield
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { formatDistanceToNow } from '@/lib/utils'
+import { formatRelativeTime } from '@/lib/utils'
 
 interface ViewerGroup {
   id: string
@@ -223,7 +223,7 @@ export function DataroomViewerGroups({ dataroomId }: DataroomViewerGroupsProps) 
             Organize viewers into groups for easier permission management
           </p>
         </div>
-        
+
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
             <Button onClick={resetForm}>
@@ -267,8 +267,8 @@ export function DataroomViewerGroups({ dataroomId }: DataroomViewerGroupsProps) 
                 />
               </div>
               <div className="flex justify-end gap-2">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setShowCreateDialog(false)}
                 >
                   Cancel
@@ -298,15 +298,15 @@ export function DataroomViewerGroups({ dataroomId }: DataroomViewerGroupsProps) 
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {viewerGroups.map((group) => (
-            <Card 
-              key={group.id} 
+            <Card
+              key={group.id}
               className="cursor-pointer hover:shadow-md transition-shadow"
               onClick={() => handleGroupSelect(group)}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div 
+                    <div
                       className="w-3 h-3 rounded-full"
                       style={{ backgroundColor: group.color }}
                     />
@@ -317,11 +317,11 @@ export function DataroomViewerGroups({ dataroomId }: DataroomViewerGroupsProps) 
                       </Badge>
                     )}
                   </div>
-                  
+
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="sm"
                         onClick={(e) => e.stopPropagation()}
                       >
@@ -355,14 +355,14 @@ export function DataroomViewerGroups({ dataroomId }: DataroomViewerGroupsProps) 
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </div>
-                
+
                 {group.description && (
                   <CardDescription className="text-sm">
                     {group.description}
                   </CardDescription>
                 )}
               </CardHeader>
-              
+
               <CardContent>
                 <div className="flex items-center justify-between text-sm text-gray-500">
                   <div className="flex items-center gap-1">
@@ -370,7 +370,7 @@ export function DataroomViewerGroups({ dataroomId }: DataroomViewerGroupsProps) 
                     <span>{group.member_count} member(s)</span>
                   </div>
                   <span>
-                    {formatDistanceToNow(new Date(group.created_at), { addSuffix: true })}
+                    {formatRelativeTime(group.created_at)}
                   </span>
                 </div>
               </CardContent>
@@ -417,8 +417,8 @@ export function DataroomViewerGroups({ dataroomId }: DataroomViewerGroupsProps) 
               />
             </div>
             <div className="flex justify-end gap-2">
-              <Button 
-                variant="outline" 
+              <Button
+                variant="outline"
                 onClick={() => setEditingGroup(null)}
               >
                 Cancel
@@ -437,7 +437,7 @@ export function DataroomViewerGroups({ dataroomId }: DataroomViewerGroupsProps) 
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <div 
+                <div
                   className="w-3 h-3 rounded-full"
                   style={{ backgroundColor: selectedGroup.color }}
                 />
@@ -452,7 +452,7 @@ export function DataroomViewerGroups({ dataroomId }: DataroomViewerGroupsProps) 
                 {selectedGroup.description || 'No description provided'}
               </DialogDescription>
             </DialogHeader>
-            
+
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h4 className="font-medium">Group Members</h4>
@@ -461,7 +461,7 @@ export function DataroomViewerGroups({ dataroomId }: DataroomViewerGroupsProps) 
                   Invite Members
                 </Button>
               </div>
-              
+
               {groupMembers.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
                   <Users className="h-8 w-8 mx-auto mb-2 opacity-50" />
@@ -495,7 +495,7 @@ export function DataroomViewerGroups({ dataroomId }: DataroomViewerGroupsProps) 
                           </span>
                         </div>
                       </div>
-                      
+
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                           <Button variant="ghost" size="sm">

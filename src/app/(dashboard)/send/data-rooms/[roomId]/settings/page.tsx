@@ -23,7 +23,7 @@ import {
   Lock,
   Eye,
   Download,
-  Watermark,
+  Image,
   AlertTriangle
 } from 'lucide-react'
 import Link from 'next/link'

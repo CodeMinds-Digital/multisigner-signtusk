@@ -4,7 +4,7 @@ import { promisify } from 'util'
 // Promisify DNS functions
 const resolveTxt = promisify(dns.resolveTxt)
 const resolveCname = promisify(dns.resolveCname)
-const resolveA = promisify(dns.resolveA)
+const resolveA = promisify(dns.resolve4)
 
 export interface DNSVerificationResult {
   success: boolean
@@ -33,11 +33,11 @@ export async function verifyDomainOwnership(
   try {
     // Check for TXT record at _signtusk-verification.domain.com
     const verificationDomain = `_signtusk-verification.${domain}`
-    
+
     const txtRecords = await resolveTxt(verificationDomain)
-    
+
     // Look for our verification token in the TXT records
-    const hasValidToken = txtRecords.some(record => 
+    const hasValidToken = txtRecords.some(record =>
       record.join('').includes(`signtusk-verification=${verificationToken}`)
     )
 
@@ -70,8 +70,8 @@ export async function verifyCnameRecord(
 ): Promise<DNSVerificationResult> {
   try {
     const cnameRecords = await resolveCname(domain)
-    
-    const hasValidCname = cnameRecords.some(record => 
+
+    const hasValidCname = cnameRecords.some(record =>
       record.toLowerCase() === expectedTarget.toLowerCase()
     )
 
@@ -104,7 +104,7 @@ export async function verifyARecord(
 ): Promise<DNSVerificationResult> {
   try {
     const aRecords = await resolveA(domain)
-    
+
     const hasValidA = aRecords.some(ip => expectedIPs.includes(ip))
 
     if (hasValidA) {

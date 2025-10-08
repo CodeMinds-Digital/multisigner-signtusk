@@ -25,9 +25,15 @@ export async function GET(request: NextRequest) {
 
     if (action === 'fix' && email) {
       // Try to create missing user profile for specific email
-      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserByEmail(email)
+      const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers()
 
-      if (authError || !authUser.user) {
+      if (authError) {
+        return NextResponse.json({ error: 'Failed to fetch users from auth' }, { status: 500 })
+      }
+
+      const authUser = authUsers.users.find(user => user.email?.toLowerCase() === email.toLowerCase())
+
+      if (!authUser) {
         return NextResponse.json({ error: 'User not found in auth' }, { status: 404 })
       }
 
@@ -35,7 +41,7 @@ export async function GET(request: NextRequest) {
       const { data: existingProfile, error: profileCheckError } = await supabaseAdmin
         .from('user_profiles')
         .select('id')
-        .eq('id', authUser.user.id)
+        .eq('id', authUser.id)
         .single()
 
       if (existingProfile) {
@@ -43,17 +49,17 @@ export async function GET(request: NextRequest) {
       }
 
       // Create the missing profile
-      const userMetadata = authUser.user.user_metadata || {}
+      const userMetadata = authUser.user_metadata || {}
       const { data: newProfile, error: createError } = await supabaseAdmin
         .from('user_profiles')
         .insert({
-          id: authUser.user.id,
-          email: authUser.user.email,
-          full_name: userMetadata.full_name || userMetadata.first_name || authUser.user.email?.split('@')[0] || 'User',
+          id: authUser.id,
+          email: authUser.email,
+          full_name: userMetadata.full_name || userMetadata.first_name || authUser.email?.split('@')[0] || 'User',
           first_name: userMetadata.first_name || '',
           last_name: userMetadata.last_name || '',
           account_type: userMetadata.account_type || 'personal',
-          email_verified: authUser.user.email_confirmed_at ? true : false,
+          email_verified: authUser.email_confirmed_at ? true : false,
           onboarding_completed: false,
           plan: 'free',
           subscription_status: 'active',
@@ -61,7 +67,7 @@ export async function GET(request: NextRequest) {
           storage_used_mb: 0,
           monthly_documents_used: 0,
           monthly_limit: 10,
-          is_admin: authUser.user.email === 'admin@signtusk.com',
+          is_admin: authUser.email === 'admin@signtusk.com',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
@@ -81,9 +87,14 @@ export async function GET(request: NextRequest) {
 
     if (action === 'check' && email) {
       // Check specific email status
-      const { data: authUser, error: authError } = await supabaseAdmin.auth.admin.getUserByEmail(email)
+      const { data: authUsers, error: authError } = await supabaseAdmin.auth.admin.listUsers()
 
-      const authExists = !authError && authUser.user
+      if (authError) {
+        return NextResponse.json({ error: 'Failed to fetch users from auth' }, { status: 500 })
+      }
+
+      const authUser = authUsers.users.find(user => user.email?.toLowerCase() === email.toLowerCase())
+      const authExists = !!authUser
 
       const { data: profile, error: profileError } = await supabaseAdmin
         .from('user_profiles')
@@ -98,11 +109,11 @@ export async function GET(request: NextRequest) {
         authExists,
         profileExists,
         authUser: authExists ? {
-          id: authUser.user?.id,
-          email: authUser.user?.email,
-          emailConfirmed: authUser.user?.email_confirmed_at,
-          createdAt: authUser.user?.created_at,
-          metadata: authUser.user?.user_metadata
+          id: authUser?.id,
+          email: authUser?.email,
+          emailConfirmed: authUser?.email_confirmed_at,
+          createdAt: authUser?.created_at,
+          metadata: authUser?.user_metadata
         } : null,
         profile: profileExists ? profile : null,
         isOrphaned: authExists && !profileExists

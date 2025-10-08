@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getAuthTokensFromRequest, verifyAccessToken } from '@/lib/auth-utils'
+import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
+import { verifyAccessToken } from '@/lib/jwt-utils'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,7 +19,7 @@ interface BulkOperationResult {
 export async function POST(request: NextRequest) {
   try {
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -254,9 +255,9 @@ async function bulkShareDocuments(documentIds: string[], userId: string, shareDa
       if (error) throw error
 
       result.processed++
-      result.results.push({ 
-        documentId, 
-        status: 'shared', 
+      result.results.push({
+        documentId,
+        status: 'shared',
         linkId: link.id,
         shareUrl: `/v/${link.slug}`
       })

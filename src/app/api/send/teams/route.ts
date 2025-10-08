@@ -73,7 +73,7 @@ export async function GET(request: NextRequest) {
     })
 
     // Add member teams only if not already present
-    memberTeamsList.forEach(team => {
+    memberTeamsList.forEach((team: any) => {
       if (!teamsMap.has(team.id)) {
         teamsMap.set(team.id, team)
       }

@@ -9,6 +9,8 @@ const nextConfig = {
     },
   },
 
+
+
   // Remove standalone output for Netlify compatibility
   // output: 'standalone',
 

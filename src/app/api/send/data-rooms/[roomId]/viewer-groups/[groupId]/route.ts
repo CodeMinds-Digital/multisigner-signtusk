@@ -11,7 +11,7 @@ export async function GET(
   try {
     const { roomId, groupId } = await params
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -96,7 +96,7 @@ export async function PATCH(
   try {
     const { roomId, groupId } = await params
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -118,7 +118,7 @@ export async function PATCH(
       .eq('data_room_id', roomId)
       .single()
 
-    if (verifyError || !existingGroup || existingGroup.data_room.user_id !== userId) {
+    if (verifyError || !existingGroup || (existingGroup.data_room as any).user_id !== userId) {
       return NextResponse.json(
         { error: 'Viewer group not found' },
         { status: 404 }
@@ -144,7 +144,7 @@ export async function PATCH(
 
     if (updateError) {
       console.error('Error updating viewer group:', updateError)
-      
+
       // Handle unique constraint violation
       if (updateError.code === '23505') {
         return NextResponse.json(
@@ -152,7 +152,7 @@ export async function PATCH(
           { status: 409 }
         )
       }
-      
+
       return NextResponse.json(
         { error: 'Failed to update viewer group' },
         { status: 500 }
@@ -181,7 +181,7 @@ export async function DELETE(
   try {
     const { roomId, groupId } = await params
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -203,7 +203,7 @@ export async function DELETE(
       .eq('data_room_id', roomId)
       .single()
 
-    if (verifyError || !existingGroup || existingGroup.data_room.user_id !== userId) {
+    if (verifyError || !existingGroup || (existingGroup.data_room as any).user_id !== userId) {
       return NextResponse.json(
         { error: 'Viewer group not found' },
         { status: 404 }

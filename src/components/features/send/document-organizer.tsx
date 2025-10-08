@@ -6,10 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { 
-  FileText, 
-  MoreHorizontal, 
-  FolderOpen, 
+import {
+  FileText,
+  MoreHorizontal,
+  FolderOpen,
   Move,
   Trash2,
   Download,
@@ -17,7 +17,7 @@ import {
   Eye
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { formatBytes, formatDistanceToNow } from '@/lib/utils'
+import { formatFileSize, formatRelativeTime } from '@/lib/utils'
 import { FolderTree } from './folder-tree'
 
 interface Document {
@@ -50,7 +50,7 @@ export function DocumentOrganizer({ folderId, onDocumentSelect }: DocumentOrgani
     try {
       let url = '/api/send/documents/upload'
       const params = new URLSearchParams()
-      
+
       if (targetFolderId) {
         // Fetch documents in specific folder
         url = `/api/send/folders/${targetFolderId}`
@@ -193,7 +193,7 @@ export function DocumentOrganizer({ folderId, onDocumentSelect }: DocumentOrgani
                   {documents.length} document(s) found
                 </CardDescription>
               </div>
-              
+
               {selectedDocuments.size > 0 && (
                 <div className="flex items-center gap-2">
                   <Badge variant="secondary">
@@ -210,7 +210,7 @@ export function DocumentOrganizer({ folderId, onDocumentSelect }: DocumentOrgani
                 </div>
               )}
             </div>
-            
+
             {documents.length > 0 && (
               <div className="flex items-center gap-2 mt-4">
                 <Checkbox
@@ -223,7 +223,7 @@ export function DocumentOrganizer({ folderId, onDocumentSelect }: DocumentOrgani
               </div>
             )}
           </CardHeader>
-          
+
           <CardContent>
             {loading ? (
               <div className="flex items-center justify-center py-8">
@@ -246,18 +246,18 @@ export function DocumentOrganizer({ folderId, onDocumentSelect }: DocumentOrgani
                       checked={selectedDocuments.has(document.id)}
                       onCheckedChange={() => toggleDocumentSelection(document.id)}
                     />
-                    
+
                     <div className="text-2xl">
                       {getFileTypeIcon(document.file_type)}
                     </div>
-                    
+
                     <div className="flex-1 min-w-0">
                       <h3 className="font-medium truncate">
                         {document.title}
                       </h3>
                       <div className="flex items-center gap-4 text-sm text-gray-500">
-                        <span>{formatBytes(document.file_size)}</span>
-                        <span>{formatDistanceToNow(new Date(document.created_at), { addSuffix: true })}</span>
+                        <span>{formatFileSize(document.file_size)}</span>
+                        <span>{formatRelativeTime(document.created_at)}</span>
                         {document.version_number > 1 && (
                           <Badge variant="outline" className="text-xs">
                             v{document.version_number}
@@ -265,7 +265,7 @@ export function DocumentOrganizer({ folderId, onDocumentSelect }: DocumentOrgani
                         )}
                       </div>
                     </div>
-                    
+
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm">
@@ -319,8 +319,8 @@ export function DocumentOrganizer({ folderId, onDocumentSelect }: DocumentOrgani
                 />
               </div>
               <div className="flex justify-end gap-2 mt-4">
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   onClick={() => setShowMoveDialog(false)}
                 >
                   Cancel

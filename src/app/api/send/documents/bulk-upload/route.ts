@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getAuthTokensFromRequest, verifyAccessToken } from '@/lib/auth-utils'
+import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
+import { verifyAccessToken } from '@/lib/jwt-utils'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,

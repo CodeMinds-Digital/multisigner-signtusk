@@ -669,7 +669,6 @@ export function DataRoomDocumentManager({
                               setSelectedFolders(selectedFolders.filter(path => path !== folder.path))
                             }
                           }}
-                          onClick={(e) => e.stopPropagation()}
                           className="absolute top-2 left-2 z-10"
                         />
                         <div className="flex flex-col items-center text-center">
@@ -679,7 +678,7 @@ export function DataRoomDocumentManager({
                           })()}
                           <span className="text-sm font-medium text-gray-900 truncate w-full">{folder.name}</span>
                           <span className="text-xs text-gray-500 mt-1">
-                            {folder.document_count} docs • {folder.subfolder_count} folders
+                            {folder.document_count} docs
                           </span>
                         </div>
                         <DropdownMenu>

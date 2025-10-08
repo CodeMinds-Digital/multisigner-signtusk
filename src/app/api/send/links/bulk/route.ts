@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getAuthTokensFromRequest, verifyAccessToken } from '@/lib/auth-utils'
+import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
+import { verifyAccessToken } from '@/lib/jwt-utils'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -18,7 +19,7 @@ interface BulkLinkResult {
 export async function POST(request: NextRequest) {
   try {
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -51,7 +52,7 @@ export async function POST(request: NextRequest) {
         }
         result = await bulkCreateLinks(documentIds, userId, linkSettings)
         break
-      
+
       case 'delete':
         if (!linkIds || !Array.isArray(linkIds)) {
           return NextResponse.json(
@@ -61,7 +62,7 @@ export async function POST(request: NextRequest) {
         }
         result = await bulkDeleteLinks(linkIds, userId)
         break
-      
+
       case 'update':
         if (!linkIds || !Array.isArray(linkIds)) {
           return NextResponse.json(
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
         }
         result = await bulkUpdateLinks(linkIds, userId, data)
         break
-      
+
       case 'expire':
         if (!linkIds || !Array.isArray(linkIds)) {
           return NextResponse.json(
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
         }
         result = await bulkExpireLinks(linkIds, userId)
         break
-      
+
       case 'extend':
         if (!linkIds || !Array.isArray(linkIds)) {
           return NextResponse.json(
@@ -91,7 +92,7 @@ export async function POST(request: NextRequest) {
         }
         result = await bulkExtendLinks(linkIds, userId, data.expiresAt)
         break
-      
+
       default:
         return NextResponse.json(
           { error: 'Invalid operation' },

@@ -11,11 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem } from '@/components/ui/command'
 import { Checkbox } from '@/components/ui/checkbox'
-import { 
-  Plus, 
-  Tag, 
-  X, 
-  Search, 
+import {
+  Plus,
+  Tag,
+  X,
+  Search,
   Filter,
   Palette,
   Hash,
@@ -212,7 +212,7 @@ export function DocumentTagsManager({
     const newTagIds = currentSelectedTags.includes(tagId)
       ? currentSelectedTags.filter(id => id !== tagId)
       : [...currentSelectedTags, tagId]
-    
+
     assignTags(newTagIds)
   }
 
@@ -289,7 +289,7 @@ export function DocumentTagsManager({
                   >
                     <Checkbox
                       checked={currentSelectedTags.includes(tag.id)}
-                      onChange={() => {}}
+                      onCheckedChange={() => { }}
                     />
                     <div
                       className="w-3 h-3 rounded-full"
@@ -322,7 +322,7 @@ export function DocumentTagsManager({
             Organize and categorize your documents with tags
           </p>
         </div>
-        
+
         {showCreateTag && (
           <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
             <DialogTrigger asChild>
@@ -348,7 +348,7 @@ export function DocumentTagsManager({
                     placeholder="e.g., Important"
                   />
                 </div>
-                
+
                 <div>
                   <Label htmlFor="tag-description">Description (Optional)</Label>
                   <Input
@@ -376,9 +376,8 @@ export function DocumentTagsManager({
                         <button
                           key={color}
                           onClick={() => setTagColor(color)}
-                          className={`w-6 h-6 rounded-full border-2 ${
-                            tagColor === color ? 'border-gray-800' : 'border-gray-300'
-                          }`}
+                          className={`w-6 h-6 rounded-full border-2 ${tagColor === color ? 'border-gray-800' : 'border-gray-300'
+                            }`}
                           style={{ backgroundColor: color }}
                         />
                       ))}
@@ -387,8 +386,8 @@ export function DocumentTagsManager({
                 </div>
 
                 <div className="flex justify-end gap-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setShowCreateDialog(false)}
                   >
                     Cancel
@@ -474,11 +473,10 @@ export function DocumentTagsManager({
                 <button
                   key={tag.id}
                   onClick={() => toggleTag(tag.id)}
-                  className={`p-3 rounded-lg border text-left transition-colors ${
-                    isSelected
+                  className={`p-3 rounded-lg border text-left transition-colors ${isSelected
                       ? 'border-blue-500 bg-blue-50'
                       : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
-                  }`}
+                    }`}
                 >
                   <div className="flex items-center gap-2 mb-1">
                     <div
@@ -489,7 +487,7 @@ export function DocumentTagsManager({
                     <span className="font-medium text-sm">{tag.name}</span>
                     {isSelected && <Check className="h-4 w-4 text-blue-600 ml-auto" />}
                   </div>
-                  
+
                   <div className="flex items-center gap-2 text-xs text-gray-500">
                     <span>{tag.usage_count} documents</span>
                     {tag.is_system && (
@@ -498,8 +496,8 @@ export function DocumentTagsManager({
                       </Badge>
                     )}
                     {tag.group && (
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className="text-xs"
                         style={{ borderColor: tag.group.color, color: tag.group.color }}
                       >
@@ -507,7 +505,7 @@ export function DocumentTagsManager({
                       </Badge>
                     )}
                   </div>
-                  
+
                   {tag.description && (
                     <p className="text-xs text-gray-600 mt-1 line-clamp-2">
                       {tag.description}

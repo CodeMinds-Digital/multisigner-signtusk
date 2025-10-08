@@ -104,10 +104,10 @@ export function ScreenshotProtection({
     const handleKeyDown = (e: KeyboardEvent) => {
       // Prevent common screenshot shortcuts
       if (
-        (e.ctrlKey || e.metaKey) && 
+        (e.ctrlKey || e.metaKey) &&
         (e.key === 's' || e.key === 'S' || // Save
-         e.key === 'p' || e.key === 'P' || // Print
-         e.shiftKey && (e.key === 's' || e.key === 'S')) // Screenshot on some systems
+          e.key === 'p' || e.key === 'P' || // Print
+          e.shiftKey && (e.key === 's' || e.key === 'S')) // Screenshot on some systems
       ) {
         e.preventDefault()
         logProtectionEvent('keyboard_shortcut_blocked', {
@@ -236,21 +236,21 @@ export function ScreenshotProtection({
   }
 
   return (
-    <div 
+    <div
       ref={containerRef}
       className={`relative ${enabled ? 'select-none' : ''}`}
       style={{
         userSelect: enabled ? 'none' : 'auto',
         WebkitUserSelect: enabled ? 'none' : 'auto',
         MozUserSelect: enabled ? 'none' : 'auto',
-        msUserSelect: enabled ? 'none' : 'auto',
-        WebkitTouchCallout: enabled ? 'none' : 'auto',
+        msUserSelect: enabled ? 'none' : 'text',
+        WebkitTouchCallout: enabled ? 'none' : 'inherit',
         WebkitUserDrag: enabled ? 'none' : 'auto',
         KhtmlUserSelect: enabled ? 'none' : 'auto'
-      }}
+      } as any}
     >
       {children}
-      
+
       {/* Watermark overlay */}
       {watermarkConfig?.enabled && (
         <div style={getWatermarkStyle()}>

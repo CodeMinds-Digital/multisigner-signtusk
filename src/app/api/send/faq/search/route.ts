@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     // If no user_id provided, try to get from auth token
     if (!targetUserId) {
       const { accessToken } = getAuthTokensFromRequest(request)
-      
+
       if (!accessToken) {
         return NextResponse.json(
           { error: 'Authentication required' },
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
       const ipAddress = forwarded?.split(',')[0] || realIp || '127.0.0.1'
 
       // Don't await this to avoid slowing down the response
-      supabaseAdmin
+      Promise.resolve(supabaseAdmin
         .from('send_faq_search_history')
         .insert({
           user_id: targetUserId,
@@ -74,9 +74,9 @@ export async function GET(request: NextRequest) {
           document_id: documentId || null,
           data_room_id: dataroomId || null,
           ip_address: ipAddress
-        })
-        .then(() => {})
-        .catch(err => console.error('Error logging search:', err))
+        }))
+        .then(() => { })
+        .catch((err: any) => console.error('Error logging search:', err))
     }
 
     return NextResponse.json({

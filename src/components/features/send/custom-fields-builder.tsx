@@ -28,7 +28,7 @@ import {
   AlignLeft
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
+// import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 
 interface CustomField {
   id: string
@@ -251,39 +251,39 @@ export function CustomFieldsBuilder({ onFieldsChange }: CustomFieldsBuilderProps
     }
   }
 
-  // Handle drag and drop reordering
-  const handleDragEnd = async (result: any) => {
-    if (!result.destination) return
+  // Handle drag and drop reordering - disabled for now
+  // const handleDragEnd = async (result: any) => {
+  //   if (!result.destination) return
 
-    const items = Array.from(customFields)
-    const [reorderedItem] = items.splice(result.source.index, 1)
-    items.splice(result.destination.index, 0, reorderedItem)
+  //   const items = Array.from(customFields)
+  //   const [reorderedItem] = items.splice(result.source.index, 1)
+  //   items.splice(result.destination.index, 0, reorderedItem)
 
-    // Update display order
-    const updates = items.map((item, index) => ({
-      id: item.id,
-      display_order: index
-    }))
+  //   // Update display order
+  //   const updates = items.map((item, index) => ({
+  //     id: item.id,
+  //     display_order: index
+  //   }))
 
-    setCustomFields(items)
+  //   setCustomFields(items)
 
-    // Update in backend
-    try {
-      await Promise.all(
-        updates.map(update =>
-          fetch(`/api/send/custom-fields/${update.id}`, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ display_order: update.display_order })
-          })
-        )
-      )
-    } catch (error) {
-      console.error('Error updating field order:', error)
-      toast.error('Failed to update field order')
-      fetchCustomFields() // Revert on error
-    }
-  }
+  //   // Update in backend
+  //   try {
+  //     await Promise.all(
+  //       updates.map(update =>
+  //         fetch(`/api/send/custom-fields/${update.id}`, {
+  //           method: 'PATCH',
+  //           headers: { 'Content-Type': 'application/json' },
+  //           body: JSON.stringify({ display_order: update.display_order })
+  //         })
+  //       )
+  //     )
+  //   } catch (error) {
+  //     console.error('Error updating field order:', error)
+  //     toast.error('Failed to update field order')
+  //     fetchCustomFields() // Revert on error
+  //   }
+  // }
 
   // Reset form
   const resetForm = () => {
@@ -503,102 +503,79 @@ export function CustomFieldsBuilder({ onFieldsChange }: CustomFieldsBuilderProps
           </CardContent>
         </Card>
       ) : (
-        <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="custom-fields">
-            {(provided) => (
-              <div
-                {...provided.droppableProps}
-                ref={provided.innerRef}
-                className="space-y-3"
+        <div className="space-y-3">
+          {customFields.map((field, index) => {
+            const Icon = getFieldTypeIcon(field.field_type)
+            return (
+              <Card
+                key={field.id}
+                className={`${!field.is_active ? 'opacity-50' : ''}`}
               >
-                {customFields.map((field, index) => {
-                  const Icon = getFieldTypeIcon(field.field_type)
-                  return (
-                    <Draggable key={field.id} draggableId={field.id} index={index}>
-                      {(provided) => (
-                        <Card
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          className={`${!field.is_active ? 'opacity-50' : ''}`}
+                <CardContent className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Icon className="h-5 w-5 text-gray-600" />
+
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h4 className="font-medium">{field.label}</h4>
+                        {field.is_required && (
+                          <Badge variant="secondary" className="text-xs">
+                            Required
+                          </Badge>
+                        )}
+                        {!field.is_active && (
+                          <Badge variant="outline" className="text-xs">
+                            Inactive
+                          </Badge>
+                        )}
+                        {field.group_name && (
+                          <Badge variant="outline" className="text-xs">
+                            {field.group_name}
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-gray-500">
+                        <span>Type: {fieldTypes.find(ft => ft.value === field.field_type)?.label}</span>
+                        <span>Name: {field.name}</span>
+                        {field.description && (
+                          <span>Description: {field.description}</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem
+                          onClick={() => handleEditField(field)}
                         >
-                          <CardContent className="p-4">
-                            <div className="flex items-center gap-3">
-                              <div
-                                {...provided.dragHandleProps}
-                                className="cursor-grab active:cursor-grabbing"
-                              >
-                                <GripVertical className="h-5 w-5 text-gray-400" />
-                              </div>
-
-                              <Icon className="h-5 w-5 text-gray-600" />
-
-                              <div className="flex-1">
-                                <div className="flex items-center gap-2">
-                                  <h4 className="font-medium">{field.label}</h4>
-                                  {field.is_required && (
-                                    <Badge variant="secondary" className="text-xs">
-                                      Required
-                                    </Badge>
-                                  )}
-                                  {!field.is_active && (
-                                    <Badge variant="outline" className="text-xs">
-                                      Inactive
-                                    </Badge>
-                                  )}
-                                  {field.group_name && (
-                                    <Badge variant="outline" className="text-xs">
-                                      {field.group_name}
-                                    </Badge>
-                                  )}
-                                </div>
-                                <div className="flex items-center gap-4 text-sm text-gray-500">
-                                  <span>Type: {fieldTypes.find(ft => ft.value === field.field_type)?.label}</span>
-                                  <span>Name: {field.name}</span>
-                                  {field.description && (
-                                    <span>Description: {field.description}</span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                  <Button variant="ghost" size="sm">
-                                    <MoreHorizontal className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                  <DropdownMenuItem
-                                    onClick={() => handleEditField(field)}
-                                  >
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => toggleFieldStatus(field.id, field.is_active)}
-                                  >
-                                    {field.is_active ? 'Deactivate' : 'Activate'}
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem
-                                    onClick={() => deleteCustomField(field.id)}
-                                    className="text-red-600"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      )}
-                    </Draggable>
-                  )
-                })}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => toggleFieldStatus(field.id, field.is_active)}
+                        >
+                          {field.is_active ? 'Deactivate' : 'Activate'}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={() => deleteCustomField(field.id)}
+                          className="text-red-600"
+                        >
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
       )}
 
       {/* Edit Field Dialog */}
@@ -747,6 +724,6 @@ export function CustomFieldsBuilder({ onFieldsChange }: CustomFieldsBuilderProps
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </div >
   )
 }

@@ -11,7 +11,7 @@ export async function GET(
   try {
     const { id } = await params
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -52,7 +52,7 @@ export async function GET(
       custom_field: {
         ...customField,
         usage_count: usageStats?.length || 0,
-        last_used: usageStats?.length > 0 ? 
+        last_used: usageStats && usageStats.length > 0 ?
           Math.max(...usageStats.map(s => new Date(s.submitted_at).getTime())) : null
       }
     })
@@ -74,7 +74,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -150,7 +150,7 @@ export async function PATCH(
 
     if (updateError) {
       console.error('Error updating custom field:', updateError)
-      
+
       // Handle unique constraint violation
       if (updateError.code === '23505') {
         return NextResponse.json(
@@ -158,7 +158,7 @@ export async function PATCH(
           { status: 409 }
         )
       }
-      
+
       return NextResponse.json(
         { error: 'Failed to update custom field' },
         { status: 500 }
@@ -187,7 +187,7 @@ export async function DELETE(
   try {
     const { id } = await params
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },

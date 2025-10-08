@@ -46,14 +46,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const fieldMap = new Map(linkFields.map(f => [f.field_id, f]))
+    const fieldMap = new Map(linkFields.map((f: any) => [f.field_id, f]))
     const validationErrors = []
     const responseInserts = []
 
     // Validate and prepare responses
     for (const response of responses) {
       const { field_id, field_value, field_values } = response
-      
+
       if (!field_id) {
         validationErrors.push('field_id is required for all responses')
         continue
@@ -75,12 +75,12 @@ export async function POST(request: NextRequest) {
 
       if (validationError) {
         console.error('Validation error:', validationError)
-        validationErrors.push(`Validation failed for field ${fieldDef.name}`)
+        validationErrors.push(`Validation failed for field ${(fieldDef as any).name}`)
         continue
       }
 
       if (!isValid) {
-        validationErrors.push(`Invalid value for field ${fieldDef.label}`)
+        validationErrors.push(`Invalid value for field ${(fieldDef as any).label}`)
         continue
       }
 

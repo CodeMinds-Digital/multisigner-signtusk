@@ -10,11 +10,11 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Separator } from '@/components/ui/separator'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { 
-  Clock, 
-  Upload, 
-  Star, 
-  FileText, 
+import {
+  Clock,
+  Upload,
+  Star,
+  FileText,
   Calendar,
   User,
   Download,
@@ -23,7 +23,7 @@ import {
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { formatDistanceToNow } from 'date-fns'
-import { formatBytes } from '@/lib/utils'
+import { formatFileSize } from '@/lib/utils'
 
 interface DocumentVersion {
   id: string
@@ -43,10 +43,10 @@ interface DocumentVersionManagerProps {
   onVersionChange?: (version: DocumentVersion) => void
 }
 
-export function DocumentVersionManager({ 
-  documentId, 
+export function DocumentVersionManager({
+  documentId,
   currentTitle,
-  onVersionChange 
+  onVersionChange
 }: DocumentVersionManagerProps) {
   const [versions, setVersions] = useState<DocumentVersion[]>([])
   const [loading, setLoading] = useState(false)
@@ -217,13 +217,13 @@ export function DocumentVersionManager({
                   />
                 </div>
                 <div className="flex justify-end gap-2">
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     onClick={() => setShowUploadDialog(false)}
                   >
                     Cancel
                   </Button>
-                  <Button 
+                  <Button
                     onClick={handleUploadVersion}
                     disabled={!uploadFile || uploading}
                   >
@@ -246,11 +246,10 @@ export function DocumentVersionManager({
               {versions.map((version) => (
                 <div
                   key={version.id}
-                  className={`p-4 rounded-lg border ${
-                    version.is_primary 
-                      ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950' 
-                      : 'border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900'
-                  }`}
+                  className={`p-4 rounded-lg border ${version.is_primary
+                    ? 'border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950'
+                    : 'border-gray-200 bg-gray-50 dark:border-gray-800 dark:bg-gray-900'
+                    }`}
                 >
                   <div className="flex items-start justify-between">
                     <div className="flex-1">
@@ -265,11 +264,11 @@ export function DocumentVersionManager({
                           </Badge>
                         )}
                       </div>
-                      
+
                       <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
                         <div className="flex items-center gap-2">
                           <FileText className="h-4 w-4" />
-                          {formatBytes(version.file_size)}
+                          {formatFileSize(version.file_size)}
                         </div>
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4" />

@@ -11,7 +11,7 @@ export async function GET(
   try {
     const { id } = await params
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -93,7 +93,7 @@ export async function PATCH(
   try {
     const { id } = await params
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -123,9 +123,9 @@ export async function PATCH(
     }
 
     // Check if user owns the document or dataroom
-    const hasAccess = 
-      (conversation.document && conversation.document.user_id === userId) ||
-      (conversation.dataroom && conversation.dataroom.user_id === userId)
+    const hasAccess =
+      (conversation.document && (conversation.document as any).user_id === userId) ||
+      (conversation.dataroom && (conversation.dataroom as any).user_id === userId)
 
     if (!hasAccess) {
       return NextResponse.json(
@@ -192,7 +192,7 @@ export async function DELETE(
   try {
     const { id } = await params
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -222,9 +222,9 @@ export async function DELETE(
     }
 
     // Check if user owns the document or dataroom
-    const hasAccess = 
-      (conversation.document && conversation.document.user_id === userId) ||
-      (conversation.dataroom && conversation.dataroom.user_id === userId)
+    const hasAccess =
+      (conversation.document && (conversation.document as any).user_id === userId) ||
+      (conversation.dataroom && (conversation.dataroom as any).user_id === userId)
 
     if (!hasAccess) {
       return NextResponse.json(

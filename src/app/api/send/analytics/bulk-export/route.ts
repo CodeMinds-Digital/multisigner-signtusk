@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getAuthTokensFromRequest, verifyAccessToken } from '@/lib/auth-utils'
+import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
+import { verifyAccessToken } from '@/lib/jwt-utils'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -10,7 +11,7 @@ const supabaseAdmin = createClient(
 export async function POST(request: NextRequest) {
   try {
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -98,14 +99,14 @@ export async function POST(request: NextRequest) {
 
       // Aggregate analytics
       const totalViews = views?.length || 0
-      const uniqueViewers = new Set(views?.map(v => v.visitor_sessions?.visitor_id).filter(Boolean)).size
-      const totalDuration = views?.reduce((sum, v) => sum + (v.duration_seconds || 0), 0) || 0
+      const uniqueViewers = new Set(views?.map((v: any) => v.visitor_sessions?.visitor_id).filter(Boolean)).size
+      const totalDuration = views?.reduce((sum: number, v: any) => sum + (v.duration_seconds || 0), 0) || 0
       const avgDuration = totalViews > 0 ? Math.round(totalDuration / totalViews) : 0
-      const totalPages = views?.reduce((sum, v) => sum + (v.pages_viewed || 0), 0) || 0
+      const totalPages = views?.reduce((sum: number, v: any) => sum + (v.pages_viewed || 0), 0) || 0
       const avgPages = totalViews > 0 ? Math.round(totalPages / totalViews) : 0
 
       // Get top countries
-      const countries = views?.map(v => v.visitor_sessions?.location_country).filter(Boolean) || []
+      const countries = views?.map((v: any) => v.visitor_sessions?.location_country).filter(Boolean) || []
       const countryStats = countries.reduce((acc: any, country) => {
         acc[country] = (acc[country] || 0) + 1
         return acc
@@ -209,7 +210,7 @@ export async function POST(request: NextRequest) {
 export async function GET(request: NextRequest) {
   try {
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
