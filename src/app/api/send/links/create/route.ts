@@ -3,6 +3,8 @@ import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { SendPasswordService } from '@/lib/send-password-service'
+import { EnhancedWatermarkConfig } from '@/lib/enhanced-watermark-service'
+import { OneClickNDAConfig } from '@/lib/one-click-nda-service'
 
 export interface CreateLinkRequest {
   documentId: string
@@ -19,6 +21,8 @@ export interface CreateLinkRequest {
   enableNotifications?: boolean
   enableWatermark?: boolean
   watermarkText?: string
+  enhancedWatermark?: EnhancedWatermarkConfig
+  oneClickNDA?: OneClickNDAConfig
   welcomeMessage?: string
   welcomeDisplayName?: string
   customButtonText?: string
@@ -81,6 +85,8 @@ export async function POST(request: NextRequest) {
       enableNotifications = true,
       enableWatermark = false,
       watermarkText,
+      enhancedWatermark,
+      oneClickNDA,
       welcomeMessage,
       welcomeDisplayName,
       customButtonText,
@@ -165,24 +171,20 @@ export async function POST(request: NextRequest) {
         document_id: documentId,
         link_id: linkId,
         title: name || `${document.title} - Share Link`,
-        account_name: accountName || null,
+        description: accountName || null, // Store account name in description field
         custom_slug: customUrl || null,
         password_hash: passwordHash,
         expires_at: expiresAt || null,
         max_views: viewLimit || null,
         current_views: 0,
         allow_download: allowDownload,
-        allow_printing: allowPrinting,
         require_email: requireEmail,
         require_nda: requireNda,
         require_totp: false,
-        enable_watermark: enableWatermark,
-        watermark_text: enableWatermark ? watermarkText : null,
-        welcome_message: welcomeMessage || null,
-        welcome_display_name: welcomeDisplayName || null,
-        custom_button_text: customButtonText || null,
         is_active: true,
-        created_by: userId
+        created_by: userId,
+        enhanced_watermark_config: enhancedWatermark || null,
+        nda_config: oneClickNDA || null
       })
       .select()
       .single()
@@ -209,7 +211,7 @@ export async function POST(request: NextRequest) {
       const accessControlData = {
         link_id: link.id,
         allowed_emails: accessControls.allowedEmails || [],
-        blocked_emails: accessControls.blockedEmails || [],
+        // Note: blocked_emails field doesn't exist in schema, skipping
         allowed_domains: accessControls.allowedDomains || [],
         blocked_domains: accessControls.blockedDomains || [],
         allowed_countries: accessControls.allowedCountries || [],
@@ -230,8 +232,10 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate share URL
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
     const shareUrl = `${baseUrl}/v/${linkId}`
+
+    console.log('✅ Share link created successfully:', { linkId, shareUrl, documentId })
 
     return NextResponse.json({
       success: true,
@@ -311,7 +315,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Add share URLs to links
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'
     const linksWithUrls = links.map(link => ({
       ...link,
       shareUrl: `${baseUrl}/v/${link.link_id}`

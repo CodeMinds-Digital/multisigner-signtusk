@@ -119,8 +119,8 @@ export async function POST(request: NextRequest) {
       await supabaseAdmin
         .from('send_document_links')
         .update({
-          view_count: supabaseAdmin.rpc('increment', { x: 1 }),
-          last_viewed_at: new Date().toISOString()
+          current_views: supabaseAdmin.rpc('increment', { x: 1 }),
+          updated_at: new Date().toISOString()
         })
         .eq('id', link.id)
     }
@@ -163,15 +163,8 @@ export async function POST(request: NextRequest) {
         console.error('Event tracking error:', eventError)
       }
 
-      // Increment download/print count on link
-      if (eventType === 'download') {
-        await supabaseAdmin
-          .from('send_document_links')
-          .update({
-            download_count: supabaseAdmin.rpc('increment', { x: 1 })
-          })
-          .eq('id', link.id)
-      }
+      // Note: Download counts are tracked via send_analytics_events table
+      // The send_document_links table doesn't have a download_count column
     }
 
     return NextResponse.json({

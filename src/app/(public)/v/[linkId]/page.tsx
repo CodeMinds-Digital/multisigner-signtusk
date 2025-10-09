@@ -11,6 +11,8 @@ import { Lock, Mail, FileText, Eye, AlertCircle } from 'lucide-react'
 import { SendVisitorTracking } from '@/lib/send-visitor-tracking'
 import { useViewerTracking } from '@/hooks/use-realtime-analytics'
 import { useSendNotifications } from '@/hooks/use-send-notifications'
+import { EnhancedWatermark } from '@/components/features/send/enhanced-watermark'
+import { EnhancedWatermarkConfig } from '@/lib/enhanced-watermark-service'
 
 interface LinkData {
   link: {
@@ -21,6 +23,7 @@ interface LinkData {
     allowPrinting: boolean
     enableWatermark: boolean
     watermarkText: string | null
+    enhancedWatermarkConfig: EnhancedWatermarkConfig | null
     viewCount: number
     expiresAt: string | null
   }
@@ -514,19 +517,47 @@ export default function PublicDocumentViewerPage() {
   if (linkData) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <SendDocumentViewer
-          fileUrl={linkData.document.file_url}
-          fileName={linkData.document.file_name}
-          linkId={linkId}
-          documentId={linkData.document.id}
-          viewerEmail={email || undefined}
-          allowDownload={linkData.link.allowDownload}
-          allowPrinting={linkData.link.allowPrinting}
-          watermarkText={linkData.link.enableWatermark ? linkData.link.watermarkText || undefined : undefined}
-          onView={handleView}
-          onDownload={handleDownload}
-          onPrint={handlePrint}
-        />
+        {linkData.link.enhancedWatermarkConfig?.enabled ? (
+          <EnhancedWatermark
+            config={linkData.link.enhancedWatermarkConfig}
+            context={{
+              userEmail: email || undefined,
+              userIP: 'Unknown', // Would be populated from server
+              timestamp: new Date().toISOString(),
+              documentTitle: linkData.document.title,
+              linkId: linkId,
+              sessionId: 'session_' + Date.now() // Would be actual session ID
+            }}
+          >
+            <SendDocumentViewer
+              fileUrl={linkData.document.file_url}
+              fileName={linkData.document.file_name}
+              linkId={linkId}
+              documentId={linkData.document.id}
+              viewerEmail={email || undefined}
+              allowDownload={linkData.link.allowDownload}
+              allowPrinting={linkData.link.allowPrinting}
+              watermarkText={linkData.link.enableWatermark ? linkData.link.watermarkText || undefined : undefined}
+              onView={handleView}
+              onDownload={handleDownload}
+              onPrint={handlePrint}
+            />
+          </EnhancedWatermark>
+        ) : (
+          <SendDocumentViewer
+            fileUrl={linkData.document.file_url}
+            fileName={linkData.document.file_name}
+            linkId={linkId}
+            documentId={linkData.document.id}
+            viewerEmail={email || undefined}
+            allowDownload={linkData.link.allowDownload}
+            allowPrinting={linkData.link.allowPrinting}
+            watermarkText={linkData.link.enableWatermark ? linkData.link.watermarkText || undefined : undefined}
+            onView={handleView}
+            onDownload={handleDownload}
+            onPrint={handlePrint}
+          />
+        )}
       </div>
     )
   }

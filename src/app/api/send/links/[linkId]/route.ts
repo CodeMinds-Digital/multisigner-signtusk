@@ -28,6 +28,8 @@ export async function GET(
     const password = searchParams.get('password')
     const email = searchParams.get('email')
 
+    console.log('🔍 GET request for link:', { linkId, hasPassword: !!password, hasEmail: !!email })
+
     // Fetch link details with document info
     const { data: link, error: linkError } = await supabaseAdmin
       .from('send_document_links')
@@ -144,8 +146,7 @@ export async function GET(
         .from('send_document_ndas')
         .select('*')
         .eq('link_id', link.id)
-        .eq('signer_email', email)
-        .eq('accepted', true)
+        .eq('acceptor_email', email)
         .single()
 
       if (!nda) {
@@ -172,6 +173,7 @@ export async function GET(
         allowPrinting: link.allow_printing,
         enableWatermark: link.enable_watermark,
         watermarkText: link.watermark_text,
+        enhancedWatermarkConfig: link.enhanced_watermark_config,
         viewCount: link.view_count,
         expiresAt: link.expires_at
       },
@@ -199,20 +201,25 @@ export async function POST(
     const body = await request.json()
     const { email, action } = body
 
+    console.log('📧 Email verification POST request:', { linkId, email, action })
+
     if (action === 'send-verification') {
       // Get link details for document title
       const { data: link } = await supabaseAdmin
         .from('send_document_links')
-        .select('name')
+        .select('title')
         .eq('link_id', linkId)
         .single()
 
       if (!link) {
+        console.log('❌ Link not found in database:', linkId)
         return NextResponse.json(
           { success: false, error: 'Link not found' },
           { status: 404 }
         )
       }
+
+      console.log('✅ Link found:', { linkId, linkTitle: link.title })
 
       // Check rate limiting (max 5 attempts per hour)
       const attemptCount = await SendEmailVerification.getAttemptCount(email, linkId)
@@ -224,7 +231,7 @@ export async function POST(
       }
 
       // Send verification code
-      const result = await SendEmailVerification.sendVerificationCode(email, linkId, link.name)
+      const result = await SendEmailVerification.sendVerificationCode(email, linkId, link.title)
 
       if (!result.success) {
         return NextResponse.json(
@@ -310,14 +317,17 @@ export async function POST(
       const { error: ndaError } = await supabaseAdmin
         .from('send_document_ndas')
         .insert({
-          document_id: link.document_id,
           link_id: link.id,
-          signer_email: email,
           nda_text: ndaText,
-          accepted: true,
+          acceptor_name: email, // Use email as name if not provided
+          acceptor_email: email,
+          acceptor_ip: ipAddress,
+          signature_data: null,
           accepted_at: new Date().toISOString(),
-          ip_address: ipAddress,
-          user_agent: userAgent
+          legal_binding: true,
+          user_agent: userAgent,
+          nda_template_id: 'basic-nda',
+          metadata: { acceptance_method: 'legacy' }
         })
 
       if (ndaError) {

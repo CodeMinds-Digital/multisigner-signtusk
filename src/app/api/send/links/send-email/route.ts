@@ -6,6 +6,8 @@ import { sendDocumentShareEmail } from '@/lib/send-document-email-service'
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('📧 Send email API called')
+
     // Authenticate user
     const { accessToken } = getAuthTokensFromRequest(request)
     if (!accessToken) {
@@ -28,6 +30,8 @@ export async function POST(request: NextRequest) {
       shareUrl,
       password
     } = body
+
+    console.log('📧 Email request data:', { linkId, recipientEmail, documentTitle, shareUrl })
 
     // Validate required fields
     if (!linkId || !recipientEmail || !shareUrl) {

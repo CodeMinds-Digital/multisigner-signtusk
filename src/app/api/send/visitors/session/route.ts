@@ -74,20 +74,14 @@ export async function POST(request: NextRequest) {
       .insert({
         session_id: sessionId,
         link_id: link.id,
-        fingerprint,
-        ip_address: clientIp,
-        user_agent: deviceInfo?.userAgent || request.headers.get('user-agent') || 'unknown',
-        country: geoCountry || null,
-        city: geoCity || null,
-        device_type: detectDeviceType(deviceInfo?.userAgent || request.headers.get('user-agent') || ''),
-        browser: detectBrowser(deviceInfo?.userAgent || request.headers.get('user-agent') || ''),
-        os: detectOS(deviceInfo?.userAgent || request.headers.get('user-agent') || ''),
-        screen_resolution: deviceInfo?.screenResolution || null,
-        language: deviceInfo?.language || null,
-        timezone: deviceInfo?.timezone || null,
-        is_returning_visitor: isReturningVisitor || false,
-        previous_visits: previousVisits || 0,
-        referrer: request.headers.get('referer') || null,
+        device_fingerprint: fingerprint,
+        viewer_email: deviceInfo?.email || null,
+        first_visit: new Date().toISOString(),
+        last_visit: new Date().toISOString(),
+        total_visits: 1,
+        total_duration_seconds: 0,
+        total_pages_viewed: 1,
+        is_returning: isReturningVisitor || false,
         last_activity_at: new Date().toISOString()
       })
       .select()
@@ -203,22 +197,18 @@ export async function GET(request: NextRequest) {
       if (!existing) {
         visitorMap.set(session.fingerprint, {
           fingerprint: session.fingerprint,
-          firstVisit: session.created_at,
-          lastVisit: session.last_activity_at || session.created_at,
-          totalSessions: 1,
-          totalDuration: session.total_duration || 0,
-          country: session.country,
-          city: session.city,
-          deviceType: session.device_type,
-          browser: session.browser,
-          os: session.os,
-          isReturning: session.is_returning_visitor,
+          firstVisit: session.first_visit,
+          lastVisit: session.last_visit,
+          totalSessions: session.total_visits || 1,
+          totalDuration: session.total_duration_seconds || 0,
+          deviceFingerprint: session.device_fingerprint,
+          isReturning: session.is_returning,
           sessions: [session]
         })
       } else {
         existing.totalSessions += 1
-        existing.totalDuration += session.total_duration || 0
-        existing.lastVisit = session.last_activity_at || session.created_at
+        existing.totalDuration += session.total_duration_seconds || 0
+        existing.lastVisit = session.last_visit
         existing.sessions.push(session)
       }
     })

@@ -127,8 +127,7 @@ export async function POST(request: NextRequest) {
       file_url: fileUrl,
       file_size: file.size,
       file_type: file.type,
-      status: 'active',
-      created_by: userId
+      status: 'active'
     }
 
     // If this is a new version of an existing document
@@ -184,24 +183,7 @@ export async function POST(request: NextRequest) {
 
     console.log('✅ Document created:', document.id)
 
-    // Create version history record
-    const { error: historyError } = await supabaseAdmin
-      .from('send_document_versions')
-      .insert({
-        document_id: document.id,
-        version_number: document.version_number,
-        file_url: fileUrl,
-        file_name: file.name,
-        file_size: file.size,
-        file_type: file.type,
-        version_notes: versionNotes || (documentId ? 'New version uploaded' : 'Initial version'),
-        created_by: userId
-      })
-
-    if (historyError) {
-      console.error('Version history creation error:', historyError)
-      // Don't fail the request, just log the error
-    }
+    // Note: Version history is tracked via parent_version_id and version_number in send_shared_documents table
 
     return NextResponse.json({
       success: true,

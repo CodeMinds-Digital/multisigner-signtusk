@@ -49,15 +49,15 @@ export class SendRealtimeAnalytics {
   ): Promise<void> {
     try {
       const key = `${this.ACTIVE_VIEWERS_PREFIX}${linkId}`
-      
+
       // Store viewer data with 5-minute expiration
       await redis.hset(key, {
         [viewer.sessionId]: JSON.stringify(viewer)
       })
-      
+
       // Set expiration on the hash key
       await redis.expire(key, 300) // 5 minutes
-      
+
       // Update peak concurrent viewers
       await this.updatePeakViewers(linkId)
     } catch (error) {
@@ -90,17 +90,25 @@ export class SendRealtimeAnalytics {
   ): Promise<void> {
     try {
       const key = `${this.ACTIVE_VIEWERS_PREFIX}${linkId}`
-      
+
       // Get current viewer data
       const viewerData = await redis.hget(key, sessionId)
-      
+
       if (viewerData) {
-        const viewer = JSON.parse(viewerData as string)
+        let viewer
+        try {
+          // Handle both string and object data
+          viewer = typeof viewerData === 'string' ? JSON.parse(viewerData) : viewerData
+        } catch (error) {
+          console.error('Failed to parse viewer data:', error)
+          return
+        }
+
         viewer.lastActivity = Date.now()
         if (currentPage !== undefined) {
           viewer.currentPage = currentPage
         }
-        
+
         await redis.hset(key, {
           [sessionId]: JSON.stringify(viewer)
         })
@@ -117,16 +125,23 @@ export class SendRealtimeAnalytics {
     try {
       const key = `${this.ACTIVE_VIEWERS_PREFIX}${linkId}`
       const viewersData = await redis.hgetall(key)
-      
+
       if (!viewersData) return []
-      
+
       const now = Date.now()
       const activeViewers: ActiveViewer[] = []
-      
+
       // Filter out inactive viewers (no activity in last 5 minutes)
       for (const [sessionId, data] of Object.entries(viewersData)) {
-        const viewer = JSON.parse(data as string)
-        
+        let viewer
+        try {
+          // Handle both string and object data
+          viewer = typeof data === 'string' ? JSON.parse(data) : data
+        } catch (error) {
+          console.error('Failed to parse viewer data:', error)
+          continue
+        }
+
         // Remove if inactive for more than 5 minutes
         if (now - viewer.lastActivity > 300000) {
           await redis.hdel(key, sessionId)
@@ -134,7 +149,7 @@ export class SendRealtimeAnalytics {
           activeViewers.push(viewer)
         }
       }
-      
+
       return activeViewers
     } catch (error) {
       console.error('Failed to get active viewers:', error)
@@ -149,12 +164,12 @@ export class SendRealtimeAnalytics {
     try {
       const key = `${this.VIEW_COUNT_PREFIX}${linkId}`
       const count = await redis.incr(key)
-      
+
       // Also increment daily, weekly, monthly counts
       await this.incrementDailyViews(linkId)
       await this.incrementWeeklyViews(linkId)
       await this.incrementMonthlyViews(linkId)
-      
+
       return count
     } catch (error) {
       console.error('Failed to increment view count:', error)
@@ -270,11 +285,11 @@ export class SendRealtimeAnalytics {
     try {
       const activeViewers = await this.getActiveViewers(linkId)
       const currentCount = activeViewers.length
-      
+
       const key = `${this.PEAK_VIEWERS_PREFIX}${linkId}`
       const peak = await redis.get(key)
       const peakCount = peak ? parseInt(peak as string) : 0
-      
+
       if (currentCount > peakCount) {
         await redis.set(key, currentCount)
       }
@@ -303,7 +318,7 @@ export class SendRealtimeAnalytics {
   static async trackViewDuration(linkId: string, duration: number): Promise<void> {
     try {
       const key = `${this.DURATION_PREFIX}${linkId}`
-      
+
       // Store duration in a list (keep last 100 durations)
       await redis.lpush(key, duration)
       await redis.ltrim(key, 0, 99)
@@ -319,9 +334,9 @@ export class SendRealtimeAnalytics {
     try {
       const key = `${this.DURATION_PREFIX}${linkId}`
       const durations = await redis.lrange(key, 0, -1)
-      
+
       if (!durations || durations.length === 0) return 0
-      
+
       const total = durations.reduce((sum, d) => sum + parseInt(d as string), 0)
       return Math.round(total / durations.length)
     } catch (error) {

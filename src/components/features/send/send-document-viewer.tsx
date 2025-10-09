@@ -13,9 +13,11 @@ import {
   Minimize2,
   ChevronLeft,
   ChevronRight,
-  Eye
+  Eye,
+  MessageSquare
 } from 'lucide-react'
 import { SendAnalyticsService } from '@/lib/send-analytics-service'
+import { AIDocumentAssistant } from './ai-document-assistant'
 
 interface PDFTemplate {
   basePdf: string
@@ -86,6 +88,9 @@ export default function SendDocumentViewer({
   const [pageStartTime, setPageStartTime] = useState<number>(Date.now())
   const [scrollDepth, setScrollDepth] = useState<number>(0)
   const [sessionStartTime] = useState<number>(Date.now())
+
+  // AI Assistant
+  const [showAIAssistant, setShowAIAssistant] = useState<boolean>(false)
 
   // Load PDF
   useEffect(() => {
@@ -299,6 +304,17 @@ export default function SendDocumentViewer({
                   <Maximize2 className="w-4 h-4" />
                 )}
               </Button>
+
+              {/* AI Assistant Toggle */}
+              <Button
+                variant={showAIAssistant ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowAIAssistant(!showAIAssistant)}
+                className="flex items-center gap-2"
+              >
+                <MessageSquare className="w-4 h-4" />
+                AI Assistant
+              </Button>
             </div>
           </div>
         </div>
@@ -348,6 +364,15 @@ export default function SendDocumentViewer({
           )}
         </CardContent>
       </Card>
+
+      {/* AI Document Assistant */}
+      <AIDocumentAssistant
+        documentId={documentId || ''}
+        documentTitle={fileName}
+        linkId={linkId}
+        isVisible={showAIAssistant}
+        onToggle={() => setShowAIAssistant(false)}
+      />
     </div>
   )
 }

@@ -7,9 +7,12 @@ import { Button } from '@/components/ui/button'
 import { ArrowLeft, FileText, Share2, Settings } from 'lucide-react'
 import { DocumentUpload } from '@/components/features/send/document-upload'
 import { CreateLinkModal } from '@/components/features/send/create-link-modal'
+import { Breadcrumb } from '@/components/ui/breadcrumb'
 import {
   Dialog,
   DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from '@/components/ui/dialog'
 
 export default function UploadPage() {
@@ -34,11 +37,18 @@ export default function UploadPage() {
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
+        {/* Breadcrumb Navigation */}
+        <Breadcrumb
+          items={[
+            { label: 'Upload Document' }
+          ]}
+        />
+
         {/* Page Title */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Upload Document</h1>
           <p className="text-gray-600 mt-1">
-            Share securely and track who views your documents
+            Share documents securely and track engagement
           </p>
         </div>
 
@@ -138,6 +148,11 @@ export default function UploadPage() {
         if (!open) setShowLinkModal(false)
       }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white">
+          <DialogHeader>
+            <DialogTitle>
+              Share Document: {uploadedDocument?.title || uploadedDocument?.file_name}
+            </DialogTitle>
+          </DialogHeader>
           {uploadedDocument && (
             <CreateLinkModal
               documentId={uploadedDocument.id}

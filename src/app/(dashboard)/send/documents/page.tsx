@@ -11,7 +11,8 @@ import {
   Archive,
   MoreVertical,
   ArrowUpDown,
-  BarChart3
+  BarChart3,
+  Plus
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -358,10 +359,10 @@ export default function DocumentLibraryPage() {
             </Button>
             <Button
               className="bg-green-600 hover:bg-green-700"
-              onClick={() => router.push('/send')}
+              onClick={() => router.push('/send/upload')}
             >
-              <FileText className="w-4 h-4 mr-2" />
-              Back to Dashboard
+              <Plus className="w-4 h-4 mr-2" />
+              Upload Document
             </Button>
           </div>
         </div>
@@ -606,6 +607,11 @@ export default function DocumentLibraryPage() {
         }
       }}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white">
+          <DialogHeader>
+            <DialogTitle>
+              Share Document: {selectedDocument?.title}
+            </DialogTitle>
+          </DialogHeader>
           {selectedDocument && (
             <CreateLinkModal
               documentId={selectedDocument.id}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -62,6 +62,15 @@ interface DataRoomDocumentManagerProps {
   onDocumentsChange: () => void
 }
 
+// Helper function to format file size
+const formatFileSize = (bytes: number): string => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
 export function DataRoomDocumentManager({
   dataRoomId,
   documents,
@@ -99,7 +108,7 @@ export function DataRoomDocumentManager({
   }
 
   // Fetch folders
-  const fetchFolders = async () => {
+  const fetchFolders = useCallback(async () => {
     try {
       const response = await fetch(`/api/send/data-rooms/${dataRoomId}/folders`)
       if (response.ok) {
@@ -109,10 +118,10 @@ export function DataRoomDocumentManager({
     } catch (error) {
       console.error('Failed to fetch folders:', error)
     }
-  }
+  }, [dataRoomId])
 
   // Fetch available documents to add
-  const fetchAvailableDocuments = async () => {
+  const fetchAvailableDocuments = useCallback(async () => {
     try {
       const response = await fetch('/api/send/documents')
       if (response.ok) {
@@ -121,11 +130,14 @@ export function DataRoomDocumentManager({
         const existingDocIds = documents.map(d => d.document_id)
         const available = data.documents.filter((doc: any) => !existingDocIds.includes(doc.id))
         setAvailableDocuments(available)
+        console.log('📄 Available documents:', available.length, 'Total documents:', data.documents.length, 'Existing in room:', existingDocIds.length)
+      } else {
+        console.error('Failed to fetch documents:', response.status, response.statusText)
       }
     } catch (error) {
       console.error('Failed to fetch available documents:', error)
     }
-  }
+  }, [documents])
 
   // Create folder
   const createFolder = async () => {
@@ -280,6 +292,55 @@ export function DataRoomDocumentManager({
     }
   }
 
+  // View document
+  const viewDocument = async (documentId: string, title: string) => {
+    try {
+      const response = await fetch(`/api/send/documents/${documentId}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.document?.signed_url) {
+          // Open document in new tab
+          window.open(data.document.signed_url, '_blank')
+        } else {
+          toast.error('Document URL not available')
+        }
+      } else {
+        toast.error('Failed to access document')
+      }
+    } catch (error) {
+      console.error('Error viewing document:', error)
+      toast.error('Failed to view document')
+    }
+  }
+
+  // Download document
+  const downloadDocument = async (documentId: string, title: string) => {
+    try {
+      const response = await fetch(`/api/send/documents/${documentId}`)
+      if (response.ok) {
+        const data = await response.json()
+        if (data.document?.signed_url) {
+          // Create download link
+          const link = document.createElement('a')
+          link.href = data.document.signed_url
+          link.download = title
+          link.target = '_blank'
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          toast.success('Download started')
+        } else {
+          toast.error('Document URL not available')
+        }
+      } else {
+        toast.error('Failed to access document')
+      }
+    } catch (error) {
+      console.error('Error downloading document:', error)
+      toast.error('Failed to download document')
+    }
+  }
+
   // Add documents to data room
   const addDocuments = async (documentIds: string[]) => {
     setLoading(true)
@@ -413,8 +474,15 @@ export function DataRoomDocumentManager({
 
   useEffect(() => {
     fetchFolders()
-    fetchAvailableDocuments()
-  }, [dataRoomId])
+  }, [dataRoomId, fetchFolders])
+
+  // Reset selected documents when dialog opens
+  useEffect(() => {
+    if (showAddDocuments) {
+      setSelectedDocuments([])
+      fetchAvailableDocuments()
+    }
+  }, [showAddDocuments, fetchAvailableDocuments])
 
   return (
     <div className="space-y-6">
@@ -460,62 +528,7 @@ export function DataRoomDocumentManager({
             </DialogContent>
           </Dialog>
 
-          <Dialog open={showAddDocuments} onOpenChange={setShowAddDocuments}>
-            <DialogTrigger asChild>
-              <Button onClick={fetchAvailableDocuments}>
-                <Plus className="h-4 w-4 mr-2" />
-                Add Documents
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl">
-              <DialogHeader>
-                <DialogTitle>Add Documents to Data Room</DialogTitle>
-                <DialogDescription>
-                  Select documents to add to this data room
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 max-h-96 overflow-y-auto">
-                {availableDocuments.length === 0 ? (
-                  <p className="text-center text-gray-500 py-8">
-                    No available documents to add
-                  </p>
-                ) : (
-                  availableDocuments.map((doc) => (
-                    <div key={doc.id} className="flex items-center gap-3 p-3 border rounded-lg">
-                      <Checkbox
-                        checked={selectedDocuments.includes(doc.id)}
-                        onCheckedChange={(checked) => {
-                          if (checked) {
-                            setSelectedDocuments([...selectedDocuments, doc.id])
-                          } else {
-                            setSelectedDocuments(selectedDocuments.filter(id => id !== doc.id))
-                          }
-                        }}
-                      />
-                      <FileText className="h-5 w-5 text-gray-500" />
-                      <div className="flex-1">
-                        <p className="font-medium">{doc.title}</p>
-                        <p className="text-sm text-gray-500">
-                          {formatFileSize(doc.file_size)} • {doc.file_type}
-                        </p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-              <div className="flex justify-end gap-2">
-                <Button variant="outline" onClick={() => setShowAddDocuments(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  onClick={() => addDocuments(selectedDocuments)}
-                  disabled={selectedDocuments.length === 0 || loading}
-                >
-                  Add {selectedDocuments.length} Document{selectedDocuments.length !== 1 ? 's' : ''}
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+
         </div>
       </div>
 
@@ -762,10 +775,20 @@ export function DataRoomDocumentManager({
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => viewDocument(doc.document.id, doc.document.title)}
+                            title="View document"
+                          >
                             <Eye className="h-4 w-4" />
                           </Button>
-                          <Button variant="ghost" size="sm">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => downloadDocument(doc.document.id, doc.document.title)}
+                            title="Download document"
+                          >
                             <Download className="h-4 w-4" />
                           </Button>
                           <DropdownMenu>
@@ -842,9 +865,12 @@ export function DataRoomDocumentManager({
           </DialogHeader>
           <div className="space-y-4 max-h-96 overflow-y-auto">
             {availableDocuments.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">
-                No available documents to add
-              </p>
+              <div className="text-center text-gray-500 py-8">
+                <p>No available documents to add</p>
+                <p className="text-xs mt-2">
+                  Debug: Total docs in room: {documents.length}, Available: {availableDocuments.length}
+                </p>
+              </div>
             ) : (
               availableDocuments.map((doc) => (
                 <div key={doc.id} className="flex items-center gap-3 p-3 border rounded-lg">

@@ -6,13 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import {
-  FileText,
   Eye,
   Link as LinkIcon,
   TrendingUp,
   Users,
   Download,
-  Plus,
   ArrowRight,
   Activity,
   CheckCircle
@@ -47,19 +45,6 @@ export default function SendDashboard() {
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Send Dashboard</h1>
           <p className="text-gray-600 mt-1">Track and manage your shared documents</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            onClick={() => router.push('/send/documents')}
-          >
-            <FileText className="w-4 h-4 mr-2" />
-            All Documents
-          </Button>
-          <Button onClick={() => router.push('/send/upload')}>
-            <Plus className="w-4 h-4 mr-2" />
-            Upload Document
-          </Button>
         </div>
       </div>
 
