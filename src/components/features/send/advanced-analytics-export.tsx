@@ -10,12 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { 
-  Download, 
-  Calendar, 
-  FileText, 
-  Table, 
-  FileSpreadsheet, 
+import {
+  Download,
+  Calendar,
+  FileText,
+  Table,
+  FileSpreadsheet,
   FileJson,
   Clock,
   Settings,
@@ -26,11 +26,11 @@ import {
   Pause,
   RefreshCw
 } from 'lucide-react'
-import { 
-  AdvancedAnalyticsExport, 
-  AdvancedExportConfig, 
+import {
+  AdvancedAnalyticsExport,
+  AdvancedExportConfig,
   ScheduledExportConfig,
-  ExportJob 
+  ExportJob
 } from '@/lib/advanced-analytics-export'
 import { toast } from 'sonner'
 
@@ -39,9 +39,9 @@ interface AdvancedAnalyticsExportProps {
   documentTitle: string
 }
 
-export function AdvancedAnalyticsExportComponent({ 
-  documentId, 
-  documentTitle 
+export function AdvancedAnalyticsExportComponent({
+  documentId,
+  documentTitle
 }: AdvancedAnalyticsExportProps) {
   const [config, setConfig] = useState<AdvancedExportConfig>(
     AdvancedAnalyticsExport.getDefaultConfig()
@@ -77,7 +77,7 @@ export function AdvancedAnalyticsExportComponent({
   const handleExport = async () => {
     try {
       setLoading(true)
-      
+
       const job = await AdvancedAnalyticsExport.createExportJob(
         documentId,
         config,
@@ -90,7 +90,7 @@ export function AdvancedAnalyticsExportComponent({
 
       // Poll for job completion
       pollJobStatus(job.id)
-      
+
       await loadExportHistory()
     } catch (error: any) {
       toast.error('Export failed', {
@@ -301,9 +301,8 @@ export function AdvancedAnalyticsExportComponent({
                     {Object.entries(config.includeData).map(([key, value]) => (
                       <div key={key} className="flex items-center space-x-2">
                         <Checkbox
-                          id={key}
                           checked={value}
-                          onCheckedChange={(checked) => 
+                          onCheckedChange={(checked) =>
                             updateConfig({
                               includeData: { ...config.includeData, [key]: !!checked }
                             })
@@ -383,19 +382,19 @@ export function AdvancedAnalyticsExportComponent({
                               </p>
                             </div>
                           </div>
-                          
+
                           <div className="flex items-center gap-3">
-                            <Badge 
-                              variant="secondary" 
+                            <Badge
+                              variant="secondary"
                               className={`${getStatusColor(job.status)} text-white`}
                             >
                               {job.status}
                             </Badge>
-                            
+
                             {job.status === 'processing' && (
                               <Progress value={job.progress} className="w-20" />
                             )}
-                            
+
                             {job.status === 'completed' && job.downloadUrl && (
                               <Button
                                 variant="outline"

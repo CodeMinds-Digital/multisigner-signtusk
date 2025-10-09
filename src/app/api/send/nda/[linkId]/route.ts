@@ -249,7 +249,7 @@ export async function POST(
     await supabaseAdmin
       .from('send_document_links')
       .update({
-        nda_acceptances_count: supabaseAdmin.raw('COALESCE(nda_acceptances_count, 0) + 1'),
+        nda_acceptances_count: `COALESCE(nda_acceptances_count, 0) + 1`,
         last_nda_acceptance: new Date().toISOString()
       })
       .eq('id', link.id)

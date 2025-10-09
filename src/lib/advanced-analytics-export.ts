@@ -179,7 +179,7 @@ export class AdvancedAnalyticsExport {
     if (config.includeData.views && data.views) {
       csv += 'DOCUMENT VIEWS\n'
       csv += 'View ID,Viewer Email,IP Address,Duration (seconds),Created At,Link ID\n'
-      data.views.forEach(view => {
+      data.views.forEach((view: any) => {
         csv += `${view.id},${view.viewerEmail || ''},${view.ipAddress},${view.duration},${view.createdAt},${view.linkId}\n`
       })
       csv += '\n'
@@ -189,7 +189,7 @@ export class AdvancedAnalyticsExport {
     if (config.includeData.pageViews && data.pageViews) {
       csv += 'PAGE VIEWS\n'
       csv += 'Page Number,Viewer Email,Duration (seconds),Scroll Depth (%),Created At\n'
-      data.pageViews.forEach(pv => {
+      data.pageViews.forEach((pv: any) => {
         csv += `${pv.pageNumber},${pv.viewerEmail || ''},${pv.duration},${pv.scrollDepth},${pv.createdAt}\n`
       })
       csv += '\n'
@@ -199,7 +199,7 @@ export class AdvancedAnalyticsExport {
     if (config.includeData.events && data.events) {
       csv += 'EVENTS\n'
       csv += 'Event Type,Viewer Email,Page Number,Created At,Metadata\n'
-      data.events.forEach(event => {
+      data.events.forEach((event: any) => {
         csv += `${event.type},${event.viewerEmail || ''},${event.pageNumber || ''},${event.createdAt},${JSON.stringify(event.metadata || {})}\n`
       })
       csv += '\n'
@@ -209,7 +209,7 @@ export class AdvancedAnalyticsExport {
     if (config.includeData.geographic && data.geographic) {
       csv += 'GEOGRAPHIC DATA\n'
       csv += 'Country,City,Views,Unique Viewers\n'
-      data.geographic.forEach(geo => {
+      data.geographic.forEach((geo: any) => {
         csv += `${geo.country},${geo.city || ''},${geo.views},${geo.uniqueViewers}\n`
       })
       csv += '\n'
@@ -322,7 +322,7 @@ export class AdvancedAnalyticsExport {
           </thead>
           <tbody>
       `
-      data.views.slice(0, 20).forEach(view => {
+      data.views.slice(0, 20).forEach((view: any) => {
         html += `
             <tr>
               <td>${view.viewerEmail || view.ipAddress}</td>

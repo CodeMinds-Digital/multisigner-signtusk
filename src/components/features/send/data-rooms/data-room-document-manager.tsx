@@ -28,7 +28,8 @@ import {
   SortAsc,
   Filter,
   Home,
-  ChevronRight
+  ChevronRight,
+  Share2
 } from 'lucide-react'
 import { toast } from 'sonner'
 // import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
@@ -368,6 +369,40 @@ export function DataRoomDocumentManager({
       toast.error('Failed to add documents')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // Create share link for document
+  const createShareLink = async (documentId: string, title: string) => {
+    try {
+      const response = await fetch('/api/send/links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: documentId,
+          name: `${title} - Share Link`,
+          allowDownload: true,
+          allowPrinting: true,
+          requireEmail: false,
+          enableNotifications: true
+        })
+      })
+
+      if (response.ok) {
+        const linkData = await response.json()
+        const shareUrl = `${window.location.origin}/v/${linkData.link.linkId}`
+
+        // Copy to clipboard
+        await navigator.clipboard.writeText(shareUrl)
+        toast.success('Share link created and copied to clipboard!')
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || `Failed to create share link (${response.status})`
+        toast.error(errorMessage)
+      }
+    } catch (error) {
+      console.error('Error creating share link:', error)
+      toast.error('Failed to create share link')
     }
   }
 
@@ -798,6 +833,12 @@ export function DataRoomDocumentManager({
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={() => createShareLink(doc.document.id, doc.document.title)}
+                              >
+                                <Share2 className="h-4 w-4 mr-2" />
+                                Create Share Link
+                              </DropdownMenuItem>
                               <DropdownMenuItem>
                                 <Move className="h-4 w-4 mr-2" />
                                 Move to Folder

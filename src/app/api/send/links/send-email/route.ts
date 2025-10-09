@@ -61,11 +61,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Verify link belongs to user
+    // Verify link belongs to user (linkId is the string identifier, not UUID)
     const { data: link, error: linkError } = await supabaseAdmin
       .from('send_document_links')
       .select('*, send_shared_documents!inner(user_id)')
-      .eq('id', linkId)
+      .eq('link_id', linkId)
       .eq('send_shared_documents.user_id', userId)
       .single()
 
@@ -107,7 +107,7 @@ export async function POST(request: NextRequest) {
 
     // Log the email send in database
     const emailLogData = {
-      link_id: linkId,
+      link_id: link.id, // Use the UUID id, not the string linkId
       recipient_email: recipientEmail,
       sender_id: userId,
       message: message || null,

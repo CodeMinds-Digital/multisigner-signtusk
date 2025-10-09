@@ -101,14 +101,38 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify document ownership
-    const { data: document, error: docError } = await supabaseAdmin
+    // First try to find it as a standalone document
+    let { data: document, error: docError } = await supabaseAdmin
       .from('send_shared_documents')
       .select('*')
       .eq('id', documentId)
-      .eq('user_id', userId)
       .single()
 
+    // If not found as standalone, check if it's in a data room owned by the user
     if (docError || !document) {
+      const { data: dataRoomDoc, error: dataRoomError } = await supabaseAdmin
+        .from('send_data_room_documents')
+        .select(`
+          document_id,
+          data_room:send_data_rooms!inner(user_id),
+          document:send_shared_documents(*)
+        `)
+        .eq('document_id', documentId)
+        .eq('data_room.user_id', userId)
+        .single()
+
+      if (dataRoomError || !dataRoomDoc?.document) {
+        return NextResponse.json(
+          { error: 'Document not found or access denied' },
+          { status: 404 }
+        )
+      }
+
+      document = dataRoomDoc.document
+    }
+
+    // Verify user has access to the document
+    if (document.user_id !== userId) {
       return NextResponse.json(
         { error: 'Document not found or access denied' },
         { status: 404 }
@@ -183,8 +207,8 @@ export async function POST(request: NextRequest) {
         require_totp: false,
         is_active: true,
         created_by: userId,
-        enhanced_watermark_config: enhancedWatermark || null,
-        nda_config: oneClickNDA || null
+        // enhanced_watermark_config and nda_config don't exist in schema
+        // These will be handled in send_link_access_controls table
       })
       .select()
       .single()

@@ -31,10 +31,11 @@ export function EnhancedWatermarkSettings({ config, onChange, disabled = false }
   }
 
   const updateNestedConfig = (key: keyof EnhancedWatermarkConfig, nestedKey: string, value: any) => {
+    const currentValue = config[key]
     const newConfig = {
       ...config,
       [key]: {
-        ...config[key],
+        ...(typeof currentValue === 'object' && currentValue !== null ? currentValue : {}),
         [nestedKey]: value
       }
     }
@@ -62,7 +63,7 @@ export function EnhancedWatermarkSettings({ config, onChange, disabled = false }
       sessionId: 'sess_456',
       viewerFingerprint: 'fp_789abc'
     }
-    
+
     return EnhancedWatermarkService.generateWatermarkText(config.template, sampleContext)
   }
 
@@ -150,7 +151,7 @@ export function EnhancedWatermarkSettings({ config, onChange, disabled = false }
                   rows={3}
                 />
                 <p className="text-xs text-gray-500">
-                  Use placeholders: {{user_email}}, {{user_name}}, {{timestamp}}, {{date}}, {{time}}, {{document_title}}, {{ip_address}}, {{fingerprint}}
+                  Use placeholders: {`{{ user_email }}, {{ user_name }}, {{ timestamp }}, {{ date }}, {{ time }}, {{ document_title }}, {{ ip_address }}, {{ fingerprint }}`}
                 </p>
               </div>
 

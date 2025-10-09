@@ -70,8 +70,8 @@ export function OneClickNDA({
   }, [template, acceptorEmail, acceptorName, documentTitle, config.customVariables])
 
   // Check if domain is auto-approved
-  const isAutoApproved = acceptorEmail ? 
-    OneClickNDAService.isAutoApprovedDomain(acceptorEmail, config.autoAcceptDomains) : 
+  const isAutoApproved = acceptorEmail ?
+    OneClickNDAService.isAutoApprovedDomain(acceptorEmail, config.autoAcceptDomains) :
     false
 
   const handleAccept = async () => {
@@ -154,7 +154,7 @@ export function OneClickNDA({
     const canvas = document.createElement('canvas')
     const ctx = canvas.getContext('2d')
     ctx?.fillText('fingerprint', 10, 10)
-    
+
     const fingerprint = [
       navigator.userAgent,
       navigator.language,
@@ -162,7 +162,7 @@ export function OneClickNDA({
       new Date().getTimezoneOffset(),
       canvas.toDataURL()
     ].join('|')
-    
+
     return btoa(fingerprint).substring(0, 16)
   }
 
@@ -279,14 +279,13 @@ export function OneClickNDA({
           {/* Agreement Checkbox */}
           <div className="flex items-start space-x-2">
             <Checkbox
-              id="agree"
               checked={agreed}
               onCheckedChange={setAgreed}
               disabled={loading}
             />
             <Label htmlFor="agree" className="text-sm leading-relaxed">
-              I have read, understood, and agree to be legally bound by the terms of this 
-              Non-Disclosure Agreement. I understand that this agreement is legally binding 
+              I have read, understood, and agree to be legally bound by the terms of this
+              Non-Disclosure Agreement. I understand that this agreement is legally binding
               and enforceable.
             </Label>
           </div>
@@ -335,7 +334,7 @@ export function OneClickNDA({
                 </>
               )}
             </Button>
-            
+
             <Button
               variant="outline"
               onClick={() => window.history.back()}
@@ -349,7 +348,7 @@ export function OneClickNDA({
           {/* Legal Notice */}
           <div className="text-xs text-gray-500 text-center pt-4 border-t">
             <p>
-              This is a legally binding agreement. By clicking "I Accept & Agree", you acknowledge 
+              This is a legally binding agreement. By clicking "I Accept & Agree", you acknowledge
               that you have read and understood the terms and agree to be bound by them.
             </p>
             <p className="mt-1">

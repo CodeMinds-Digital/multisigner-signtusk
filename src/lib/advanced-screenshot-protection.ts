@@ -266,7 +266,7 @@ export class AdvancedScreenshotProtection {
     // Function toString detection
     if (methods.includes('function_toString')) {
       const originalToString = Function.prototype.toString
-      Function.prototype.toString = function () {
+      Function.prototype.toString = function (this: any) {
         if (this === Function.prototype.toString) {
           this.handleSuspiciousActivity('devtools_detected', 'function_inspection', 'medium')
         }

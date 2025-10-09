@@ -463,7 +463,7 @@ export function CreateLinkModal({
             )}
 
             <Button
-              onClick={handleSendEmail}
+              onClick={() => handleSendEmail()}
               disabled={sendingEmail || !recipientEmail}
               className="w-full bg-green-600 hover:bg-green-700"
             >
@@ -910,7 +910,6 @@ export function CreateLinkModal({
               </div>
               <div className="flex items-center space-x-2">
                 <CustomSwitch
-                  id="autoSendEmail"
                   checked={autoSendEmail}
                   onCheckedChange={setAutoSendEmail}
                 />

@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   ArrowLeft,
   Plus,
@@ -15,10 +16,20 @@ import {
   Settings,
   Share2,
   Download,
-  Calendar
+  Calendar,
+  Palette,
+  UserPlus,
+  Rocket
 } from 'lucide-react'
 import Link from 'next/link'
 import { DataRoomDocumentManager } from '@/components/features/send/data-rooms/data-room-document-manager'
+import { UserGroupManager } from '@/components/features/send/data-rooms/user-group-manager'
+import { PermissionManager } from '@/components/features/send/data-rooms/permission-manager'
+import { GroupShareLinks } from '@/components/features/send/data-rooms/group-share-links'
+import { BrandingManager } from '@/components/features/send/data-rooms/branding-manager'
+import { CollaboratorManager } from '@/components/features/send/data-rooms/collaborator-manager'
+import { AdvancedAnalytics } from '@/components/features/send/data-rooms/advanced-analytics'
+import { WorkflowManager } from '@/components/features/send/data-rooms/workflow-manager'
 import { DataRoomShareModal } from '@/components/features/send/data-rooms/data-room-share-modal'
 
 interface DataRoom {
@@ -221,20 +232,107 @@ export default function DataRoomDetailsPage() {
         </Card>
       </div>
 
-      {/* Document Manager */}
-      <DataRoomDocumentManager
-        dataRoomId={roomId}
-        documents={dataRoom.documents || []}
-        onDocumentsChange={fetchDataRoom}
-      />
+      {/* Management Tabs */}
+      <Tabs defaultValue="documents" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-8">
+          <TabsTrigger value="documents" className="flex items-center gap-2">
+            <FileText className="w-4 h-4" />
+            Documents
+          </TabsTrigger>
+          <TabsTrigger value="groups" className="flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            User Groups
+          </TabsTrigger>
+          <TabsTrigger value="permissions" className="flex items-center gap-2">
+            <Settings className="w-4 h-4" />
+            Permissions
+          </TabsTrigger>
+          <TabsTrigger value="group-links" className="flex items-center gap-2">
+            <Share2 className="w-4 h-4" />
+            Group Links
+          </TabsTrigger>
+          <TabsTrigger value="branding" className="flex items-center gap-2">
+            <Palette className="w-4 h-4" />
+            Branding
+          </TabsTrigger>
+          <TabsTrigger value="collaborators" className="flex items-center gap-2">
+            <UserPlus className="w-4 h-4" />
+            Collaborators
+          </TabsTrigger>
+          <TabsTrigger value="workflow" className="flex items-center gap-2">
+            <Rocket className="w-4 h-4" />
+            Workflow
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <Eye className="w-4 h-4" />
+            Analytics
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Share Modal */}
-      {showShareModal && (
-        <DataRoomShareModal
-          dataRoom={dataRoom}
-          onClose={() => setShowShareModal(false)}
-        />
-      )}
-    </div>
+        <TabsContent value="documents">
+          <DataRoomDocumentManager
+            dataRoomId={roomId}
+            documents={dataRoom.documents || []}
+            onDocumentsChange={fetchDataRoom}
+          />
+        </TabsContent>
+
+        <TabsContent value="groups">
+          <UserGroupManager dataRoomId={roomId} />
+        </TabsContent>
+
+        <TabsContent value="permissions">
+          <PermissionManager dataRoomId={roomId} />
+        </TabsContent>
+
+        <TabsContent value="group-links">
+          <GroupShareLinks dataRoomId={roomId} />
+        </TabsContent>
+
+        <TabsContent value="branding">
+          <BrandingManager dataRoomId={roomId} />
+        </TabsContent>
+
+        <TabsContent value="collaborators">
+          <CollaboratorManager dataRoomId={roomId} />
+        </TabsContent>
+
+        <TabsContent value="workflow">
+          <WorkflowManager dataRoomId={roomId} />
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <AdvancedAnalytics dataRoomId={roomId} />
+        </TabsContent>
+        <Card>
+          <CardHeader>
+            <CardTitle>Analytics Dashboard</CardTitle>
+            <CardDescription>
+              Detailed analytics and insights for your data room
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-12">
+              <Eye className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">Analytics Coming Soon</h3>
+              <p className="text-gray-500">
+                Advanced analytics dashboard with geographic insights, session tracking, and engagement scoring
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
+
+      {/* Share Modal */ }
+  {
+    showShareModal && (
+      <DataRoomShareModal
+        dataRoom={dataRoom}
+        onClose={() => setShowShareModal(false)}
+      />
+    )
+  }
+    </div >
   )
 }

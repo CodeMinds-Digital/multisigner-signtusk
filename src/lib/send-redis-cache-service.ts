@@ -64,7 +64,7 @@ export class SendRedisCacheService {
    */
   static async getDocument(documentId: string): Promise<CachedDocument | null> {
     const cacheKey = RedisUtils.buildKey(this.CACHE_PREFIX, 'document', documentId)
-    
+
     try {
       // Try cache first
       const cached = await RedisUtils.get(cacheKey)
@@ -75,7 +75,7 @@ export class SendRedisCacheService {
 
       // Cache miss - fetch from database
       await this.recordCacheMiss('document')
-      
+
       const { data: document } = await supabaseAdmin
         .from('send_shared_documents')
         .select('*')
@@ -120,7 +120,7 @@ export class SendRedisCacheService {
    */
   static async getLink(linkId: string): Promise<CachedLink | null> {
     const cacheKey = RedisUtils.buildKey(this.CACHE_PREFIX, 'link', linkId)
-    
+
     try {
       // Try cache first
       const cached = await RedisUtils.get(cacheKey)
@@ -131,7 +131,7 @@ export class SendRedisCacheService {
 
       // Cache miss - fetch from database
       await this.recordCacheMiss('link')
-      
+
       const { data: link } = await supabaseAdmin
         .from('send_document_links')
         .select('*')
@@ -140,7 +140,7 @@ export class SendRedisCacheService {
 
       if (link) {
         // Cache for 30 minutes
-        await RedisUtils.setWithTTL(cacheKey, link, CACHE_TTL.LINK_METADATA)
+        await RedisUtils.setWithTTL(cacheKey, link, CACHE_TTL.DOCUMENT_METADATA)
         return link as CachedLink
       }
 
@@ -156,7 +156,7 @@ export class SendRedisCacheService {
    */
   static async cacheLink(link: CachedLink): Promise<void> {
     const cacheKey = RedisUtils.buildKey(this.CACHE_PREFIX, 'link', link.id)
-    await RedisUtils.setWithTTL(cacheKey, link, CACHE_TTL.LINK_METADATA)
+    await RedisUtils.setWithTTL(cacheKey, link, CACHE_TTL.DOCUMENT_METADATA)
   }
 
   /**
@@ -176,7 +176,7 @@ export class SendRedisCacheService {
    */
   static async getAnalytics(documentId: string): Promise<CachedAnalytics | null> {
     const cacheKey = RedisUtils.buildKey(this.CACHE_PREFIX, 'analytics', documentId)
-    
+
     try {
       // Try cache first
       const cached = await RedisUtils.get(cacheKey)
@@ -187,7 +187,7 @@ export class SendRedisCacheService {
 
       // Cache miss - compute from database
       await this.recordCacheMiss('analytics')
-      
+
       const analytics = await this.computeAnalytics(documentId)
       if (analytics) {
         // Cache for 5 minutes (analytics change frequently)
@@ -229,7 +229,7 @@ export class SendRedisCacheService {
       const completionRate = (completedViews / views.length) * 100
 
       // Get last viewed
-      const lastViewed = views.sort((a, b) => 
+      const lastViewed = views.sort((a, b) =>
         new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
       )[0]?.created_at
 
@@ -282,7 +282,7 @@ export class SendRedisCacheService {
    */
   static async cacheUserDocuments(userId: string, documents: any[]): Promise<void> {
     const cacheKey = RedisUtils.buildKey(this.CACHE_PREFIX, 'user_documents', userId)
-    await RedisUtils.setWithTTL(cacheKey, documents, CACHE_TTL.USER_DATA)
+    await RedisUtils.setWithTTL(cacheKey, documents, CACHE_TTL.USER_PROFILE)
   }
 
   /**
@@ -290,14 +290,14 @@ export class SendRedisCacheService {
    */
   static async getUserDocuments(userId: string): Promise<any[] | null> {
     const cacheKey = RedisUtils.buildKey(this.CACHE_PREFIX, 'user_documents', userId)
-    
+
     try {
       const cached = await RedisUtils.get(cacheKey)
       if (cached) {
         await this.recordCacheHit('user_documents')
         return cached as any[]
       }
-      
+
       await this.recordCacheMiss('user_documents')
       return null
     } catch (error) {
@@ -324,7 +324,7 @@ export class SendRedisCacheService {
   private static async recordCacheHit(type: string): Promise<void> {
     const today = new Date().toISOString().split('T')[0]
     const statsKey = RedisUtils.buildKey(this.STATS_PREFIX, today)
-    
+
     await redis.hincrby(statsKey, `${type}_hits`, 1)
     await redis.hincrby(statsKey, `${type}_total`, 1)
     await redis.expire(statsKey, 86400) // 24 hours
@@ -336,7 +336,7 @@ export class SendRedisCacheService {
   private static async recordCacheMiss(type: string): Promise<void> {
     const today = new Date().toISOString().split('T')[0]
     const statsKey = RedisUtils.buildKey(this.STATS_PREFIX, today)
-    
+
     await redis.hincrby(statsKey, `${type}_misses`, 1)
     await redis.hincrby(statsKey, `${type}_total`, 1)
     await redis.expire(statsKey, 86400) // 24 hours
@@ -348,18 +348,18 @@ export class SendRedisCacheService {
   static async getCacheStats(): Promise<Record<string, CacheStats>> {
     const today = new Date().toISOString().split('T')[0]
     const statsKey = RedisUtils.buildKey(this.STATS_PREFIX, today)
-    
-    const stats = await redis.hgetall(statsKey)
+
+    const stats = await redis.hgetall(statsKey) || {}
     const result: Record<string, CacheStats> = {}
 
     // Parse stats for each cache type
     const types = ['document', 'link', 'analytics', 'user_documents']
-    
+
     for (const type of types) {
-      const hits = parseInt(stats[`${type}_hits`] || '0')
-      const misses = parseInt(stats[`${type}_misses`] || '0')
+      const hits = parseInt((stats as any)[`${type}_hits`] || '0')
+      const misses = parseInt((stats as any)[`${type}_misses`] || '0')
       const total = hits + misses
-      
+
       result[type] = {
         hits,
         misses,

@@ -62,7 +62,6 @@ export function OneClickNDASettings({ config, onChange, disabled = false }: OneC
       {/* Enable/Disable Toggle */}
       <div className="flex items-center space-x-2">
         <Checkbox
-          id="nda-enabled"
           checked={config.enabled}
           onCheckedChange={(checked) => updateConfig({ enabled: !!checked })}
           disabled={disabled}
@@ -134,7 +133,7 @@ export function OneClickNDASettings({ config, onChange, disabled = false }: OneC
                       {previewTemplate ? 'Hide' : 'Show'} Preview
                     </Button>
                   </div>
-                  
+
                   {previewTemplate && (
                     <div className="bg-gray-50 border rounded-lg p-4 max-h-64 overflow-y-auto">
                       <pre className="text-xs whitespace-pre-wrap font-mono">
@@ -220,7 +219,6 @@ export function OneClickNDASettings({ config, onChange, disabled = false }: OneC
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="require-signature"
                     checked={config.requireSignature}
                     onCheckedChange={(checked) => updateConfig({ requireSignature: !!checked })}
                     disabled={disabled}
@@ -230,7 +228,6 @@ export function OneClickNDASettings({ config, onChange, disabled = false }: OneC
 
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="require-full-name"
                     checked={config.requireFullName}
                     onCheckedChange={(checked) => updateConfig({ requireFullName: !!checked })}
                     disabled={disabled}
@@ -240,7 +237,6 @@ export function OneClickNDASettings({ config, onChange, disabled = false }: OneC
 
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="require-witness"
                     checked={config.requireWitness}
                     onCheckedChange={(checked) => updateConfig({ requireWitness: !!checked })}
                     disabled={disabled}
@@ -312,9 +308,8 @@ export function OneClickNDASettings({ config, onChange, disabled = false }: OneC
               <CardContent className="space-y-4">
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="notify-owner"
                     checked={config.emailNotifications.notifyOwner}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       updateConfig({
                         emailNotifications: {
                           ...config.emailNotifications,
@@ -329,9 +324,8 @@ export function OneClickNDASettings({ config, onChange, disabled = false }: OneC
 
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="notify-acceptor"
                     checked={config.emailNotifications.notifyAcceptor}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       updateConfig({
                         emailNotifications: {
                           ...config.emailNotifications,
@@ -346,9 +340,8 @@ export function OneClickNDASettings({ config, onChange, disabled = false }: OneC
 
                 <div className="flex items-center space-x-2">
                   <Checkbox
-                    id="notify-witness"
                     checked={config.emailNotifications.notifyWitness}
-                    onCheckedChange={(checked) => 
+                    onCheckedChange={(checked) =>
                       updateConfig({
                         emailNotifications: {
                           ...config.emailNotifications,

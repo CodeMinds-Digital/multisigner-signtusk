@@ -14,9 +14,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Get client IP and user agent
-    const clientIp = request.headers.get('x-forwarded-for') || 
-                    request.headers.get('x-real-ip') || 
-                    'unknown'
+    const clientIp = request.headers.get('x-forwarded-for') ||
+      request.headers.get('x-real-ip') ||
+      'unknown'
     const userAgent = request.headers.get('user-agent') || 'unknown'
 
     // Get link details
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     if (event.severity === 'high') {
       // Could trigger additional security measures here
       // e.g., notify document owner, temporarily disable link, etc.
-      
+
       // For now, just log it as a critical event
       console.warn(`🚨 High-severity protection event: ${event.type} on link ${linkId}`)
     }
@@ -72,12 +72,12 @@ export async function POST(request: NextRequest) {
     await supabaseAdmin
       .from('send_document_links')
       .update({
-        protection_events_count: supabaseAdmin.raw('protection_events_count + 1'),
+        protection_events_count: `protection_events_count + 1`,
         last_protection_event: new Date().toISOString()
       })
       .eq('id', link.id)
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
       eventLogged: true,
       severity: event.severity

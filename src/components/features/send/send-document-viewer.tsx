@@ -99,7 +99,30 @@ export default function SendDocumentViewer({
         setLoading(true)
         setError(null)
 
-        const base64String = await convertToBase64(fileUrl)
+        let base64String: string
+
+        // Use proxy API if linkId is available (for public viewer)
+        if (linkId) {
+          console.log('🔗 Using proxy API for linkId:', linkId)
+          const response = await fetch(`/api/send/documents/content/${linkId}`)
+
+          if (!response.ok) {
+            throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`)
+          }
+
+          const data = await response.json()
+          if (!data.success || !data.data?.base64) {
+            throw new Error(data.error || 'Invalid response from document API')
+          }
+
+          base64String = data.data.base64
+          console.log('✅ Document loaded via proxy API')
+        } else {
+          // Fallback to direct URL conversion (for authenticated users)
+          console.log('🔗 Using direct URL conversion for:', fileUrl)
+          base64String = await convertToBase64(fileUrl)
+          console.log('✅ Document loaded via direct conversion')
+        }
 
         const template: PDFTemplate = {
           basePdf: base64String,
@@ -125,10 +148,10 @@ export default function SendDocumentViewer({
       }
     }
 
-    if (fileUrl) {
+    if (fileUrl || linkId) {
       fetchPdf()
     }
-  }, [fileUrl, onView, linkId, documentId, viewerEmail])
+  }, [fileUrl, linkId, onView, documentId, viewerEmail])
 
   // Initialize PDF viewer
   useEffect(() => {

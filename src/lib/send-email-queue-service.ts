@@ -211,7 +211,7 @@ export class SendEmailQueueService {
           retryCount: 0,
           maxRetries: emailData.maxRetries || this.MAX_RETRIES
         },
-        delay: delay > 0 ? `${delay}s` : undefined,
+        delay: delay > 0 ? `${BigInt(delay)}s` : undefined,
         retries: emailData.maxRetries || this.MAX_RETRIES,
         headers: {
           'X-Priority': emailData.priority,
@@ -293,7 +293,7 @@ export class SendEmailQueueService {
       linkId: emailData.linkId
     }
 
-    await RedisUtils.setWithTTL(jobKey, jobInfo, CACHE_TTL.ANALYTICS_DATA)
+    await RedisUtils.setWithTTL(jobKey, jobInfo, CACHE_TTL.ANALYTICS)
 
     // Add to priority queue
     const queueKey = RedisUtils.buildKey(this.QUEUE_PREFIX, emailData.priority)
@@ -309,7 +309,7 @@ export class SendEmailQueueService {
 
     await redis.hincrby(statsKey, status, 1)
     await redis.hincrby(statsKey, 'totalToday', 1)
-    await redis.expire(statsKey, CACHE_TTL.ANALYTICS_DATA)
+    await redis.expire(statsKey, CACHE_TTL.ANALYTICS)
   }
 
   /**
@@ -319,14 +319,14 @@ export class SendEmailQueueService {
     const today = new Date().toISOString().split('T')[0]
     const statsKey = RedisUtils.buildKey(this.STATS_PREFIX, today)
 
-    const stats = await redis.hgetall(statsKey)
+    const stats = await redis.hgetall(statsKey) || {}
 
     return {
-      queued: parseInt(stats.queued || '0'),
-      processing: parseInt(stats.processing || '0'),
-      completed: parseInt(stats.completed || '0'),
-      failed: parseInt(stats.failed || '0'),
-      totalToday: parseInt(stats.totalToday || '0')
+      queued: parseInt((stats as any).queued || '0'),
+      processing: parseInt((stats as any).processing || '0'),
+      completed: parseInt((stats as any).completed || '0'),
+      failed: parseInt((stats as any).failed || '0'),
+      totalToday: parseInt((stats as any).totalToday || '0')
     }
   }
 

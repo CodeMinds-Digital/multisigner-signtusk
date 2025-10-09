@@ -14,7 +14,7 @@ export function EnhancedWatermark({ config, context, children }: EnhancedWaterma
   const [patternWatermarks, setPatternWatermarks] = useState<Array<{ id: string; text: string; style: React.CSSProperties }>>([])
   const [isVisible, setIsVisible] = useState(true)
   const containerRef = useRef<HTMLDivElement>(null)
-  const animationFrameRef = useRef<number>()
+  const animationFrameRef = useRef<number | null>(null)
 
   // Generate watermark text and styles
   useEffect(() => {
@@ -45,7 +45,7 @@ export function EnhancedWatermark({ config, context, children }: EnhancedWaterma
     const handleKeyDown = (e: KeyboardEvent) => {
       // Detect common screenshot shortcuts
       if (
-        (e.metaKey || e.ctrlKey) && 
+        (e.metaKey || e.ctrlKey) &&
         (e.shiftKey && (e.key === '3' || e.key === '4' || e.key === '5')) ||
         e.key === 'PrintScreen'
       ) {
@@ -131,9 +131,8 @@ export function EnhancedWatermark({ config, context, children }: EnhancedWaterma
           patternWatermarks.map((watermark) => (
             <div
               key={watermark.id}
-              className={`watermark-text ${animationClass || ''} ${
-                config.security?.hideOnScreenshot ? 'watermark-screenshot-protection' : ''
-              }`}
+              className={`watermark-text ${animationClass || ''} ${config.security?.hideOnScreenshot ? 'watermark-screenshot-protection' : ''
+                }`}
               style={watermark.style}
             >
               {watermark.text}
@@ -142,9 +141,8 @@ export function EnhancedWatermark({ config, context, children }: EnhancedWaterma
         ) : (
           // Single watermark
           <div
-            className={`watermark-text ${animationClass || ''} ${
-              config.security?.hideOnScreenshot ? 'watermark-screenshot-protection' : ''
-            }`}
+            className={`watermark-text ${animationClass || ''} ${config.security?.hideOnScreenshot ? 'watermark-screenshot-protection' : ''
+              }`}
             style={textStyle}
           >
             {watermarkText}
@@ -202,7 +200,7 @@ export const WatermarkPresets = {
     rotation: 0,
     fontFamily: 'Arial, sans-serif'
   },
-  
+
   confidential: {
     enabled: true,
     template: 'CONFIDENTIAL - {{user_email}} - {{timestamp}}',
@@ -218,7 +216,7 @@ export const WatermarkPresets = {
       stagger: true
     }
   },
-  
+
   security: {
     enabled: true,
     template: 'ID: {{fingerprint}} | {{user_email}} | {{time}}',

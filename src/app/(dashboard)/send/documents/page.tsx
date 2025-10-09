@@ -12,7 +12,8 @@ import {
   MoreVertical,
   ArrowUpDown,
   BarChart3,
-  Plus
+  Plus,
+  Settings
 } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -24,11 +25,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { CreateLinkModal } from '@/components/features/send/create-link-modal'
+import { SimpleShareModal } from '@/components/features/send/simple-share-modal'
+import { AdvancedShareSidebar } from '@/components/features/send/advanced-share-sidebar'
+import { PapermarkStyleShareModal } from '@/components/features/send/papermark-style-share-modal'
 import { BulkSelectionToolbar, useBulkSelection, BulkSelectionCheckbox } from '@/components/features/send/bulk-operations/bulk-selection-toolbar'
 import { BulkUploadModal } from '@/components/features/send/bulk-operations/bulk-upload-modal'
 import { BulkShareModal } from '@/components/features/send/bulk-operations/bulk-share-modal'
+import { Breadcrumb } from '@/components/ui/breadcrumb'
+import { LoadingTable } from '@/components/features/send/loading-states'
 import { useAuth } from '@/components/providers/secure-auth-provider'
+import { toast } from 'sonner'
 import {
   Table,
   TableBody,
@@ -73,6 +79,8 @@ export default function DocumentLibraryPage() {
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc')
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null)
   const [showLinkModal, setShowLinkModal] = useState(false)
+  const [showPapermarkModal, setShowPapermarkModal] = useState(false)
+  const [showShareSidebar, setShowShareSidebar] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
 
   // Pagination
@@ -162,9 +170,52 @@ export default function DocumentLibraryPage() {
     }
   }
 
+  // Papermark-style share function - opens modal with recipients first
   const handleShare = (doc: Document) => {
     setSelectedDocument(doc)
-    setShowLinkModal(true)
+    setShowPapermarkModal(true)
+  }
+
+  // Advanced share function - opens sidebar for advanced settings
+  const handleAdvancedShare = (doc: Document) => {
+    setSelectedDocument(doc)
+    setShowShareSidebar(true)
+  }
+
+  // Papermark-style quick share - creates instant link
+  const handleQuickShare = async (document: Document) => {
+    try {
+      const response = await fetch('/api/send/links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: document.id,
+          name: `${document.title} - Quick Share`,
+          // Default settings for instant sharing
+          allowDownload: true,
+          allowPrinting: true,
+          requireEmail: false,
+          enableNotifications: true
+        })
+      })
+
+      if (response.ok) {
+        const linkData = await response.json()
+        const shareUrl = `${window.location.origin}/v/${linkData.link.linkId}`
+
+        // Copy to clipboard immediately
+        await navigator.clipboard.writeText(shareUrl)
+        toast.success('Share link created and copied to clipboard!')
+      } else {
+        const errorData = await response.json().catch(() => ({}))
+        const errorMessage = errorData.error || `Failed to create share link (${response.status})`
+        console.error('Share link creation failed:', response.status, errorData)
+        toast.error(errorMessage)
+      }
+    } catch (error) {
+      console.error('Quick share failed:', error)
+      toast.error('Failed to create share link')
+    }
   }
 
   const handleDelete = async (doc: Document) => {
@@ -342,7 +393,15 @@ export default function DocumentLibraryPage() {
 
   return (
     <>
-      <div className="space-y-6">
+      <div className="space-y-6 p-6">
+        {/* Breadcrumb */}
+        <Breadcrumb
+          items={[
+            { label: 'Send', href: '/send' },
+            { label: 'Documents' }
+          ]}
+        />
+
         {/* Header */}
         <div className="flex justify-between items-center">
           <div>
@@ -428,10 +487,7 @@ export default function DocumentLibraryPage() {
             />
 
             {loading ? (
-              <div className="text-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto"></div>
-                <p className="text-gray-500 mt-4">Loading documents...</p>
-              </div>
+              <LoadingTable rows={5} columns={6} />
             ) : filteredDocuments.length === 0 ? (
               <div className="text-center py-12">
                 <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
@@ -531,35 +587,49 @@ export default function DocumentLibraryPage() {
                           {formatDate(doc.created_at)}
                         </TableCell>
                         <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm">
-                                <MoreVertical className="w-4 h-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => router.push(`/send/analytics/${doc.id}`)}>
-                                <BarChart3 className="w-4 h-4 mr-2" />
-                                Analytics
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleShare(doc)}>
-                                <Share2 className="w-4 h-4 mr-2" />
-                                Share
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleArchive(doc)}>
-                                <Archive className="w-4 h-4 mr-2" />
-                                Archive
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={() => handleDelete(doc)}
-                                className="text-red-600"
-                              >
-                                <Trash2 className="w-4 h-4 mr-2" />
-                                Delete
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                          <div className="flex items-center gap-1">
+                            {/* Unified Share Button */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleShare(doc)}
+                              className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                            >
+                              <Share2 className="w-3 h-3 mr-1" />
+                              Share
+                            </Button>
+
+                            {/* More Actions Dropdown */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm">
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                <DropdownMenuItem onClick={() => handleAdvancedShare(doc)}>
+                                  <Settings className="w-4 h-4 mr-2" />
+                                  Advanced Share
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => router.push(`/send/analytics/${doc.id}`)}>
+                                  <BarChart3 className="w-4 h-4 mr-2" />
+                                  Analytics
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleArchive(doc)}>
+                                  <Archive className="w-4 h-4 mr-2" />
+                                  Archive
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={() => handleDelete(doc)}
+                                  className="text-red-600"
+                                >
+                                  <Trash2 className="w-4 h-4 mr-2" />
+                                  Delete
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -599,35 +669,33 @@ export default function DocumentLibraryPage() {
         </Card>
       </div>
 
+      {/* Papermark-Style Share Modal */}
+      {selectedDocument && showPapermarkModal && (
+        <PapermarkStyleShareModal
+          document={selectedDocument}
+          onClose={() => {
+            setShowPapermarkModal(false)
+            setSelectedDocument(null)
+          }}
+        />
+      )}
+
       {/* Share Link Modal */}
-      <Dialog open={showLinkModal && !!selectedDocument} onOpenChange={(open) => {
-        if (!open) {
-          setShowLinkModal(false)
-          setSelectedDocument(null)
-        }
-      }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white">
-          <DialogHeader>
-            <DialogTitle>
-              Share Document: {selectedDocument?.title}
-            </DialogTitle>
-          </DialogHeader>
-          {selectedDocument && (
-            <CreateLinkModal
-              documentId={selectedDocument.id}
-              documentTitle={selectedDocument.title}
-              onClose={() => {
-                setShowLinkModal(false)
-                setSelectedDocument(null)
-              }}
-              onLinkCreated={() => {
-                setShowLinkModal(false)
-                setSelectedDocument(null)
-              }}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {selectedDocument && (
+        <SimpleShareModal
+          documentId={selectedDocument.id}
+          documentTitle={selectedDocument.title}
+          isOpen={showLinkModal}
+          onClose={() => {
+            setShowLinkModal(false)
+            setSelectedDocument(null)
+          }}
+          onLinkCreated={() => {
+            setShowLinkModal(false)
+            setSelectedDocument(null)
+          }}
+        />
+      )}
 
       {/* Delete Confirmation Modal */}
       <Dialog open={showDeleteModal} onOpenChange={(open) => {
@@ -679,6 +747,18 @@ export default function DocumentLibraryPage() {
         selectedDocuments={documents.filter(doc => bulkSelection.selectedItems.includes(doc.id))}
         onShareComplete={handleBulkShareComplete}
       />
+
+      {/* Advanced Share Sidebar */}
+      {selectedDocument && (
+        <AdvancedShareSidebar
+          isOpen={showShareSidebar}
+          onClose={() => {
+            setShowShareSidebar(false)
+            setSelectedDocument(null)
+          }}
+          document={selectedDocument}
+        />
+      )}
     </>
   )
 }

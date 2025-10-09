@@ -156,3 +156,170 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
+
+export async function POST(request: NextRequest) {
+  try {
+    // Get and verify authentication
+    const tokens = getAuthTokensFromRequest(request)
+    if (!tokens?.accessToken) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const payload = await verifyAccessToken(tokens.accessToken)
+    if (!payload?.userId) {
+      return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
+    }
+
+    const body = await request.json()
+    const {
+      documentId,
+      name,
+      password,
+      expiresAt,
+      requireEmail = false,
+      allowDownload = true,
+      allowPrinting = true,
+      enableNotifications = true,
+      viewLimit,
+      allowedEmails = [],
+      blockedEmails = [],
+      allowedDomains = [],
+      blockedDomains = [],
+      allowedCountries = [],
+      blockedCountries = [],
+      allowedIPs = [],
+      blockedIPs = [],
+      requireNda = false,
+      enableWatermark = false,
+      watermarkText,
+      screenshotProtection = false,
+      customUrl,
+      welcomeMessage,
+      accountName,
+      customButtonText = 'View Document'
+    } = body
+
+    if (!documentId || !name) {
+      return NextResponse.json({ error: 'Document ID and name are required' }, { status: 400 })
+    }
+
+    // Verify document exists and belongs to user
+    // First try to find it as a standalone document
+    let { data: document, error: docError } = await supabaseAdmin
+      .from('send_shared_documents')
+      .select('id, title, user_id')
+      .eq('id', documentId)
+      .single()
+
+    // If not found as standalone, check if it's in a data room owned by the user
+    if (docError || !document) {
+      const { data: dataRoomDoc, error: dataRoomError } = await supabaseAdmin
+        .from('send_data_room_documents')
+        .select(`
+          document_id,
+          data_room:send_data_rooms!inner(user_id),
+          document:send_shared_documents(id, title, user_id)
+        `)
+        .eq('document_id', documentId)
+        .eq('data_room.user_id', payload.userId)
+        .single()
+
+      if (dataRoomError || !dataRoomDoc?.document) {
+        return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+      }
+
+      document = dataRoomDoc.document
+    }
+
+    // Verify user has access to the document
+    if (document.user_id !== payload.userId) {
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
+    }
+
+    // Generate unique link ID
+    const linkId = Math.random().toString(36).substring(2, 10)
+
+    // Hash password if provided
+    let passwordHash = null
+    if (password) {
+      const bcrypt = require('bcryptjs')
+      passwordHash = await bcrypt.hash(password, 10)
+    }
+
+    // Create share link
+    // Create the basic link record (only fields that exist in send_document_links table)
+    const { data: link, error: linkError } = await supabaseAdmin
+      .from('send_document_links')
+      .insert({
+        link_id: linkId,
+        document_id: documentId,
+        title: name,
+        description: welcomeMessage || null,
+        custom_slug: customUrl || null,
+        password_hash: passwordHash,
+        expires_at: expiresAt || null,
+        max_views: viewLimit || null,
+        require_email: requireEmail,
+        allow_download: allowDownload,
+        require_nda: requireNda,
+        require_totp: false, // Default for now
+        is_active: true,
+        created_by: payload.userId
+      })
+      .select()
+      .single()
+
+    if (linkError) {
+      console.error('Error creating share link:', linkError)
+      return NextResponse.json({ error: 'Failed to create share link' }, { status: 500 })
+    }
+
+    // Create advanced access controls if any advanced settings are provided
+    const hasAdvancedSettings = enableWatermark || screenshotProtection ||
+      allowedEmails.length > 0 || blockedEmails.length > 0 ||
+      allowedDomains.length > 0 || blockedDomains.length > 0 ||
+      allowedCountries.length > 0 || blockedCountries.length > 0 ||
+      allowedIPs.length > 0 || blockedIPs.length > 0 ||
+      watermarkText || !allowPrinting
+
+    if (hasAdvancedSettings) {
+      const { error: accessControlError } = await supabaseAdmin
+        .from('send_link_access_controls')
+        .insert({
+          link_id: link.id,
+          require_email: requireEmail,
+          allowed_emails: allowedEmails.length > 0 ? allowedEmails : null,
+          blocked_domains: blockedDomains.length > 0 ? blockedDomains : null,
+          allowed_domains: allowedDomains.length > 0 ? allowedDomains : null,
+          allowed_countries: allowedCountries.length > 0 ? allowedCountries : null,
+          blocked_countries: blockedCountries.length > 0 ? blockedCountries : null,
+          allowed_ips: allowedIPs.length > 0 ? allowedIPs : null,
+          blocked_ips: blockedIPs.length > 0 ? blockedIPs : null,
+          watermark_enabled: enableWatermark,
+          watermark_text: watermarkText || null,
+          screenshot_prevention: screenshotProtection,
+          print_prevention: !allowPrinting,
+          download_prevention: !allowDownload
+        })
+
+      if (accessControlError) {
+        console.error('Access control creation error:', accessControlError)
+        // Don't fail the whole request, just log the error
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      link: {
+        id: link.id,
+        linkId: link.link_id,
+        title: link.title,
+        url: `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3001'}/v/${link.link_id}`
+      }
+    })
+
+  } catch (error) {
+    console.error('Error in POST /api/send/links:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
+  }
+}

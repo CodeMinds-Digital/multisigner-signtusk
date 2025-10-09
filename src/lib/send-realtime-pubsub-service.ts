@@ -166,7 +166,7 @@ export class SendRealtimePubSubService {
     const viewersKey = RedisUtils.buildKey(this.ACTIVE_VIEWERS_PREFIX, linkId)
 
     // Store visitor data with session ID as field
-    await redis.hset(viewersKey, visitor.sessionId, JSON.stringify(visitor))
+    await redis.hset(viewersKey, { [visitor.sessionId]: JSON.stringify(visitor) })
 
     // Set expiration for cleanup
     await redis.expire(viewersKey, 3600) // 1 hour
@@ -195,7 +195,7 @@ export class SendRealtimePubSubService {
   static async getActiveViewers(linkId: string): Promise<VisitorActivity[]> {
     const viewersKey = RedisUtils.buildKey(this.ACTIVE_VIEWERS_PREFIX, linkId)
 
-    const viewers = await redis.hgetall(viewersKey)
+    const viewers = await redis.hgetall(viewersKey) || {}
 
     return Object.values(viewers).map(data => {
       try {
@@ -285,7 +285,12 @@ export class SendRealtimePubSubService {
     if (!data) return null
 
     try {
-      return typeof data === 'string' ? JSON.parse(data) : data
+      const parsed = typeof data === 'string' ? JSON.parse(data) : data
+      // Ensure the parsed data has the required LiveAnalytics structure
+      if (parsed && typeof parsed === 'object' && 'documentId' in parsed) {
+        return parsed as LiveAnalytics
+      }
+      return null
     } catch (error) {
       console.error('Failed to parse live analytics data:', error)
       return null

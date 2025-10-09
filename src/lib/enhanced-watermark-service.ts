@@ -66,7 +66,7 @@ export class EnhancedWatermarkService {
     // Add custom data replacements
     if (context.customData) {
       Object.entries(context.customData).forEach(([key, value]) => {
-        replacements[`{{${key}}}`] = value
+        (replacements as any)[`{{${key}}}`] = value
       })
     }
 
@@ -112,7 +112,7 @@ export class EnhancedWatermarkService {
 
     // Position-specific styles
     let positionStyle: React.CSSProperties = {}
-    
+
     switch (config.position) {
       case 'center':
         positionStyle = {
@@ -207,7 +207,7 @@ export class EnhancedWatermarkService {
         const y = row * spacing
 
         const watermarkText = this.generateWatermarkText(config.template, context)
-        
+
         watermarks.push({
           id: `watermark-${row}-${col}`,
           text: watermarkText,

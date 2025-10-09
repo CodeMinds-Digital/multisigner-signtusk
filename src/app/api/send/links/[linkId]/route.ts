@@ -107,14 +107,17 @@ export async function GET(
         )
       }
 
-      // Check if email is verified
-      const { data: verification } = await supabaseAdmin
+      // Check if email is verified (get the most recent verified record)
+      const { data: verifications, error: verificationError } = await supabaseAdmin
         .from('send_email_verifications')
         .select('*')
         .eq('link_id', link.id)
         .eq('email', email)
         .eq('verified', true)
-        .single()
+        .order('verified_at', { ascending: false })
+        .limit(1)
+
+      const verification = verifications && verifications.length > 0 ? verifications[0] : null
 
       if (!verification) {
         return NextResponse.json(
@@ -162,22 +165,33 @@ export async function GET(
       }
     }
 
+    // Clean up filename for display (remove storage prefix)
+    const cleanFileName = (fileName: string) => {
+      if (!fileName) return fileName
+      // Remove timestamp prefix like "1760016189209-vpudsnv1-"
+      return fileName.replace(/^\d+-[a-z0-9]+-/, '')
+    }
+
     // All checks passed - return link and document details
     return NextResponse.json({
       success: true,
       link: {
         id: link.id,
         linkId: link.link_id,
-        name: link.name,
+        name: link.title,
         allowDownload: link.allow_download,
-        allowPrinting: link.allow_printing,
-        enableWatermark: link.enable_watermark,
-        watermarkText: link.watermark_text,
-        enhancedWatermarkConfig: link.enhanced_watermark_config,
-        viewCount: link.view_count,
+        allowPrinting: true, // Default value since field doesn't exist in schema
+        enableWatermark: false, // Default value since field doesn't exist in schema
+        watermarkText: null, // Default value since field doesn't exist in schema
+        enhancedWatermarkConfig: null, // Default value since field doesn't exist in schema
+        viewCount: link.current_views,
         expiresAt: link.expires_at
       },
-      document: link.document
+      document: {
+        ...link.document,
+        file_name: cleanFileName(link.document.file_name), // Clean filename for display
+        title: link.document.title || cleanFileName(link.document.file_name) // Use clean filename as fallback title
+      }
     })
   } catch (error: any) {
     console.error('Link verification error:', error)

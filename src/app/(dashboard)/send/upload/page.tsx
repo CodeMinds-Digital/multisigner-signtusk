@@ -6,25 +6,42 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, FileText, Share2, Settings } from 'lucide-react'
 import { DocumentUpload } from '@/components/features/send/document-upload'
-import { CreateLinkModal } from '@/components/features/send/create-link-modal'
+import { SimpleShareModal } from '@/components/features/send/simple-share-modal'
+import { InstantShareSuccess } from '@/components/features/send/instant-share-success'
 import { Breadcrumb } from '@/components/ui/breadcrumb'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 
 export default function UploadPage() {
   const router = useRouter()
   const [uploadedDocument, setUploadedDocument] = useState<any>(null)
   const [showLinkModal, setShowLinkModal] = useState(false)
 
-  const handleUploadComplete = (documentId: string, documentData: any) => {
+  const handleUploadComplete = async (documentId: string, documentData: any) => {
     console.log('Upload complete:', documentId, documentData)
     setUploadedDocument({ id: documentId, ...documentData })
-    // Automatically show link creation modal
-    setShowLinkModal(true)
+
+    // Papermark-style: Generate instant shareable link
+    try {
+      const response = await fetch('/api/send/links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId,
+          name: `${documentData.title} - Share Link`,
+          // Default settings for instant sharing
+          allowDownload: true,
+          allowPrinting: true,
+          requireEmail: false,
+          enableNotifications: true
+        })
+      })
+
+      if (response.ok) {
+        const linkData = await response.json()
+        setUploadedDocument(prev => ({ ...prev, instantLink: linkData.link }))
+      }
+    } catch (error) {
+      console.error('Failed to create instant link:', error)
+    }
   }
 
   const handleLinkCreated = (linkData: any) => {
@@ -40,6 +57,7 @@ export default function UploadPage() {
         {/* Breadcrumb Navigation */}
         <Breadcrumb
           items={[
+            { label: 'Send', href: '/send' },
             { label: 'Upload Document' }
           ]}
         />
@@ -52,12 +70,24 @@ export default function UploadPage() {
           </p>
         </div>
 
-        {/* Upload Section */}
-        <DocumentUpload
-          onUploadComplete={handleUploadComplete}
-          maxFileSize={100}
-          showHeader={false}
-        />
+        {/* Upload Section or Success State */}
+        {uploadedDocument ? (
+          <InstantShareSuccess
+            document={uploadedDocument}
+            onCreateAdvancedLink={() => setShowLinkModal(true)}
+            onViewAnalytics={() => router.push(`/send/analytics/${uploadedDocument.id}`)}
+            onUploadAnother={() => {
+              setUploadedDocument(null)
+              setShowLinkModal(false)
+            }}
+          />
+        ) : (
+          <DocumentUpload
+            onUploadComplete={handleUploadComplete}
+            maxFileSize={100}
+            showHeader={false}
+          />
+        )}
 
         {/* Features Info */}
         {!uploadedDocument && (
@@ -144,25 +174,15 @@ export default function UploadPage() {
       </div>
 
       {/* Create Link Modal */}
-      <Dialog open={showLinkModal && !!uploadedDocument} onOpenChange={(open) => {
-        if (!open) setShowLinkModal(false)
-      }}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white">
-          <DialogHeader>
-            <DialogTitle>
-              Share Document: {uploadedDocument?.title || uploadedDocument?.file_name}
-            </DialogTitle>
-          </DialogHeader>
-          {uploadedDocument && (
-            <CreateLinkModal
-              documentId={uploadedDocument.id}
-              documentTitle={uploadedDocument.title || uploadedDocument.file_name}
-              onClose={() => setShowLinkModal(false)}
-              onLinkCreated={handleLinkCreated}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      {uploadedDocument && (
+        <SimpleShareModal
+          documentId={uploadedDocument.id}
+          documentTitle={uploadedDocument.title || uploadedDocument.file_name}
+          isOpen={showLinkModal}
+          onClose={() => setShowLinkModal(false)}
+          onLinkCreated={handleLinkCreated}
+        />
+      )}
     </div>
   )
 }
