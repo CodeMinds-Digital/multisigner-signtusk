@@ -3,6 +3,7 @@
 import { usePathname, useRouter } from 'next/navigation'
 import { User, Settings } from 'lucide-react'
 import { NotificationBell } from '@/components/ui/notification-bell'
+
 import { useAuth } from '@/components/providers/secure-auth-provider'
 import { getAllServices, getServiceByRoute, type Service } from '@/config/services'
 import { useState, useRef, useEffect } from 'react'
@@ -43,6 +44,8 @@ export function TopNavigation() {
     return name.charAt(0).toUpperCase()
   }
 
+
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white shadow-sm">
       <div className="flex h-14 items-center px-4 gap-4">
@@ -80,6 +83,8 @@ export function TopNavigation() {
             )
           })}
         </nav>
+
+
 
         {/* Right Side Actions */}
         <div className="ml-auto flex items-center gap-2">

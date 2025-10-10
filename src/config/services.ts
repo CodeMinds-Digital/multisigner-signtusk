@@ -20,7 +20,13 @@ import {
   TrendingUp,
   Folder,
   Activity,
-  PieChart
+  PieChart,
+  Calendar,
+  CalendarDays,
+  Clock,
+  Video,
+  MapPin,
+  Phone
 } from 'lucide-react'
 
 export interface SidebarItem {
@@ -194,6 +200,73 @@ export const SERVICES: Service[] = [
     ]
   },
   {
+    id: 'schedule',
+    name: 'Schedule',
+    displayName: 'Schedule',
+    icon: Calendar,
+    description: 'Meeting scheduling & appointments',
+    route: '/schedule',
+    enabled: true,
+    color: '#8B5CF6', // Purple
+    sidebarItems: [
+      {
+        id: 'schedule-dashboard',
+        label: 'Dashboard',
+        icon: BarChart2,
+        route: '/schedule'
+      },
+      {
+        id: 'quick-meeting',
+        label: 'Quick Meeting',
+        icon: CalendarDays,
+        route: '/schedule/quick-meeting'
+      },
+      {
+        id: 'business-meeting',
+        label: 'Business Meeting',
+        icon: FileSignature,
+        route: '/schedule/business-meeting'
+      },
+      {
+        id: 'my-bookings',
+        label: 'My Bookings',
+        icon: Clock,
+        route: '/schedule/bookings'
+      },
+      {
+        id: 'availability',
+        label: 'Availability',
+        icon: Calendar,
+        route: '/schedule/availability'
+      },
+      {
+        id: 'meeting-types',
+        label: 'Meeting Types',
+        icon: Video,
+        route: '/schedule/meeting-types'
+      },
+      // Settings section
+      {
+        id: 'schedule-integrations',
+        label: 'Calendar Integration',
+        icon: Activity,
+        route: '/schedule/settings/integrations'
+      },
+      {
+        id: 'schedule-notifications',
+        label: 'Notifications',
+        icon: Bell,
+        route: '/schedule/settings/notifications'
+      },
+      {
+        id: 'schedule-branding',
+        label: 'Branding',
+        icon: PieChart,
+        route: '/schedule/settings/branding'
+      }
+    ]
+  },
+  {
     id: 'analytics',
     name: 'Analytics',
     displayName: 'Analytics',
@@ -237,7 +310,7 @@ export const SERVICES: Service[] = [
     description: 'Document tracking & monitoring',
     route: '/track',
     enabled: true,
-    color: '#8B5CF6', // Purple
+    color: '#EF4444', // Red
     sidebarItems: [
       {
         id: 'track-dashboard',
