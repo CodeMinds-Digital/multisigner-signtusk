@@ -28,6 +28,7 @@ interface UniversalDocumentViewerProps {
   viewerEmail?: string
   allowDownload?: boolean
   allowPrinting?: boolean
+  isDataRoom?: boolean
   watermarkText?: string
   onView?: () => void
   onDownload?: () => void
@@ -43,6 +44,7 @@ export default function UniversalDocumentViewer({
   viewerEmail,
   allowDownload = true,
   allowPrinting = true,
+  isDataRoom = false,
   watermarkText,
   onView,
   onDownload,
@@ -93,9 +95,15 @@ export default function UniversalDocumentViewer({
         let url = fileUrl
 
         // Use proxy API if linkId is available (for public viewer)
-        if (linkId) {
-          console.log('🔗 Using proxy API for linkId:', linkId)
-          const response = await fetch(`/api/send/documents/content/${linkId}`)
+        if (linkId && documentId) {
+          console.log('🔗 Using proxy API for linkId:', linkId, 'documentId:', documentId)
+
+          // Use different API endpoint for data room documents
+          const apiUrl = isDataRoom
+            ? `/api/send/dataroom-documents/content/${linkId}/${documentId}`
+            : `/api/send/documents/content/${linkId}`
+
+          const response = await fetch(apiUrl)
 
           if (!response.ok) {
             throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`)
@@ -106,8 +114,10 @@ export default function UniversalDocumentViewer({
             throw new Error(data.error || 'Failed to load document')
           }
 
-          // Use the URL provided by the API (either public URL for PDFs or base64 data URL for others)
-          if (data.data?.url) {
+          // Use the URL provided by the API
+          if (data.url) {
+            url = data.url
+          } else if (data.data?.url) {
             url = data.data.url
           } else if (data.data?.base64) {
             url = data.data.base64

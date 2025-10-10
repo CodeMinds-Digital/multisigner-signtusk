@@ -10,7 +10,7 @@ export async function GET(
   try {
     const { roomId } = await params
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -66,9 +66,10 @@ export async function GET(
     if (documents) {
       for (const doc of documents) {
         if (doc.document) {
+          const document = doc.document as any
           resources.push({
-            id: doc.document.id,
-            name: doc.document.title || doc.document.file_name,
+            id: document.id,
+            name: document.title || document.file_name,
             type: 'document',
             path: doc.folder_path || '/'
           })
@@ -93,7 +94,7 @@ export async function GET(
           if (key !== '/' && typeof value === 'object' && value !== null) {
             const folderPath = basePath + '/' + key
             folderSet.add(folderPath)
-            
+
             // Recursively add subfolders
             if ((value as any).subfolders) {
               addFoldersFromStructure((value as any).subfolders, folderPath)
@@ -101,7 +102,7 @@ export async function GET(
           }
         }
       }
-      
+
       addFoldersFromStructure(dataroom.folder_structure)
     }
 

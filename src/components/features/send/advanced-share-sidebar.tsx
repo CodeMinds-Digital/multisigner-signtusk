@@ -192,14 +192,16 @@ export function AdvancedShareSidebar({
   }
 
   const addEmail = (type: 'allowed' | 'blocked') => {
-    if (!newEmail.trim()) return
+    const email = type === 'allowed' ? newAllowedEmail : newBlockedEmail
+    if (!email.trim()) return
 
     if (type === 'allowed') {
-      setAllowedEmails([...allowedEmails, newEmail.trim()])
+      setAllowedEmails([...allowedEmails, email.trim()])
+      setNewAllowedEmail('')
     } else {
-      setBlockedEmails([...blockedEmails, newEmail.trim()])
+      setBlockedEmails([...blockedEmails, email.trim()])
+      setNewBlockedEmail('')
     }
-    setNewEmail('')
   }
 
   const removeEmail = (email: string, type: 'allowed' | 'blocked') => {
@@ -211,14 +213,16 @@ export function AdvancedShareSidebar({
   }
 
   const addDomain = (type: 'allowed' | 'blocked') => {
-    if (!newDomain.trim()) return
+    const domain = type === 'allowed' ? newAllowedDomain : newBlockedDomain
+    if (!domain.trim()) return
 
     if (type === 'allowed') {
-      setAllowedDomains([...allowedDomains, newDomain.trim()])
+      setAllowedDomains([...allowedDomains, domain.trim()])
+      setNewAllowedDomain('')
     } else {
-      setBlockedDomains([...blockedDomains, newDomain.trim()])
+      setBlockedDomains([...blockedDomains, domain.trim()])
+      setNewBlockedDomain('')
     }
-    setNewDomain('')
   }
 
   const removeDomain = (domain: string, type: 'allowed' | 'blocked') => {

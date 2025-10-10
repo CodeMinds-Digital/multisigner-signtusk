@@ -228,11 +228,11 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Document not found' }, { status: 404 })
       }
 
-      document = dataRoomDoc.document
+      document = dataRoomDoc.document as any
     }
 
     // Verify user has access to the document
-    if (document.user_id !== payload.userId) {
+    if (!document || document.user_id !== payload.userId) {
       return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
 

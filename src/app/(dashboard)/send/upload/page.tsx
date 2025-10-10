@@ -37,7 +37,7 @@ export default function UploadPage() {
 
       if (response.ok) {
         const linkData = await response.json()
-        setUploadedDocument(prev => ({ ...prev, instantLink: linkData.link }))
+        setUploadedDocument((prev: any) => ({ ...prev, instantLink: linkData.link }))
       }
     } catch (error) {
       console.error('Failed to create instant link:', error)

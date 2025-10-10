@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import UniversalDocumentViewer from '@/components/features/send/universal-document-viewer'
+import { DataRoomPublicViewer } from '@/components/features/send/data-room-public-viewer'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,19 +17,22 @@ import { EnhancedWatermarkConfig } from '@/lib/enhanced-watermark-service'
 import { AccessGateLayout } from '@/components/features/send/share-page-layout'
 
 interface LinkData {
+  type?: 'document' | 'dataroom'
   link: {
     id: string
-    linkId: string
+    linkId?: string
+    slug?: string
     name: string
     allowDownload: boolean
     allowPrinting: boolean
     enableWatermark: boolean
     watermarkText: string | null
-    enhancedWatermarkConfig: EnhancedWatermarkConfig | null
+    enhancedWatermarkConfig?: EnhancedWatermarkConfig | null
     viewCount: number
     expiresAt: string | null
+    screenshotProtection?: boolean
   }
-  document: {
+  document?: {
     id: string
     title: string
     file_url: string
@@ -36,6 +40,23 @@ interface LinkData {
     file_type: string
     file_size: number
   }
+  dataRoom?: {
+    id: string
+    name: string
+    description: string
+    folderStructure: any
+  }
+  documents?: Array<{
+    id: string
+    title: string
+    file_url: string
+    file_name: string
+    file_type: string
+    file_size: number
+    thumbnail_url?: string
+    folder_path: string
+    sort_order: number
+  }>
 }
 
 export default function PublicDocumentViewerPage() {
@@ -69,35 +90,41 @@ export default function PublicDocumentViewerPage() {
     const initVisitorSession = async () => {
       if (linkData) {
         try {
-          const session = await SendVisitorTracking.initSession(
-            linkId,
-            linkData.document.id,
-            email || undefined
-          )
-          setVisitorSession(session)
-
-          // Trigger notification for document viewed (non-blocking)
-          try {
-            const fingerprint = await SendVisitorTracking.generateFingerprint()
-            await notifyDocumentViewed(
-              linkData.document.id,
-              email || undefined,
-              fingerprint
+          // For data rooms, we don't need a specific document ID for session init
+          const documentId = linkData.type === 'dataroom' ? 'dataroom' : linkData.document?.id
+          if (documentId) {
+            const session = await SendVisitorTracking.initSession(
+              linkId,
+              documentId,
+              email || undefined
             )
+            setVisitorSession(session)
 
-            // Check if returning visitor and notify
-            if (session.isReturningVisitor) {
-              await notifyReturningVisitor(
-                linkData.document.id,
-                email || undefined,
-                fingerprint,
-                undefined,
-                session.previousVisits
-              )
+            // Trigger notification for document viewed (non-blocking)
+            if (linkData.document) {
+              try {
+                const fingerprint = await SendVisitorTracking.generateFingerprint()
+                await notifyDocumentViewed(
+                  linkData.document.id,
+                  email || undefined,
+                  fingerprint
+                )
+
+                // Check if returning visitor and notify
+                if (session.isReturningVisitor) {
+                  await notifyReturningVisitor(
+                    linkData.document.id,
+                    email || undefined,
+                    fingerprint,
+                    undefined,
+                    session.previousVisits
+                  )
+                }
+              } catch (notificationError) {
+                // Silently handle notification failures - don't block the viewer
+                console.warn('Notification failed (non-critical):', notificationError)
+              }
             }
-          } catch (notificationError) {
-            // Silently handle notification failures - don't block the viewer
-            console.warn('Notification failed (non-critical):', notificationError)
           }
         } catch (error) {
           console.error('Failed to initialize visitor session:', error)
@@ -126,8 +153,16 @@ export default function PublicDocumentViewerPage() {
       if (pwd) params.append('password', pwd)
       if (eml) params.append('email', eml)
 
-      const response = await fetch(`/api/send/links/${linkId}?${params.toString()}`)
-      const data = await response.json()
+      // Try single document link first
+      let response = await fetch(`/api/send/links/${linkId}?${params.toString()}`)
+      let data = await response.json()
+
+      // If single document link not found, try data room link
+      if (!response.ok && response.status === 404) {
+        console.log('🔄 Single document link not found, trying data room link...')
+        response = await fetch(`/api/send/dataroom-links/${linkId}?${params.toString()}`)
+        data = await response.json()
+      }
 
       if (!response.ok) {
         if (data.requiresPassword) {
@@ -146,7 +181,29 @@ export default function PublicDocumentViewerPage() {
           setError(null)
           return
         }
-        throw new Error(data.error || 'Failed to load document')
+
+        // Handle specific error cases with user-friendly messages
+        if (response.status === 401) {
+          if (data.error?.includes('password') || data.error?.includes('Password')) {
+            setError('Incorrect password. Please try again.')
+            setRequiresPassword(true) // Show password form with error
+          } else {
+            setError('Authentication required. Please check your credentials.')
+          }
+        } else if (response.status === 403) {
+          if (data.error?.includes('expired') || data.error?.includes('Expired')) {
+            setError('This link has expired and is no longer accessible.')
+          } else if (data.error?.includes('limit') || data.error?.includes('View limit')) {
+            setError('View limit exceeded. This link has reached its maximum number of views.')
+          } else {
+            setError('Access denied. You do not have permission to view this content.')
+          }
+        } else if (response.status === 404) {
+          setError('Document not found. This link may have been removed or is invalid.')
+        } else {
+          setError(data.error || 'Failed to load content. Please try again.')
+        }
+        return
       }
 
       setLinkData(data)
@@ -175,7 +232,13 @@ export default function PublicDocumentViewerPage() {
   const handleSendVerification = async () => {
     try {
       setVerifying(true)
-      const response = await fetch(`/api/send/links/${linkId}`, {
+
+      // Determine API endpoint based on link type
+      const apiEndpoint = linkData?.type === 'dataroom'
+        ? `/api/send/dataroom-links/${linkId}`
+        : `/api/send/links/${linkId}`
+
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -201,7 +264,13 @@ export default function PublicDocumentViewerPage() {
     e.preventDefault()
     try {
       setVerifying(true)
-      const response = await fetch(`/api/send/links/${linkId}`, {
+
+      // Determine API endpoint based on link type
+      const apiEndpoint = linkData?.type === 'dataroom'
+        ? `/api/send/dataroom-links/${linkId}`
+        : `/api/send/links/${linkId}`
+
+      const response = await fetch(apiEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -242,7 +311,7 @@ export default function PublicDocumentViewerPage() {
       const data = await response.json()
       if (data.success) {
         // Trigger NDA accepted notification
-        if (linkData) {
+        if (linkData && linkData.document) {
           const fingerprint = await SendVisitorTracking.generateFingerprint()
           await notifyNDAAccepted(
             linkData.document.id,
@@ -270,7 +339,7 @@ export default function PublicDocumentViewerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           linkId: linkData?.link.linkId,
-          documentId: linkData?.document.id,
+          documentId: linkData?.type === 'dataroom' ? null : linkData?.document?.id,
           eventType: 'view',
           email: email || undefined
         })
@@ -288,7 +357,7 @@ export default function PublicDocumentViewerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           linkId: linkData?.link.linkId,
-          documentId: linkData?.document.id,
+          documentId: linkData?.document?.id,
           eventType: 'download',
           email: email || undefined
         })
@@ -306,7 +375,7 @@ export default function PublicDocumentViewerPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           linkId: linkData?.link.linkId,
-          documentId: linkData?.document.id,
+          documentId: linkData?.document?.id,
           eventType: 'print',
           email: email || undefined
         })
@@ -541,22 +610,56 @@ export default function PublicDocumentViewerPage() {
     )
   }
 
-  // Document viewer
+  // Content viewer (document or data room)
   if (linkData) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        {linkData.link.enhancedWatermarkConfig?.enabled ? (
-          <EnhancedWatermark
-            config={linkData.link.enhancedWatermarkConfig}
-            context={{
-              userEmail: email || undefined,
-              userIP: 'Unknown', // Would be populated from server
-              timestamp: new Date().toISOString(),
-              documentTitle: linkData.document.title,
-              linkId: linkId,
-              sessionId: 'session_' + Date.now() // Would be actual session ID
-            }}
-          >
+    // Data room viewer
+    if (linkData.type === 'dataroom' && linkData.dataRoom && linkData.documents) {
+      return (
+        <DataRoomPublicViewer
+          dataRoom={linkData.dataRoom}
+          documents={linkData.documents}
+          link={linkData.link}
+          linkId={linkId}
+          viewerEmail={email || undefined}
+          onView={handleView}
+          onDownload={handleDownload}
+          onPrint={handlePrint}
+        />
+      )
+    }
+
+    // Single document viewer
+    if (linkData.document) {
+      return (
+        <div className="min-h-screen bg-gray-50">
+          {linkData.link.enhancedWatermarkConfig?.enabled ? (
+            <EnhancedWatermark
+              config={linkData.link.enhancedWatermarkConfig}
+              context={{
+                userEmail: email || undefined,
+                userIP: 'Unknown', // Would be populated from server
+                timestamp: new Date().toISOString(),
+                documentTitle: linkData.document.title,
+                linkId: linkId,
+                sessionId: 'session_' + Date.now() // Would be actual session ID
+              }}
+            >
+              <UniversalDocumentViewer
+                fileUrl={linkData.document.file_url}
+                fileName={linkData.document.file_name}
+                fileType={linkData.document.file_type}
+                linkId={linkId}
+                documentId={linkData.document.id}
+                viewerEmail={email || undefined}
+                allowDownload={linkData.link.allowDownload}
+                allowPrinting={linkData.link.allowPrinting}
+                watermarkText={linkData.link.enableWatermark ? linkData.link.watermarkText || undefined : undefined}
+                onView={handleView}
+                onDownload={handleDownload}
+                onPrint={handlePrint}
+              />
+            </EnhancedWatermark>
+          ) : (
             <UniversalDocumentViewer
               fileUrl={linkData.document.file_url}
               fileName={linkData.document.file_name}
@@ -571,23 +674,25 @@ export default function PublicDocumentViewerPage() {
               onDownload={handleDownload}
               onPrint={handlePrint}
             />
-          </EnhancedWatermark>
-        ) : (
-          <UniversalDocumentViewer
-            fileUrl={linkData.document.file_url}
-            fileName={linkData.document.file_name}
-            fileType={linkData.document.file_type}
-            linkId={linkId}
-            documentId={linkData.document.id}
-            viewerEmail={email || undefined}
-            allowDownload={linkData.link.allowDownload}
-            allowPrinting={linkData.link.allowPrinting}
-            watermarkText={linkData.link.enableWatermark ? linkData.link.watermarkText || undefined : undefined}
-            onView={handleView}
-            onDownload={handleDownload}
-            onPrint={handlePrint}
-          />
-        )}
+          )}
+        </div>
+      )
+    }
+
+    // Fallback for invalid link data
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <Card className="w-full max-w-md">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-red-500" />
+              Invalid Link
+            </CardTitle>
+            <CardDescription>
+              This link appears to be invalid or corrupted.
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     )
   }

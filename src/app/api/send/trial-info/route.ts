@@ -6,7 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 export async function GET(request: NextRequest) {
   try {
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -34,29 +34,24 @@ export async function GET(request: NextRequest) {
     }
 
     // Get usage statistics
-    const [dataRoomsRes, collaboratorsRes, documentsRes] = await Promise.all([
-      supabaseAdmin
-        .from('send_data_rooms')
-        .select('id')
-        .eq('user_id', userId),
+    // First get user's data rooms
+    const dataRoomsRes = await supabaseAdmin
+      .from('send_data_rooms')
+      .select('id')
+      .eq('user_id', userId)
+
+    const dataRoomIds = dataRoomsRes.data?.map(room => room.id) || []
+
+    // Then get collaborators and documents for those data rooms
+    const [collaboratorsRes, documentsRes] = await Promise.all([
       supabaseAdmin
         .from('send_dataroom_collaborators')
         .select('id')
-        .in('data_room_id', 
-          supabaseAdmin
-            .from('send_data_rooms')
-            .select('id')
-            .eq('user_id', userId)
-        ),
+        .in('data_room_id', dataRoomIds),
       supabaseAdmin
         .from('send_documents')
         .select('id')
-        .in('data_room_id', 
-          supabaseAdmin
-            .from('send_data_rooms')
-            .select('id')
-            .eq('user_id', userId)
-        )
+        .in('data_room_id', dataRoomIds)
     ])
 
     const dataRoomsCount = dataRoomsRes.data?.length || 0
@@ -67,12 +62,7 @@ export async function GET(request: NextRequest) {
     const { data: brandingData } = await supabaseAdmin
       .from('send_dataroom_branding')
       .select('id')
-      .in('data_room_id', 
-        supabaseAdmin
-          .from('send_data_rooms')
-          .select('id')
-          .eq('user_id', userId)
-      )
+      .in('data_room_id', dataRoomIds)
       .limit(1)
 
     const hasCustomBranding = (brandingData?.length || 0) > 0

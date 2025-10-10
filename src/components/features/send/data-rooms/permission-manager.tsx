@@ -9,15 +9,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { 
-  Shield, 
-  Folder, 
-  FileText, 
-  Eye, 
-  Download, 
-  Share2, 
-  MessageSquare, 
-  Print,
+import {
+  Shield,
+  Folder,
+  FileText,
+  Eye,
+  Download,
+  Share2,
+  MessageSquare,
+  Printer,
   Plus,
   Edit,
   Trash2,
@@ -243,7 +243,7 @@ export function PermissionManager({ dataRoomId }: PermissionManagerProps) {
           <h2 className="text-2xl font-semibold text-gray-900">Permission Manager</h2>
           <p className="text-gray-500">Control access to folders and documents</p>
         </div>
-        
+
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700">
@@ -285,8 +285,8 @@ export function PermissionManager({ dataRoomId }: PermissionManagerProps) {
                       {userGroups.map((group) => (
                         <SelectItem key={group.id} value={group.id}>
                           <div className="flex items-center gap-2">
-                            <div 
-                              className="w-3 h-3 rounded-full" 
+                            <div
+                              className="w-3 h-3 rounded-full"
                               style={{ backgroundColor: group.color }}
                             />
                             {group.name} ({group.member_count} members)
@@ -351,7 +351,7 @@ export function PermissionManager({ dataRoomId }: PermissionManagerProps) {
                   <div className="flex items-center space-x-2">
                     <Switch checked={canPrint} onCheckedChange={setCanPrint} />
                     <Label className="flex items-center gap-2">
-                      <Print className="w-4 h-4" />
+                      <Printer className="w-4 h-4" />
                       Print
                     </Label>
                   </div>
@@ -421,13 +421,13 @@ export function PermissionManager({ dataRoomId }: PermissionManagerProps) {
                       <p className="text-sm text-gray-500">{permission.resource_type}</p>
                     </div>
                   </div>
-                  
+
                   <div className="flex items-center gap-2">
                     {permission.viewer_group_id ? (
                       <div className="flex items-center gap-2">
                         <Users className="w-4 h-4 text-gray-500" />
-                        <Badge 
-                          variant="secondary" 
+                        <Badge
+                          variant="secondary"
                           style={{ backgroundColor: permission.group_color + '20', color: permission.group_color }}
                         >
                           {permission.group_name}
@@ -439,12 +439,12 @@ export function PermissionManager({ dataRoomId }: PermissionManagerProps) {
                       </div>
                     )}
                   </div>
-                  
+
                   <div className="flex gap-1">
                     {getPermissionBadges(permission)}
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2">
                   {(permission.access_starts_at || permission.access_expires_at) && (
                     <div className="flex items-center gap-1 text-sm text-gray-500">

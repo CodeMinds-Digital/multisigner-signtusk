@@ -247,25 +247,27 @@ export function PapermarkStyleShareModal({ document, onClose }: PapermarkStyleSh
 
       // Method 2: Fallback to execCommand
       console.log('🔗 Using fallback execCommand method')
-      const textArea = document.createElement('textarea')
-      textArea.value = shareUrl
-      textArea.style.position = 'fixed'
-      textArea.style.left = '-999999px'
-      textArea.style.top = '-999999px'
-      document.body.appendChild(textArea)
-      textArea.focus()
-      textArea.select()
+      if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+        const textArea = (document as any).createElement('textarea')
+        textArea.value = shareUrl
+        textArea.style.position = 'fixed'
+        textArea.style.left = '-999999px'
+        textArea.style.top = '-999999px'
+          ; (document as any).body.appendChild(textArea)
+        textArea.focus()
+        textArea.select()
 
-      const successful = document.execCommand('copy')
-      document.body.removeChild(textArea)
+        const successful = (document as any).execCommand('copy')
+          ; (document as any).body.removeChild(textArea)
 
-      if (successful) {
-        console.log('✅ Fallback copy successful!')
-        setCopied(true)
-        toast.success('Link copied to clipboard!')
-        setTimeout(() => setCopied(false), 2000)
-      } else {
-        throw new Error('execCommand copy failed')
+        if (successful) {
+          console.log('✅ Fallback copy successful!')
+          setCopied(true)
+          toast.success('Link copied to clipboard!')
+          setTimeout(() => setCopied(false), 2000)
+        } else {
+          throw new Error('execCommand copy failed')
+        }
       }
     } catch (error) {
       console.error('❌ All copy methods failed:', error)

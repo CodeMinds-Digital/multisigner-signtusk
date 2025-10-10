@@ -10,15 +10,15 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { 
-  Users, 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Mail, 
-  Shield, 
-  Eye, 
-  Download, 
+import {
+  Users,
+  Plus,
+  Edit,
+  Trash2,
+  Mail,
+  Shield,
+  Eye,
+  Download,
   Share2,
   MessageSquare,
   Calendar,
@@ -89,7 +89,7 @@ export function UserGroupManager({ dataRoomId }: UserGroupManagerProps) {
     try {
       const response = await fetch(`/api/send/data-rooms/${dataRoomId}/viewer-groups`)
       const data = await response.json()
-      
+
       if (data.success) {
         setGroups(data.viewer_groups || [])
       } else {
@@ -194,8 +194,8 @@ export function UserGroupManager({ dataRoomId }: UserGroupManagerProps) {
           fetchGroupDetails(groupId)
         }
         // Update member count in groups list
-        setGroups(groups.map(g => 
-          g.id === groupId 
+        setGroups(groups.map(g =>
+          g.id === groupId
             ? { ...g, member_count: (g.member_count || 0) + 1 }
             : g
         ))
@@ -212,7 +212,7 @@ export function UserGroupManager({ dataRoomId }: UserGroupManagerProps) {
     try {
       const response = await fetch(`/api/send/data-rooms/${dataRoomId}/viewer-groups/${groupId}`)
       const data = await response.json()
-      
+
       if (data.success) {
         setSelectedGroup(data.viewer_group)
       } else {
@@ -254,7 +254,7 @@ export function UserGroupManager({ dataRoomId }: UserGroupManagerProps) {
           <h2 className="text-2xl font-semibold text-gray-900">User Groups</h2>
           <p className="text-gray-500">Manage access permissions for different user groups</p>
         </div>
-        
+
         <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
           <DialogTrigger asChild>
             <Button className="bg-blue-600 hover:bg-blue-700">
@@ -299,8 +299,8 @@ export function UserGroupManager({ dataRoomId }: UserGroupManagerProps) {
                     {colorOptions.map((color) => (
                       <SelectItem key={color.value} value={color.value}>
                         <div className="flex items-center gap-2">
-                          <div 
-                            className="w-4 h-4 rounded-full" 
+                          <div
+                            className="w-4 h-4 rounded-full"
                             style={{ backgroundColor: color.value }}
                           />
                           {color.label}
@@ -338,8 +338,8 @@ export function UserGroupManager({ dataRoomId }: UserGroupManagerProps) {
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div 
-                    className="w-3 h-3 rounded-full" 
+                  <div
+                    className="w-3 h-3 rounded-full"
                     style={{ backgroundColor: group.color }}
                   />
                   <CardTitle className="text-lg">{group.name}</CardTitle>
@@ -403,8 +403,8 @@ export function UserGroupManager({ dataRoomId }: UserGroupManagerProps) {
           <CardHeader>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div 
-                  className="w-4 h-4 rounded-full" 
+                <div
+                  className="w-4 h-4 rounded-full"
                   style={{ backgroundColor: selectedGroup.color }}
                 />
                 <CardTitle>{selectedGroup.name}</CardTitle>
@@ -435,7 +435,7 @@ export function UserGroupManager({ dataRoomId }: UserGroupManagerProps) {
                   placeholder="Enter email address"
                   className="flex-1"
                 />
-                <Select value={newMemberRole} onValueChange={setNewMemberRole}>
+                <Select value={newMemberRole} onValueChange={(value) => setNewMemberRole(value as 'viewer' | 'collaborator' | 'admin')}>
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
