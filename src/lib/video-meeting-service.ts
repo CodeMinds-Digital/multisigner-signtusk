@@ -7,19 +7,18 @@ export class VideoMeetingService {
 
   async generateMeetingLink(booking: MeetingBooking): Promise<VideoMeetingLink | null> {
     try {
-      // For now, we'll generate Google Meet links
-      // In production, this would integrate with actual video providers
-      const meetingId = this.generateMeetingId()
-      const joinUrl = `https://meet.google.com/${meetingId}`
+      // Use Jitsi Meet - free, no API keys required, supports recording
+      const roomName = `tuskhub-meeting-${booking.id}-${Date.now()}`
+      const joinUrl = `https://meet.jit.si/${roomName}`
 
       const videoLinkData = {
         booking_id: booking.id,
-        platform: 'google-meet' as const,
-        meeting_id: meetingId,
+        platform: 'jitsi' as const,
+        meeting_id: roomName,
         join_url: joinUrl,
         host_url: joinUrl,
         waiting_room_enabled: true,
-        recording_enabled: false,
+        recording_enabled: true, // Jitsi supports recording out of the box
         status: 'active' as const
       }
 
@@ -41,42 +40,34 @@ export class VideoMeetingService {
     }
   }
 
-  async generateZoomMeeting(booking: MeetingBooking): Promise<VideoMeetingLink | null> {
-    // TODO: Integrate with Zoom API
-    // This would require Zoom OAuth and API credentials
+  async generateJitsiMeeting(booking: MeetingBooking): Promise<VideoMeetingLink | null> {
+    // Jitsi Meet - free, no API keys required, supports recording
     try {
-      const meetingData = {
-        topic: booking.title || `Meeting with ${booking.guest_name}`,
-        type: 2, // Scheduled meeting
-        start_time: booking.scheduled_at,
-        duration: booking.duration_minutes,
-        settings: {
-          host_video: true,
-          participant_video: true,
-          join_before_host: false,
-          mute_upon_entry: true,
-          waiting_room: true,
-          auto_recording: 'none'
-        }
-      }
+      const roomName = `tuskhub-meeting-${booking.id}-${Date.now()}`
+      const meetingTitle = booking.title || `Meeting with ${booking.guest_name}`
 
-      // Mock Zoom response for now
-      const mockZoomResponse = {
-        id: this.generateMeetingId(),
-        join_url: `https://zoom.us/j/${this.generateMeetingId()}`,
-        start_url: `https://zoom.us/s/${this.generateMeetingId()}`,
-        password: this.generatePassword()
-      }
+      // Generate Jitsi meeting URL with configuration
+      const baseUrl = 'https://meet.jit.si'
+      const configParams = new URLSearchParams({
+        '#config.startWithVideoMuted': 'false',
+        '#config.startWithAudioMuted': 'true',
+        '#config.enableRecording': 'true',
+        '#config.requireDisplayName': 'true',
+        '#config.subject': meetingTitle,
+        '#userInfo.displayName': booking.guest_name,
+        '#userInfo.email': booking.guest_email
+      })
+
+      const joinUrl = `${baseUrl}/${roomName}?${configParams}`
 
       const videoLinkData = {
         booking_id: booking.id,
-        platform: 'zoom' as const,
-        meeting_id: mockZoomResponse.id,
-        join_url: mockZoomResponse.join_url,
-        host_url: mockZoomResponse.start_url,
-        password: mockZoomResponse.password,
-        waiting_room_enabled: true,
-        recording_enabled: false,
+        platform: 'jitsi' as const,
+        meeting_id: roomName,
+        join_url: joinUrl,
+        host_url: joinUrl,
+        waiting_room_enabled: false, // Jitsi doesn't have traditional waiting room
+        recording_enabled: true, // Recording available to all participants
         status: 'active' as const
       }
 
@@ -87,13 +78,13 @@ export class VideoMeetingService {
         .single()
 
       if (error) {
-        console.error('Error creating Zoom link:', error)
+        console.error('Error creating Jitsi link:', error)
         return null
       }
 
       return videoLink
     } catch (error) {
-      console.error('Error in generateZoomMeeting:', error)
+      console.error('Error in generateJitsiMeeting:', error)
       return null
     }
   }
@@ -168,6 +159,83 @@ export class VideoMeetingService {
       return videoLink
     } catch (error) {
       console.error('Error in getMeetingLink:', error)
+      return null
+    }
+  }
+
+  /**
+   * Generate Jitsi meeting URL with custom configuration
+   */
+  generateJitsiMeetingUrl(roomName: string, options: {
+    displayName?: string
+    email?: string
+    subject?: string
+    enableRecording?: boolean
+    startWithVideoMuted?: boolean
+    startWithAudioMuted?: boolean
+  } = {}): string {
+    const baseUrl = 'https://meet.jit.si'
+    const params = new URLSearchParams()
+
+    // Add configuration parameters
+    if (options.subject) {
+      params.append('#config.subject', options.subject)
+    }
+    if (options.displayName) {
+      params.append('#userInfo.displayName', options.displayName)
+    }
+    if (options.email) {
+      params.append('#userInfo.email', options.email)
+    }
+
+    // Meeting configuration
+    params.append('#config.startWithVideoMuted', String(options.startWithVideoMuted ?? false))
+    params.append('#config.startWithAudioMuted', String(options.startWithAudioMuted ?? true))
+    params.append('#config.enableRecording', String(options.enableRecording ?? true))
+    params.append('#config.requireDisplayName', 'true')
+    params.append('#config.enableWelcomePage', 'false')
+
+    return `${baseUrl}/${roomName}?${params.toString()}`
+  }
+
+  /**
+   * Create meeting with automatic recording setup
+   */
+  async createMeetingWithRecording(booking: MeetingBooking): Promise<{
+    meetingUrl: string
+    roomName: string
+    recordingEnabled: boolean
+  } | null> {
+    try {
+      const roomName = `tuskhub-${booking.id}-${Date.now()}`
+      const meetingUrl = this.generateJitsiMeetingUrl(roomName, {
+        displayName: booking.guest_name,
+        email: booking.guest_email,
+        subject: booking.title || `Meeting with ${booking.guest_name}`,
+        enableRecording: true,
+        startWithVideoMuted: false,
+        startWithAudioMuted: true
+      })
+
+      // Save recording configuration to database
+      await this.supabase
+        .from('meeting_recordings')
+        .insert({
+          booking_id: booking.id,
+          room_name: roomName,
+          platform: 'jitsi',
+          recording_enabled: true,
+          auto_start_recording: true,
+          status: 'scheduled'
+        })
+
+      return {
+        meetingUrl,
+        roomName,
+        recordingEnabled: true
+      }
+    } catch (error) {
+      console.error('Error creating meeting with recording:', error)
       return null
     }
   }

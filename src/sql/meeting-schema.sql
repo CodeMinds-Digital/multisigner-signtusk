@@ -269,7 +269,7 @@ CREATE TABLE meeting_video_links (
     booking_id UUID NOT NULL REFERENCES meeting_bookings(id) ON DELETE CASCADE,
 
     -- Video platform details
-    platform VARCHAR(50) NOT NULL CHECK (platform IN ('zoom', 'google-meet', 'teams', 'custom')),
+    platform VARCHAR(50) NOT NULL CHECK (platform IN ('zoom', 'google-meet', 'teams', 'jitsi', 'custom')),
     meeting_id VARCHAR(255),
     join_url TEXT NOT NULL,
     host_url TEXT,

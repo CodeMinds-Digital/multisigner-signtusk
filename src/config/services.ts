@@ -26,7 +26,11 @@ import {
   Clock,
   Video,
   MapPin,
-  Phone
+  Phone,
+  Mail,
+  Globe,
+  Key,
+  Settings
 } from 'lucide-react'
 
 export interface SidebarItem {
@@ -263,6 +267,73 @@ export const SERVICES: Service[] = [
         label: 'Branding',
         icon: PieChart,
         route: '/schedule/settings/branding'
+      }
+    ]
+  },
+  {
+    id: 'mail',
+    name: 'Mail',
+    displayName: 'Mail',
+    icon: Mail,
+    description: 'Transactional email service',
+    route: '/mail',
+    enabled: true,
+    color: '#DC2626', // Red
+    sidebarItems: [
+      {
+        id: 'mail-dashboard',
+        label: 'Dashboard',
+        icon: BarChart2,
+        route: '/mail'
+      },
+      {
+        id: 'send-email',
+        label: 'Send Email',
+        icon: Send,
+        route: '/mail/send'
+      },
+      {
+        id: 'email-templates',
+        label: 'Templates',
+        icon: FileText,
+        route: '/mail/templates'
+      },
+      {
+        id: 'email-domains',
+        label: 'Domains',
+        icon: Globe,
+        route: '/mail/domains'
+      },
+      {
+        id: 'email-messages',
+        label: 'Messages',
+        icon: Mail,
+        route: '/mail/messages'
+      },
+      {
+        id: 'email-analytics',
+        label: 'Analytics',
+        icon: TrendingUp,
+        route: '/mail/analytics'
+      },
+      // Settings section
+      {
+        id: 'api-keys',
+        label: 'API Keys',
+        icon: Key,
+        route: '/mail/settings/api-keys'
+      },
+      {
+        id: 'mail-settings',
+        label: 'Email Settings',
+        icon: Settings,
+        route: '/mail/settings'
+      },
+      {
+        id: 'mail-billing',
+        label: 'Billing & Usage',
+        icon: Receipt,
+        route: '/mail/settings/billing'
       }
     ]
   },

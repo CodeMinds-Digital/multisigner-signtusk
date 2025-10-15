@@ -9,7 +9,7 @@ export type DocumentStatus = 'pending' | 'sent' | 'viewed' | 'downloaded' | 'sig
 export type WorkflowStage = 'pre-meeting' | 'during-meeting' | 'post-meeting'
 export type SendTiming = 'immediate' | 'scheduled' | 'manual'
 export type ReminderType = 'confirmation' | '24h' | '1h' | 'follow-up'
-export type VideoProvider = 'zoom' | 'google-meet' | 'teams' | 'custom'
+export type VideoProvider = 'zoom' | 'google-meet' | 'teams' | 'jitsi' | 'custom'
 export type CalendarProvider = 'google' | 'outlook' | 'apple' | 'caldav'
 
 // Core Meeting Type Configuration
@@ -24,23 +24,23 @@ export interface MeetingTypeConfig {
   color: string
   is_active: boolean
   booking_url_slug: string
-  
+
   // Pricing
   is_paid: boolean
   price_amount: number // in cents
   currency: string
-  
+
   // Business meeting specific
   workflow_type?: string
   requires_documents: boolean
   requires_signatures: boolean
   auto_send_documents: boolean
-  
+
   // Security
   requires_mfa: boolean
   requires_watermarks: boolean
   access_restrictions: Record<string, any>
-  
+
   // Metadata
   total_bookings: number
   created_at: string
@@ -93,18 +93,18 @@ export interface MeetingBooking {
   id: string
   meeting_type_id: string
   host_user_id: string
-  
+
   // Booking details
   scheduled_at: string
   duration_minutes: number
   status: BookingStatus
-  
+
   // Meeting information
   title?: string
   description?: string
   meeting_format: MeetingFormat
   location?: string
-  
+
   // Guest information
   guest_name: string
   guest_email: string
@@ -113,24 +113,24 @@ export interface MeetingBooking {
   guest_title?: string
   guest_notes?: string
   guest_custom_data: Record<string, any>
-  
+
   // Business meeting specific
   project_details?: string
   budget_range?: string
   timeline?: string
   security_preferences: Record<string, any>
-  
+
   // Booking management
   booking_token: string
   reschedule_count: number
   max_reschedules: number
   cancellation_reason?: string
-  
+
   // Payment
   payment_status: PaymentStatus
   payment_intent_id?: string
   amount_paid: number
-  
+
   created_at: string
   updated_at: string
 }
@@ -140,23 +140,23 @@ export interface MeetingDocument {
   id: string
   booking_id: string
   document_id?: string
-  
+
   // Workflow
   workflow_stage: WorkflowStage
   send_timing: SendTiming
   scheduled_send_at?: string
-  
+
   // Status
   status: DocumentStatus
   sent_at?: string
   viewed_at?: string
   downloaded_at?: string
-  
+
   // Security
   requires_signature: boolean
   access_password?: string
   expires_at?: string
-  
+
   created_at: string
   updated_at: string
 }
@@ -172,16 +172,16 @@ export interface MeetingWorkflow {
   id: string
   user_id: string
   meeting_type_id?: string
-  
+
   name: string
   description?: string
   workflow_type: string
   is_active: boolean
-  
+
   trigger_events: string[]
   actions: WorkflowAction[]
   document_templates: string[]
-  
+
   created_at: string
   updated_at: string
 }
@@ -190,21 +190,21 @@ export interface MeetingWorkflow {
 export interface MeetingAnalyticsEvent {
   id: string
   booking_id: string
-  
+
   event_type: string
   event_data: Record<string, any>
-  
+
   user_agent?: string
   ip_address?: string
   session_id?: string
-  
+
   country?: string
   region?: string
   city?: string
-  
+
   page_load_time?: number
   interaction_time?: number
-  
+
   created_at: string
 }
 
@@ -212,18 +212,18 @@ export interface MeetingAnalyticsEvent {
 export interface MeetingReminder {
   id: string
   booking_id: string
-  
+
   reminder_type: ReminderType
   scheduled_at: string
-  
+
   status: 'pending' | 'sent' | 'failed' | 'cancelled'
   sent_at?: string
   error_message?: string
-  
+
   recipient_email: string
   email_subject?: string
   email_template?: string
-  
+
   created_at: string
 }
 
@@ -231,23 +231,23 @@ export interface MeetingReminder {
 export interface CalendarIntegration {
   id: string
   user_id: string
-  
+
   provider: CalendarProvider
   provider_account_id: string
-  
+
   access_token?: string
   refresh_token?: string
   token_expires_at?: string
-  
+
   calendar_id?: string
   calendar_name?: string
   is_primary: boolean
   sync_enabled: boolean
-  
+
   last_sync_at?: string
   sync_status: 'active' | 'error' | 'disabled'
   sync_error?: string
-  
+
   created_at: string
   updated_at: string
 }
@@ -256,18 +256,18 @@ export interface CalendarIntegration {
 export interface VideoMeetingLink {
   id: string
   booking_id: string
-  
+
   platform: VideoProvider
   meeting_id?: string
   join_url: string
   host_url?: string
-  
+
   password?: string
   waiting_room_enabled: boolean
   recording_enabled: boolean
-  
+
   status: 'active' | 'ended' | 'cancelled'
-  
+
   created_at: string
 }
 
@@ -275,18 +275,18 @@ export interface VideoMeetingLink {
 export interface PaymentTransaction {
   id: string
   booking_id: string
-  
+
   stripe_payment_intent_id?: string
   amount: number
   currency: string
-  
+
   status: 'pending' | 'succeeded' | 'failed' | 'cancelled' | 'refunded'
-  
+
   payment_method_type?: string
   failure_reason?: string
   refund_amount: number
   refunded_at?: string
-  
+
   created_at: string
   updated_at: string
 }
