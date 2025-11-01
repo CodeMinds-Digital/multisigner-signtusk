@@ -1,0 +1,1065 @@
+rolname,query,calls,total_time,min_time,max_time,mean_time,avg_rows,rows_read,debug_hit,debug_read,cache_hit_rate,prop_total_time
+supabase_admin,"select * from realtime.list_changes($1, $2, $3, $4)",4566857,18802689.0333175,3.211277,2296.966376,4.11720556026154,0,0,6701464212,0,100.0000000000000000,96.3482016137985
+authenticator,SELECT name FROM pg_timezone_names,282,83642.150468,52.948688,1156.373214,296.6033704539,1194,336708,0,0,0,0.428596716268761
+postgres,"with tables as (SELECT
+  c.oid :: int8 AS id,
+  nc.nspname AS schema,
+  c.relname AS name,
+  c.relrowsecurity AS rls_enabled,
+  c.relforcerowsecurity AS rls_forced,
+  CASE
+    WHEN c.relreplident = $1 THEN $2
+    WHEN c.relreplident = $3 THEN $4
+    WHEN c.relreplident = $5 THEN $6
+    ELSE $7
+  END AS replica_identity,
+  pg_total_relation_size(format($8, nc.nspname, c.relname)) :: int8 AS bytes,
+  pg_size_pretty(
+    pg_total_relation_size(format($9, nc.nspname, c.relname))
+  ) AS size,
+  pg_stat_get_live_tuples(c.oid) AS live_rows_estimate,
+  pg_stat_get_dead_tuples(c.oid) AS dead_rows_estimate,
+  obj_description(c.oid) AS comment,
+  coalesce(pk.primary_keys, $10) as primary_keys,
+  coalesce(
+    jsonb_agg(relationships) filter (where relationships is not null),
+    $11
+  ) as relationships
+FROM
+  pg_namespace nc
+  JOIN pg_class c ON nc.oid = c.relnamespace
+  left join (
+    select
+      table_id,
+      jsonb_agg(_pk.*) as primary_keys
+    from (
+      select
+        n.nspname as schema,
+        c.relname as table_name,
+        a.attname as name,
+        c.oid :: int8 as table_id
+      from
+        pg_index i,
+        pg_class c,
+        pg_attribute a,
+        pg_namespace n
+      where
+        i.indrelid = c.oid
+        and c.relnamespace = n.oid
+        and a.attrelid = c.oid
+        and a.attnum = any (i.indkey)
+        and i.indisprimary
+    ) as _pk
+    group by table_id
+  ) as pk
+  on pk.table_id = c.oid
+  left join (
+    select
+      c.oid :: int8 as id,
+      c.conname as constraint_name,
+      nsa.nspname as source_schema,
+      csa.relname as source_table_name,
+      sa.attname as source_column_name,
+      nta.nspname as target_table_schema,
+      cta.relname as target_table_name,
+      ta.attname as target_column_name
+    from
+      pg_constraint c
+    join (
+      pg_attribute sa
+      join pg_class csa on sa.attrelid = csa.oid
+      join pg_namespace nsa on csa.relnamespace = nsa.oid
+    ) on sa.attrelid = c.conrelid and sa.attnum = any (c.conkey)
+    join (
+      pg_attribute ta
+      join pg_class cta on ta.attrelid = cta.oid
+      join pg_namespace nta on cta.relnamespace = nta.oid
+    ) on ta.attrelid = c.confrelid and ta.attnum = any (c.confkey)
+    where
+      c.contype = $12
+  ) as relationships
+  on (relationships.source_schema = nc.nspname and relationships.source_table_name = c.relname)
+  or (relationships.target_table_schema = nc.nspname and relationships.target_table_name = c.relname)
+WHERE
+  c.relkind IN ($13, $14)
+  AND NOT pg_is_other_temp_schema(nc.oid)
+  AND (
+    pg_has_role(c.relowner, $15)
+    OR has_table_privilege(
+      c.oid,
+      $16
+    )
+    OR has_any_column_privilege(c.oid, $17)
+  )
+group by
+  c.oid,
+  c.relname,
+  c.relrowsecurity,
+  c.relforcerowsecurity,
+  c.relreplident,
+  nc.nspname,
+  pk.primary_keys
+)
+  , columns as (-- Adapted from information_schema.columns
+
+SELECT
+  c.oid :: int8 AS table_id,
+  nc.nspname AS schema,
+  c.relname AS table,
+  (c.oid || $18 || a.attnum) AS id,
+  a.attnum AS ordinal_position,
+  a.attname AS name,
+  CASE
+    WHEN a.atthasdef THEN pg_get_expr(ad.adbin, ad.adrelid)
+    ELSE $19
+  END AS default_value,
+  CASE
+    WHEN t.typtype = $20 THEN CASE
+      WHEN bt.typelem <> $21 :: oid
+      AND bt.typlen = $22 THEN $23
+      WHEN nbt.nspname = $24 THEN format_type(t.typbasetype, $25)
+      ELSE $26
+    END
+    ELSE CASE
+      WHEN t.typelem <> $27 :: oid
+      AND t.typlen = $28 THEN $29
+      WHEN nt.nspname = $30 THEN format_type(a.atttypid, $31)
+      ELSE $32
+    END
+  END AS data_type,
+  COALESCE(bt.typname, t.typname) AS format,
+  a.attidentity IN ($33, $34) AS is_identity,
+  CASE
+    a.attidentity
+    WHEN $35 THEN $36
+    WHEN $37 THEN $38
+    ELSE $39
+  END AS identity_generation,
+  a.attgenerated IN ($40) AS is_generated,
+  NOT (
+    a.attnotnull
+    OR t.typtype = $41 AND t.typnotnull
+  ) AS is_nullable,
+  (
+    c.relkind IN ($42, $43)
+    OR c.relkind IN ($44, $45) AND pg_column_is_updatable(c.oid, a.attnum, $46)
+  ) AS is_updatable,
+  uniques.table_id IS NOT NULL AS is_unique,
+  check_constraints.definition AS ""check"",
+  array_to_json(
+    array(
+      SELECT
+        enumlabel
+      FROM
+        pg_catalog.pg_enum enums
+      WHERE
+        enums.enumtypid = coalesce(bt.oid, t.oid)
+        OR enums.enumtypid = coalesce(bt.typelem, t.typelem)
+      ORDER BY
+        enums.enumsortorder
+    )
+  ) AS enums,
+  col_description(c.oid, a.attnum) AS comment
+FROM
+  pg_attribute a
+  LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid
+  AND a.attnum = ad.adnum
+  JOIN (
+    pg_class c
+    JOIN pg_namespace nc ON c.relnamespace = nc.oid
+  ) ON a.attrelid = c.oid
+  JOIN (
+    pg_type t
+    JOIN pg_namespace nt ON t.typnamespace = nt.oid
+  ) ON a.atttypid = t.oid
+  LEFT JOIN (
+    pg_type bt
+    JOIN pg_namespace nbt ON bt.typnamespace = nbt.oid
+  ) ON t.typtype = $47
+  AND t.typbasetype = bt.oid
+  LEFT JOIN (
+    SELECT DISTINCT ON (table_id, ordinal_position)
+      conrelid AS table_id,
+      conkey[$48] AS ordinal_position
+    FROM pg_catalog.pg_constraint
+    WHERE contype = $49 AND cardinality(conkey) = $50
+  ) AS uniques ON uniques.table_id = c.oid AND uniques.ordinal_position = a.attnum
+  LEFT JOIN (
+    -- We only select the first column check
+    SELECT DISTINCT ON (table_id, ordinal_position)
+      conrelid AS table_id,
+      conkey[$51] AS ordinal_position,
+      substring(
+        pg_get_constraintdef(pg_constraint.oid, $52),
+        $53,
+        length(pg_get_constraintdef(pg_constraint.oid, $54)) - $55
+      ) AS ""definition""
+    FROM pg_constraint
+    WHERE contype = $56 AND cardinality(conkey) = $57
+    ORDER BY table_id, ordinal_position, oid asc
+  ) AS check_constraints ON check_constraints.table_id = c.oid AND check_constraints.ordinal_position = a.attnum
+WHERE
+  NOT pg_is_other_temp_schema(nc.oid)
+  AND a.attnum > $58
+  AND NOT a.attisdropped
+  AND (c.relkind IN ($59, $60, $61, $62, $63))
+  AND (
+    pg_has_role(c.relowner, $64)
+    OR has_column_privilege(
+      c.oid,
+      a.attnum,
+      $65
+    )
+  )
+)
+select
+  *
+  , 
+COALESCE(
+  (
+    SELECT
+      array_agg(row_to_json(columns)) FILTER (WHERE columns.table_id = tables.id)
+    FROM
+      columns
+  ),
+  $66
+) AS columns
+from tables where schema IN ($67)",203,53853.019947,158.952215,507.672835,265.285812546798,17,3561,10680233,0,100.0000000000000000,0.275952105263849
+supabase_admin,"with sub_tables as (
+        select
+        rr.entity
+        from
+        pg_publication_tables pub,
+        lateral (
+        select
+        format($7, pub.schemaname, pub.tablename)::regclass entity
+        ) rr
+        where
+        pub.pubname = $1
+        and pub.schemaname like (case $2 when $8 then $9 else $2 end)
+        and pub.tablename like (case $3 when $10 then $11 else $3 end)
+     )
+     insert into realtime.subscription as x(
+        subscription_id,
+        entity,
+        filters,
+        claims
+      )
+      select
+        $4::text::uuid,
+        sub_tables.entity,
+        $6,
+        $5
+      from
+        sub_tables
+        on conflict
+        (subscription_id, entity, filters)
+        do update set
+        claims = excluded.claims,
+        created_at = now()
+      returning
+         id",34720,40375.876117,0.027102,209.239852,1.1628996577477,0,1002,913928,0,100.0000000000000000,0.206892910134359
+postgres,"with tables as (
+SELECT
+  c.oid :: int8 AS id,
+  nc.nspname AS schema,
+  c.relname AS name,
+  c.relrowsecurity AS rls_enabled,
+  c.relforcerowsecurity AS rls_forced,
+  CASE
+    WHEN c.relreplident = $1 THEN $2
+    WHEN c.relreplident = $3 THEN $4
+    WHEN c.relreplident = $5 THEN $6
+    ELSE $7
+  END AS replica_identity,
+  pg_total_relation_size(format($8, nc.nspname, c.relname)) :: int8 AS bytes,
+  pg_size_pretty(
+    pg_total_relation_size(format($9, nc.nspname, c.relname))
+  ) AS size,
+  pg_stat_get_live_tuples(c.oid) AS live_rows_estimate,
+  pg_stat_get_dead_tuples(c.oid) AS dead_rows_estimate,
+  obj_description(c.oid) AS comment,
+  coalesce(pk.primary_keys, $10) as primary_keys,
+  coalesce(
+    jsonb_agg(relationships) filter (where relationships is not null),
+    $11
+  ) as relationships
+FROM
+  pg_namespace nc
+  JOIN pg_class c ON nc.oid = c.relnamespace
+  left join (
+    select
+      table_id,
+      jsonb_agg(_pk.*) as primary_keys
+    from (
+      select
+        n.nspname as schema,
+        c.relname as table_name,
+        a.attname as name,
+        c.oid :: int8 as table_id
+      from
+        pg_index i,
+        pg_class c,
+        pg_attribute a,
+        pg_namespace n
+      where
+        n.nspname IN ($12) AND
+        
+        i.indrelid = c.oid
+        and c.relnamespace = n.oid
+        and a.attrelid = c.oid
+        and a.attnum = any (i.indkey)
+        and i.indisprimary
+    ) as _pk
+    group by table_id
+  ) as pk
+  on pk.table_id = c.oid
+  left join (
+    select
+      c.oid :: int8 as id,
+      c.conname as constraint_name,
+      nsa.nspname as source_schema,
+      csa.relname as source_table_name,
+      sa.attname as source_column_name,
+      nta.nspname as target_table_schema,
+      cta.relname as target_table_name,
+      ta.attname as target_column_name
+    from
+      pg_constraint c
+    join (
+      pg_attribute sa
+      join pg_class csa on sa.attrelid = csa.oid
+      join pg_namespace nsa on csa.relnamespace = nsa.oid
+    ) on sa.attrelid = c.conrelid and sa.attnum = any (c.conkey)
+    join (
+      pg_attribute ta
+      join pg_class cta on ta.attrelid = cta.oid
+      join pg_namespace nta on cta.relnamespace = nta.oid
+    ) on ta.attrelid = c.confrelid and ta.attnum = any (c.confkey)
+    where
+      nsa.nspname IN ($13) OR nta.nspname IN ($14) AND
+      
+      c.contype = $15
+  ) as relationships
+  on (relationships.source_schema = nc.nspname and relationships.source_table_name = c.relname)
+  or (relationships.target_table_schema = nc.nspname and relationships.target_table_name = c.relname)
+WHERE
+  nc.nspname IN ($16) AND
+  
+  
+  c.relkind IN ($17, $18)
+  AND NOT pg_is_other_temp_schema(nc.oid)
+  AND (
+    pg_has_role(c.relowner, $19)
+    OR has_table_privilege(
+      c.oid,
+      $20
+    )
+    OR has_any_column_privilege(c.oid, $21)
+  )
+group by
+  c.oid,
+  c.relname,
+  c.relrowsecurity,
+  c.relforcerowsecurity,
+  c.relreplident,
+  nc.nspname,
+  pk.primary_keys
+
+
+)
+  , columns as (
+-- Adapted from information_schema.columns
+
+SELECT
+  c.oid :: int8 AS table_id,
+  nc.nspname AS schema,
+  c.relname AS table,
+  (c.oid || $22 || a.attnum) AS id,
+  a.attnum AS ordinal_position,
+  a.attname AS name,
+  CASE
+    WHEN a.atthasdef THEN pg_get_expr(ad.adbin, ad.adrelid)
+    ELSE $23
+  END AS default_value,
+  CASE
+    WHEN t.typtype = $24 THEN CASE
+      WHEN bt.typelem <> $25 :: oid
+      AND bt.typlen = $26 THEN $27
+      WHEN nbt.nspname = $28 THEN format_type(t.typbasetype, $29)
+      ELSE $30
+    END
+    ELSE CASE
+      WHEN t.typelem <> $31 :: oid
+      AND t.typlen = $32 THEN $33
+      WHEN nt.nspname = $34 THEN format_type(a.atttypid, $35)
+      ELSE $36
+    END
+  END AS data_type,
+  COALESCE(bt.typname, t.typname) AS format,
+  a.attidentity IN ($37, $38) AS is_identity,
+  CASE
+    a.attidentity
+    WHEN $39 THEN $40
+    WHEN $41 THEN $42
+    ELSE $43
+  END AS identity_generation,
+  a.attgenerated IN ($44) AS is_generated,
+  NOT (
+    a.attnotnull
+    OR t.typtype = $45 AND t.typnotnull
+  ) AS is_nullable,
+  (
+    c.relkind IN ($46, $47)
+    OR c.relkind IN ($48, $49) AND pg_column_is_updatable(c.oid, a.attnum, $50)
+  ) AS is_updatable,
+  uniques.table_id IS NOT NULL AS is_unique,
+  check_constraints.definition AS ""check"",
+  array_to_json(
+    array(
+      SELECT
+        enumlabel
+      FROM
+        pg_catalog.pg_enum enums
+      WHERE
+        enums.enumtypid = coalesce(bt.oid, t.oid)
+        OR enums.enumtypid = coalesce(bt.typelem, t.typelem)
+      ORDER BY
+        enums.enumsortorder
+    )
+  ) AS enums,
+  col_description(c.oid, a.attnum) AS comment
+FROM
+  pg_attribute a
+  LEFT JOIN pg_attrdef ad ON a.attrelid = ad.adrelid
+  AND a.attnum = ad.adnum
+  JOIN (
+    pg_class c
+    JOIN pg_namespace nc ON c.relnamespace = nc.oid
+  ) ON a.attrelid = c.oid
+  JOIN (
+    pg_type t
+    JOIN pg_namespace nt ON t.typnamespace = nt.oid
+  ) ON a.atttypid = t.oid
+  LEFT JOIN (
+    pg_type bt
+    JOIN pg_namespace nbt ON bt.typnamespace = nbt.oid
+  ) ON t.typtype = $51
+  AND t.typbasetype = bt.oid
+  LEFT JOIN (
+    SELECT DISTINCT ON (table_id, ordinal_position)
+      conrelid AS table_id,
+      conkey[$52] AS ordinal_position
+    FROM pg_catalog.pg_constraint
+    WHERE contype = $53 AND cardinality(conkey) = $54
+  ) AS uniques ON uniques.table_id = c.oid AND uniques.ordinal_position = a.attnum
+  LEFT JOIN (
+    -- We only select the first column check
+    SELECT DISTINCT ON (table_id, ordinal_position)
+      conrelid AS table_id,
+      conkey[$55] AS ordinal_position,
+      substring(
+        pg_get_constraintdef(pg_constraint.oid, $56),
+        $57,
+        length(pg_get_constraintdef(pg_constraint.oid, $58)) - $59
+      ) AS ""definition""
+    FROM pg_constraint
+    WHERE contype = $60 AND cardinality(conkey) = $61
+    ORDER BY table_id, ordinal_position, oid asc
+  ) AS check_constraints ON check_constraints.table_id = c.oid AND check_constraints.ordinal_position = a.attnum
+WHERE
+  nc.nspname IN ($62) AND
+  
+  
+  
+  
+  NOT pg_is_other_temp_schema(nc.oid)
+  AND a.attnum > $63
+  AND NOT a.attisdropped
+  AND (c.relkind IN ($64, $65, $66, $67, $68))
+  AND (
+    pg_has_role(c.relowner, $69)
+    OR has_column_privilege(
+      c.oid,
+      a.attnum,
+      $70
+    )
+  )
+
+
+)
+select
+  *
+  , 
+COALESCE(
+  (
+    SELECT
+      array_agg(row_to_json(columns)) FILTER (WHERE columns.table_id = tables.id)
+    FROM
+      columns
+  ),
+  $71
+) AS columns
+from tables",187,32458.928381,38.849021,1173.362266,173.577157117647,27,5136,22884157,0,100.0000000000000000,0.16632511287502
+postgres,"with base_table_info as ( select c.oid::int8 as id, nc.nspname as schema, c.relname as name, c.relkind, c.relrowsecurity as rls_enabled, c.relforcerowsecurity as rls_forced, c.relreplident, c.relowner, obj_description(c.oid) as comment from pg_class c join pg_namespace nc on nc.oid = c.relnamespace where c.oid = $1 and not pg_is_other_temp_schema(nc.oid) and ( pg_has_role(c.relowner, $2) or has_table_privilege( c.oid, $3 ) or has_any_column_privilege(c.oid, $4) ) ), table_stats as ( select b.id, case when b.relreplident = $5 then $6 when b.relreplident = $7 then $8 when b.relreplident = $9 then $10 else $11 end as replica_identity, pg_total_relation_size(format($12, b.schema, b.name))::int8 as bytes, pg_size_pretty(pg_total_relation_size(format($13, b.schema, b.name))) as size, pg_stat_get_live_tuples(b.id) as live_rows_estimate, pg_stat_get_dead_tuples(b.id) as dead_rows_estimate from base_table_info b where b.relkind in ($14, $15) ), primary_keys as ( select i.indrelid as table_id, jsonb_agg(jsonb_build_object( $16, n.nspname, $17, c.relname, $18, i.indrelid::int8, $19, a.attname )) as primary_keys from pg_index i join pg_class c on i.indrelid = c.oid join pg_attribute a on (a.attrelid = c.oid and a.attnum = any(i.indkey)) join pg_namespace n on c.relnamespace = n.oid where i.indisprimary group by i.indrelid ), relationships as ( select c.conrelid as source_id, c.confrelid as target_id, jsonb_build_object( $20, c.oid::int8, $21, c.conname, $22, c.confdeltype, $23, c.confupdtype, $24, nsa.nspname, $25, csa.relname, $26, sa.attname, $27, nta.nspname, $28, cta.relname, $29, ta.attname ) as rel_info from pg_constraint c join pg_class csa on c.conrelid = csa.oid join pg_namespace nsa on csa.relnamespace = nsa.oid join pg_attribute sa on (sa.attrelid = c.conrelid and sa.attnum = any(c.conkey)) join pg_class cta on c.confrelid = cta.oid join pg_namespace nta on cta.relnamespace = nta.oid join pg_attribute ta on (ta.attrelid = c.confrelid and ta.attnum = any(c.confkey)) where c.contype = $30 ), columns as ( select a.attrelid as table_id, jsonb_agg(jsonb_build_object( $31, (a.attrelid || $32 || a.attnum), $33, c.oid::int8, $34, nc.nspname, $35, c.relname, $36, a.attnum, $37, a.attname, $38, case when a.atthasdef then pg_get_expr(ad.adbin, ad.adrelid) else $39 end, $40, case when t.typtype = $41 then case when bt.typelem <> $42::oid and bt.typlen = $43 then $44 when nbt.nspname = $45 then format_type(t.typbasetype, $46) else $47 end else case when t.typelem <> $48::oid and t.typlen = $49 then $50 when nt.nspname = $51 then format_type(a.atttypid, $52) else $53 end end, $54, case when t.typtype = $55 then case when nt.nspname <> $56 then concat(nt.nspname, $57, coalesce(bt.typname, t.typname)) else coalesce(bt.typname, t.typname) end else coalesce(bt.typname, t.typname) end, $58, a.attidentity in ($59, $60), $61, case a.attidentity when $62 then $63 when $64 then $65 else $66 end, $67, a.attgenerated in ($68), $69, not (a.attnotnull or t.typtype = $70 and t.typnotnull), $71, ( b.relkind in ($72, $73) or (b.relkind in ($74, $75) and pg_column_is_updatable(b.id, a.attnum, $76)) ), $77, uniques.table_id is not null, $78, check_constraints.definition, $79, col_description(c.oid, a.attnum), $80, coalesce( ( select jsonb_agg(e.enumlabel order by e.enumsortorder) from pg_catalog.pg_enum e where e.enumtypid = coalesce(bt.oid, t.oid) or e.enumtypid = coalesce(bt.typelem, t.typelem) ), $81::jsonb ) ) order by a.attnum) as columns from pg_attribute a join base_table_info b on a.attrelid = b.id join pg_class c on a.attrelid = c.oid join pg_namespace nc on c.relnamespace = nc.oid left join pg_attrdef ad on (a.attrelid = ad.adrelid and a.attnum = ad.adnum) join pg_type t on a.atttypid = t.oid join pg_namespace nt on t.typnamespace = nt.oid left join pg_type bt on (t.typtype = $82 and t.typbasetype = bt.oid) left join pg_namespace nbt on bt.typnamespace = nbt.oid left join ( select conrelid as table_id, conkey[$83] as ordinal_position from pg_catalog.pg_constraint where contype = $84 and cardinality(conkey) = $85 group by conrelid, conkey[1] ) as uniques on uniques.table_id = a.attrelid and uniques.ordinal_position = a.attnum left join ( select distinct on (conrelid, conkey[1]) conrelid as table_id, conkey[$86] as ordinal_position, substring( pg_get_constraintdef(oid, $87), $88, length(pg_get_constraintdef(oid, $89)) - $90 ) as definition from pg_constraint where contype = $91 and cardinality(conkey) = $92 order by conrelid, conkey[1], oid asc ) as check_constraints on check_constraints.table_id = a.attrelid and check_constraints.ordinal_position = a.attnum where a.attnum > $93 and not a.attisdropped group by a.attrelid ) select case b.relkind when $94 then jsonb_build_object( $95, b.relkind, $96, b.id, $97, b.schema, $98, b.name, $99, b.rls_enabled, $100, b.rls_forced, $101, ts.replica_identity, $102, ts.bytes, $103, ts.size, $104, ts.live_rows_estimate, $105, ts.dead_rows_estimate, $106, b.comment, $107, coalesce(pk.primary_keys, $108::jsonb), $109, coalesce( (select jsonb_agg(r.rel_info) from relationships r where r.source_id = b.id or r.target_id = b.id), $110::jsonb ), $111, coalesce(c.columns, $112::jsonb) ) when $113 then jsonb_build_object( $114, b.relkind, $115, b.id, $116, b.schema, $117, b.name, $118, b.rls_enabled, $119, b.rls_forced, $120, ts.replica_identity, $121, ts.bytes, $122, ts.size, $123, ts.live_rows_estimate, $124, ts.dead_rows_estimate, $125, b.comment, $126, coalesce(pk.primary_keys, $127::jsonb), $128, coalesce( (select jsonb_agg(r.rel_info) from relationships r where r.source_id = b.id or r.target_id = b.id), $129::jsonb ), $130, coalesce(c.columns, $131::jsonb) ) when $132 then jsonb_build_object( $133, b.relkind, $134, b.id, $135, b.schema, $136, b.name, $137, (pg_relation_is_updatable(b.id, $138) & $139) = $140, $141, b.comment, $142, coalesce(c.columns, $143::jsonb) ) when $144 then jsonb_build_object( $145, b.relkind, $146, b.id, $147, b.schema, $148, b.name, $149, $150, $151, b.comment, $152, coalesce(c.columns, $153::jsonb) ) when $154 then jsonb_build_object( $155, b.relkind, $156, b.id, $157, b.schema, $158, b.name, $159, b.comment, $160, coalesce(c.columns, $161::jsonb) ) end as entity from base_table_info b left join table_stats ts on b.id = ts.id left join primary_keys pk on b.id = pk.table_id left join columns c on b.id = c.table_id",1132,26394.443115,0.067616,248.648705,23.3166458613074,0,1126,3794934,0,100.0000000000000000,0.135249650846311
+service_role,"WITH pgrst_source AS ( SELECT ""public"".""documents"".* FROM ""public"".""documents"" WHERE  ""public"".""documents"".""user_id"" = $1  ORDER BY ""public"".""documents"".""created_at"" DESC  LIMIT $2 OFFSET $3 )  SELECT $4::bigint AS total_result_set, pg_catalog.count(_postgrest_t) AS page_total, coalesce(json_agg(_postgrest_t), $5) AS body, nullif(current_setting($6, $7), $8) AS response_headers, nullif(current_setting($9, $10), $11) AS response_status, $12 AS response_inserted FROM ( SELECT * FROM pgrst_source ) _postgrest_t",2001,21715.736443,0.01481,509.528776,10.8524420004997,1,2001,183899,0,100.0000000000000000,0.111275155872379
+service_role,"WITH pgrst_source AS ( SELECT ""public"".""signing_requests"".*, COALESCE( ""signing_requests_signers_1"".""signing_requests_signers_1"", $8) AS ""signers"", row_to_json(""signing_requests_document_1"".*)::jsonb AS ""document"" FROM ""public"".""signing_requests"" LEFT JOIN LATERAL ( SELECT json_agg(""signing_requests_signers_1"")::jsonb AS ""signing_requests_signers_1"" FROM (SELECT ""signing_request_signers_1"".* FROM ""public"".""signing_request_signers"" AS ""signing_request_signers_1"" WHERE ""signing_request_signers_1"".""signing_request_id"" = ""public"".""signing_requests"".""id""   LIMIT $1 OFFSET $2 ) AS ""signing_requests_signers_1"" ) AS ""signing_requests_signers_1"" ON $9  LEFT JOIN LATERAL ( SELECT ""documents_1"".""id"", ""documents_1"".""title"", ""documents_1"".""pdf_url"", ""documents_1"".""file_url"" FROM ""public"".""documents"" AS ""documents_1"" WHERE ""documents_1"".""id"" = ""public"".""signing_requests"".""document_template_id""   LIMIT $3 OFFSET $4 ) AS ""signing_requests_document_1"" ON $10 WHERE  ""public"".""signing_requests"".""initiated_by"" = $5  ORDER BY ""public"".""signing_requests"".""created_at"" DESC  LIMIT $6 OFFSET $7 )  SELECT $11::bigint AS total_result_set, pg_catalog.count(_postgrest_t) AS page_total, coalesce(json_agg(_postgrest_t), $12) AS body, nullif(current_setting($13, $14), $15) AS response_headers, nullif(current_setting($16, $17), $18) AS response_status, $19 AS response_inserted FROM ( SELECT * FROM pgrst_source ) _postgrest_t",1190,21656.095164,0.019405,225.699665,18.198399297479,1,1190,254316,2,99.9992135829945187,0.11096954373555
+supabase_admin,"SELECT t.oid, t.typname, t.typsend, t.typreceive, t.typoutput, t.typinput,
+       coalesce(d.typelem, t.typelem), coalesce(r.rngsubtype, $1), ARRAY (
+  SELECT a.atttypid
+  FROM pg_attribute AS a
+  WHERE a.attrelid = t.typrelid AND a.attnum > $2 AND NOT a.attisdropped
+  ORDER BY a.attnum
+)
+
+FROM pg_type AS t
+LEFT JOIN pg_type AS d ON t.typbasetype = d.oid
+LEFT JOIN pg_range AS r ON r.rngtypid = t.oid OR r.rngmultitypid = t.oid OR (t.typbasetype <> $3 AND r.rngtypid = t.typbasetype)
+WHERE (t.typrelid = $4)
+AND (t.typelem = $5 OR NOT EXISTS (SELECT $6 FROM pg_catalog.pg_type s WHERE s.typrelid != $7 AND s.oid = t.typelem))",315,21149.27456,4.691788,199.931027,67.1405541587301,212,67007,822986,1,99.9998784913977985,0.108372508085506
+authenticator,"WITH
+-- Recursively get the base types of domains
+base_types AS (
+  WITH RECURSIVE
+  recurse AS (
+    SELECT
+      oid,
+      typbasetype,
+      typnamespace AS base_namespace,
+      COALESCE(NULLIF(typbasetype, $2), oid) AS base_type
+    FROM pg_type
+    UNION
+    SELECT
+      t.oid,
+      b.typbasetype,
+      b.typnamespace AS base_namespace,
+      COALESCE(NULLIF(b.typbasetype, $3), b.oid) AS base_type
+    FROM recurse t
+    JOIN pg_type b ON t.typbasetype = b.oid
+  )
+  SELECT
+    oid,
+    base_namespace,
+    base_type
+  FROM recurse
+  WHERE typbasetype = $4
+),
+columns AS (
+    SELECT
+        c.oid AS relid,
+        a.attname::name AS column_name,
+        d.description AS description,
+        -- typbasetype and typdefaultbin handles `CREATE DOMAIN .. DEFAULT val`,  attidentity/attgenerated handles generated columns, pg_get_expr gets the default of a column
+        CASE
+          WHEN (t.typbasetype != $5) AND (ad.adbin IS NULL) THEN pg_get_expr(t.typdefaultbin, $6)
+          WHEN a.attidentity  = $7 THEN format($8, seq.objid::regclass)
+          WHEN a.attgenerated = $9 THEN $10
+          ELSE pg_get_expr(ad.adbin, ad.adrelid)::text
+        END AS column_default,
+        not (a.attnotnull OR t.typtype = $11 AND t.typnotnull) AS is_nullable,
+        CASE
+            WHEN t.typtype = $12 THEN
+            CASE
+                WHEN bt.base_namespace = $13::regnamespace THEN format_type(bt.base_type, $14::integer)
+                ELSE format_type(a.atttypid, a.atttypmod)
+            END
+            ELSE
+            CASE
+                WHEN t.typnamespace = $15::regnamespace THEN format_type(a.atttypid, $16::integer)
+                ELSE format_type(a.atttypid, a.atttypmod)
+            END
+        END::text AS data_type,
+        format_type(a.atttypid, a.atttypmod)::text AS nominal_data_type,
+        information_schema._pg_char_max_length(
+            information_schema._pg_truetypid(a.*, t.*),
+            information_schema._pg_truetypmod(a.*, t.*)
+        )::integer AS character_maximum_length,
+        bt.base_type,
+        a.attnum::integer AS position
+    FROM pg_attribute a
+        LEFT JOIN pg_description AS d
+            ON d.objoid = a.attrelid and d.objsubid = a.attnum and d.classoid = $17::regclass
+        LEFT JOIN pg_attrdef ad
+            ON a.attrelid = ad.adrelid AND a.attnum = ad.adnum
+        JOIN pg_class c
+            ON a.attrelid = c.oid
+        JOIN pg_type t
+            ON a.atttypid = t.oid
+        LEFT JOIN base_types bt
+            ON t.oid = bt.oid
+        LEFT JOIN pg_depend seq
+            ON seq.refobjid = a.attrelid and seq.refobjsubid = a.attnum and seq.deptype = $18
+    WHERE
+        NOT pg_is_other_temp_schema(c.relnamespace)
+        AND a.attnum > $19
+        AND NOT a.attisdropped
+        AND c.relkind in ($20, $21, $22, $23, $24)
+        AND c.relnamespace = ANY($1::regnamespace[])
+),
+columns_agg AS (
+  SELECT
+    relid,
+    array_agg(row(
+      column_name,
+      description,
+      is_nullable::boolean,
+      data_type,
+      nominal_data_type,
+      character_maximum_length,
+      column_default,
+      coalesce(
+        (SELECT array_agg(enumlabel ORDER BY enumsortorder) FROM pg_enum WHERE enumtypid = base_type),
+        $25
+      )
+    ) order by position) as columns
+  FROM columns
+  GROUP BY relid
+),
+tbl_pk_cols AS (
+  SELECT
+    r.oid AS relid,
+    array_agg(a.attname ORDER BY a.attname) AS pk_cols
+  FROM pg_class r
+  JOIN pg_constraint c
+    ON r.oid = c.conrelid
+  JOIN pg_attribute a
+    ON a.attrelid = r.oid AND a.attnum = ANY (c.conkey)
+  WHERE
+    c.contype in ($26)
+    AND r.relkind IN ($27, $28)
+    AND r.relnamespace NOT IN ($29::regnamespace, $30::regnamespace)
+    AND NOT pg_is_other_temp_schema(r.relnamespace)
+    AND NOT a.attisdropped
+  GROUP BY r.oid
+)
+SELECT
+  n.nspname AS table_schema,
+  c.relname AS table_name,
+  d.description AS table_description,
+  c.relkind IN ($31,$32) as is_view,
+  (
+    c.relkind IN ($33,$34)
+    OR (
+      c.relkind in ($35,$36)
+      -- The function `pg_relation_is_updateable` returns a bitmask where 8
+      -- corresponds to `1 << CMD_INSERT` in the PostgreSQL source code, i.e.
+      -- it's possible to insert into the relation.
+      AND (pg_relation_is_updatable(c.oid::regclass, $37) & $38) = $39
+    )
+  ) AS insertable,
+  (
+    c.relkind IN ($40,$41)
+    OR (
+      c.relkind in ($42,$43)
+      -- CMD_UPDATE
+      AND (pg_relation_is_updatable(c.oid::regclass, $44) & $45) = $46
+    )
+  ) AS updatable,
+  (
+    c.relkind IN ($47,$48)
+    OR (
+      c.relkind in ($49,$50)
+      -- CMD_DELETE
+      AND (pg_relation_is_updatable(c.oid::regclass, $51) & $52) = $53
+    )
+  ) AS deletable,
+  coalesce(tpks.pk_cols, $54) as pk_cols,
+  coalesce(cols_agg.columns, $55) as columns
+FROM pg_class c
+JOIN pg_namespace n ON n.oid = c.relnamespace
+LEFT JOIN pg_description d on d.objoid = c.oid and d.objsubid = $56 and d.classoid = $57::regclass
+LEFT JOIN tbl_pk_cols tpks ON c.oid = tpks.relid
+LEFT JOIN columns_agg cols_agg ON c.oid = cols_agg.relid
+WHERE c.relkind IN ($58,$59,$60,$61,$62)
+AND c.relnamespace NOT IN ($63::regnamespace, $64::regnamespace)
+AND not c.relispartition
+ORDER BY table_schema, table_name",282,19860.650211,2.282799,614.069668,70.4278376276596,79,22333,795610,38,99.9952240186615187,0.101769376035516
+supabase_admin,"select
+    schemaname, tablename, format($2, schemaname, tablename)::regclass as oid
+    from pg_publication_tables where pubname = $1",8968,18214.496385,0.031598,64.80311,2.03105445863069,1,16224,191885,2,99.9989577199080709,0.0933342016605241
+supabase_admin,"select
+        case when not exists (
+          select $2
+          from pg_replication_slots
+          where slot_name = $1
+        )
+        then (
+          select $3 from pg_create_logical_replication_slot($1, $4, $5)
+        )
+        else $6
+        end",599,16267.831182,15.774929,843.188488,27.1583158297162,1,599,0,0,0,0.0833591554785198
+postgres,"SELECT
+  e.name,
+  n.nspname AS schema,
+  e.default_version,
+  x.extversion AS installed_version,
+  e.comment
+FROM
+  pg_available_extensions() e(name, default_version, comment)
+  LEFT JOIN pg_extension x ON e.name = x.extname
+  LEFT JOIN pg_namespace n ON x.extnamespace = n.oid",183,15666.470123,2.047014,304.607082,85.6091263551913,76,13908,981,0,100.0000000000000000,0.0802776783316844
+postgres,"SELECT
+  pol.oid :: int8 AS id,
+  n.nspname AS schema,
+  c.relname AS table,
+  c.oid :: int8 AS table_id,
+  pol.polname AS name,
+  CASE
+    WHEN pol.polpermissive THEN $1 :: text
+    ELSE $2 :: text
+  END AS action,
+  CASE
+    WHEN pol.polroles = $3 :: oid [] THEN array_to_json(
+      string_to_array($4 :: text, $5 :: text) :: name []
+    )
+    ELSE array_to_json(
+      ARRAY(
+        SELECT
+          pg_roles.rolname
+        FROM
+          pg_roles
+        WHERE
+          pg_roles.oid = ANY (pol.polroles)
+        ORDER BY
+          pg_roles.rolname
+      )
+    )
+  END AS roles,
+  CASE
+    pol.polcmd
+    WHEN $6 :: ""char"" THEN $7 :: text
+    WHEN $8 :: ""char"" THEN $9 :: text
+    WHEN $10 :: ""char"" THEN $11 :: text
+    WHEN $12 :: ""char"" THEN $13 :: text
+    WHEN $14 :: ""char"" THEN $15 :: text
+    ELSE $16 :: text
+  END AS command,
+  pg_get_expr(pol.polqual, pol.polrelid) AS definition,
+  pg_get_expr(pol.polwithcheck, pol.polrelid) AS check
+FROM
+  pg_policy pol
+  JOIN pg_class c ON c.oid = pol.polrelid
+  LEFT JOIN pg_namespace n ON n.oid = c.relnamespace
+ WHERE n.nspname NOT IN ($17,$18,$19)",475,15476.710058,1.905395,192.478514,32.5825474905263,86,40919,470184,0,100.0000000000000000,0.0793053152314666
+service_role,"WITH pgrst_source AS ( SELECT ""public"".""signing_requests"".*, COALESCE( ""signing_requests_signers_1"".""signing_requests_signers_1"", $8) AS ""signers"", row_to_json(""signing_requests_document_1"".*)::jsonb AS ""document"" FROM ""public"".""signing_requests"" LEFT JOIN LATERAL ( SELECT json_agg(""signing_requests_signers_1"")::jsonb AS ""signing_requests_signers_1"" FROM (SELECT ""signing_request_signers_1"".* FROM ""public"".""signing_request_signers"" AS ""signing_request_signers_1"" WHERE ""signing_request_signers_1"".""signing_request_id"" = ""public"".""signing_requests"".""id""   LIMIT $1 OFFSET $2 ) AS ""signing_requests_signers_1"" ) AS ""signing_requests_signers_1"" ON $9  LEFT JOIN LATERAL ( SELECT ""documents_1"".""id"", ""documents_1"".""title"", ""documents_1"".""pdf_url"", ""documents_1"".""file_url"" FROM ""public"".""documents"" AS ""documents_1"" WHERE ""documents_1"".""id"" = ""public"".""signing_requests"".""document_template_id""   LIMIT $3 OFFSET $4 ) AS ""signing_requests_document_1"" ON $10 WHERE  ""public"".""signing_requests"".""id"" = ANY ($5)   ORDER BY ""public"".""signing_requests"".""created_at"" DESC  LIMIT $6 OFFSET $7 )  SELECT $11::bigint AS total_result_set, pg_catalog.count(_postgrest_t) AS page_total, coalesce(json_agg(_postgrest_t), $12) AS body, nullif(current_setting($13, $14), $15) AS response_headers, nullif(current_setting($16, $17), $18) AS response_status, $19 AS response_inserted FROM ( SELECT * FROM pgrst_source ) _postgrest_t",1154,14827.909121,0.154599,474.912852,12.8491413526863,1,1154,198619,0,100.0000000000000000,0.0759807480179936
+authenticator,"WITH
+-- Recursively get the base types of domains
+base_types AS (
+  WITH RECURSIVE
+  recurse AS (
+    SELECT
+      oid,
+      typbasetype,
+      typnamespace AS base_namespace,
+      COALESCE(NULLIF(typbasetype, $3), oid) AS base_type
+    FROM pg_type
+    UNION
+    SELECT
+      t.oid,
+      b.typbasetype,
+      b.typnamespace AS base_namespace,
+      COALESCE(NULLIF(b.typbasetype, $4), b.oid) AS base_type
+    FROM recurse t
+    JOIN pg_type b ON t.typbasetype = b.oid
+  )
+  SELECT
+    oid,
+    base_namespace,
+    base_type
+  FROM recurse
+  WHERE typbasetype = $5
+),
+arguments AS (
+  SELECT
+    oid,
+    array_agg((
+      COALESCE(name, $6), -- name
+      type::regtype::text, -- type
+      CASE type
+        WHEN $7::regtype THEN $8
+        WHEN $9::regtype THEN $10
+        WHEN $11::regtype THEN $12
+        WHEN $13::regtype THEN $14
+        ELSE type::regtype::text
+      END, -- convert types that ignore the length and accept any value till maximum size
+      idx <= (pronargs - pronargdefaults), -- is_required
+      COALESCE(mode = $15, $16) -- is_variadic
+    ) ORDER BY idx) AS args,
+    CASE COUNT(*) - COUNT(name) -- number of unnamed arguments
+      WHEN $17 THEN $18
+      WHEN $19 THEN (array_agg(type))[$20] IN ($21::regtype, $22::regtype, $23::regtype, $24::regtype, $25::regtype)
+      ELSE $26
+    END AS callable
+  FROM pg_proc,
+       unnest(proargnames, proargtypes, proargmodes)
+         WITH ORDINALITY AS _ (name, type, mode, idx)
+  WHERE type IS NOT NULL -- only input arguments
+  GROUP BY oid
+)
+SELECT
+  pn.nspname AS proc_schema,
+  p.proname AS proc_name,
+  d.description AS proc_description,
+  COALESCE(a.args, $27) AS args,
+  tn.nspname AS schema,
+  COALESCE(comp.relname, t.typname) AS name,
+  p.proretset AS rettype_is_setof,
+  (t.typtype = $28
+   -- if any TABLE, INOUT or OUT arguments present, treat as composite
+   or COALESCE(proargmodes::text[] && $29, $30)
+  ) AS rettype_is_composite,
+  bt.oid <> bt.base_type as rettype_is_composite_alias,
+  p.provolatile,
+  p.provariadic > $31 as hasvariadic,
+  lower((regexp_split_to_array((regexp_split_to_array(iso_config, $32))[$33], $34))[$35]) AS transaction_isolation_level,
+  coalesce(func_settings.kvs, $36) as kvs
+FROM pg_proc p
+LEFT JOIN arguments a ON a.oid = p.oid
+JOIN pg_namespace pn ON pn.oid = p.pronamespace
+JOIN base_types bt ON bt.oid = p.prorettype
+JOIN pg_type t ON t.oid = bt.base_type
+JOIN pg_namespace tn ON tn.oid = t.typnamespace
+LEFT JOIN pg_class comp ON comp.oid = t.typrelid
+LEFT JOIN pg_description as d ON d.objoid = p.oid AND d.classoid = $37::regclass
+LEFT JOIN LATERAL unnest(proconfig) iso_config ON iso_config LIKE $38
+LEFT JOIN LATERAL (
+  SELECT
+    array_agg(row(
+      substr(setting, $39, strpos(setting, $40) - $41),
+      substr(setting, strpos(setting, $42) + $43)
+    )) as kvs
+  FROM unnest(proconfig) setting
+  WHERE setting ~ ANY($2)
+) func_settings ON $44
+WHERE t.oid <> $45::regtype AND COALESCE(a.callable, $46)
+AND prokind = $47
+AND p.pronamespace = ANY($1::regnamespace[])",282,14430.856545,19.626404,297.510299,51.1732501595745,21,6093,651174,118,99.9818821665243854,0.0739461825589819
+postgres,"with f as (
+      
+-- CTE with sane arg_modes, arg_names, and arg_types.
+-- All three are always of the same length.
+-- All three include all args, including OUT and TABLE args.
+with functions as (
+  select
+    *,
+    -- proargmodes is null when all arg modes are IN
+    coalesce(
+      p.proargmodes,
+      array_fill($1::text, array[cardinality(coalesce(p.proallargtypes, p.proargtypes))])
+    ) as arg_modes,
+    -- proargnames is null when all args are unnamed
+    coalesce(
+      p.proargnames,
+      array_fill($2::text, array[cardinality(coalesce(p.proallargtypes, p.proargtypes))])
+    ) as arg_names,
+    -- proallargtypes is null when all arg modes are IN
+    coalesce(p.proallargtypes, p.proargtypes) as arg_types,
+    array_cat(
+      array_fill($3, array[pronargs - pronargdefaults]),
+      array_fill($4, array[pronargdefaults])) as arg_has_defaults
+  from
+    pg_proc as p
+  where
+    p.prokind = $5
+)
+select
+  f.oid as id,
+  n.nspname as schema,
+  f.proname as name,
+  l.lanname as language,
+  case
+    when l.lanname = $6 then $7
+    else f.prosrc
+  end as definition,
+  case
+    when l.lanname = $8 then f.prosrc
+    else pg_get_functiondef(f.oid)
+  end as complete_statement,
+  coalesce(f_args.args, $9) as args,
+  pg_get_function_arguments(f.oid) as argument_types,
+  pg_get_function_identity_arguments(f.oid) as identity_argument_types,
+  f.prorettype as return_type_id,
+  pg_get_function_result(f.oid) as return_type,
+  nullif(rt.typrelid, $10) as return_type_relation_id,
+  f.proretset as is_set_returning_function,
+  case
+    when f.provolatile = $11 then $12
+    when f.provolatile = $13 then $14
+    when f.provolatile = $15 then $16
+  end as behavior,
+  f.prosecdef as security_definer,
+  f_config.config_params as config_params
+from
+  functions f
+  left join pg_namespace n on f.pronamespace = n.oid
+  left join pg_language l on f.prolang = l.oid
+  left join pg_type rt on rt.oid = f.prorettype
+  left join (
+    select
+      oid,
+      jsonb_object_agg(param, value) filter (where param is not null) as config_params
+    from
+      (
+        select
+          oid,
+          (string_to_array(unnest(proconfig), $17))[$18] as param,
+          (string_to_array(unnest(proconfig), $19))[$20] as value
+        from
+          functions
+      ) as t
+    group by
+      oid
+  ) f_config on f_config.oid = f.oid
+  left join (
+    select
+      oid,
+      jsonb_agg(jsonb_build_object(
+        $21, t2.mode,
+        $22, name,
+        $23, type_id,
+        -- Cast null into false boolean
+        $24, COALESCE(has_default, $25)
+      )) as args
+    from
+      (
+        select
+          oid,
+          unnest(arg_modes) as mode,
+          unnest(arg_names) as name,
+          -- Coming from: coalesce(p.proallargtypes, p.proargtypes) postgres won't automatically assume
+          -- integer, we need to cast it to be properly parsed
+          unnest(arg_types)::int8 as type_id,
+          unnest(arg_has_defaults) as has_default
+        from
+          functions
+      ) as t1,
+      lateral (
+        select
+          case
+            when t1.mode = $26 then $27
+            when t1.mode = $28 then $29
+            when t1.mode = $30 then $31
+            when t1.mode = $32 then $33
+            else $34
+          end as mode
+      ) as t2
+    group by
+      t1.oid
+  ) f_args on f_args.oid = f.oid
+
+    )
+    select
+      f.*
+    from f
+   where schema NOT IN ($35,$36,$37)
+
+-- source: dashboard
+-- user: fb56b1ba-e54a-42e3-b596-053dc465daca
+-- date: 2025-08-22T14:18:28.305Z",98,12380.949554,68.344623,249.193557,126.336219938775,124,12198,59797,0,100.0000000000000000,0.0634421077583811
+service_role,"select set_config('search_path', $1, true), set_config('role', $2, true), set_config('request.jwt.claims', $3, true), set_config('request.method', $4, true), set_config('request.path', $5, true), set_config('request.headers', $6, true), set_config('request.cookies', $7, true)",82715,10646.470623,0.014202,330.990266,0.12871269567793,1,82715,135536,0,100.0000000000000000,0.0545543404053843
+postgres,"SELECT 
+  con.oid as id, 
+  con.conname as constraint_name, 
+  con.confdeltype as deletion_action,
+  con.confupdtype as update_action,
+  rel.oid as source_id,
+  nsp.nspname as source_schema, 
+  rel.relname as source_table, 
+  (
+    SELECT 
+      array_agg(
+        att.attname 
+        ORDER BY 
+          un.ord
+      ) 
+    FROM 
+      unnest(con.conkey) WITH ORDINALITY un (attnum, ord) 
+      INNER JOIN pg_attribute att ON att.attnum = un.attnum 
+    WHERE 
+      att.attrelid = rel.oid
+  ) source_columns, 
+  frel.oid as target_id,
+  fnsp.nspname as target_schema, 
+  frel.relname as target_table, 
+  (
+    SELECT 
+      array_agg(
+        att.attname 
+        ORDER BY 
+          un.ord
+      ) 
+    FROM 
+      unnest(con.confkey) WITH ORDINALITY un (attnum, ord) 
+      INNER JOIN pg_attribute att ON att.attnum = un.attnum 
+    WHERE 
+      att.attrelid = frel.oid
+  ) target_columns 
+FROM 
+  pg_constraint con 
+  INNER JOIN pg_class rel ON rel.oid = con.conrelid 
+  INNER JOIN pg_namespace nsp ON nsp.oid = rel.relnamespace 
+  INNER JOIN pg_class frel ON frel.oid = con.confrelid 
+  INNER JOIN pg_namespace fnsp ON fnsp.oid = frel.relnamespace 
+WHERE 
+  con.contype = $1
+  AND nsp.nspname = $2
+
+-- source: dashboard
+-- user: fb56b1ba-e54a-42e3-b596-053dc465daca
+-- date: 2025-08-22T14:54:13.492Z",471,8537.735509,0.769343,122.584216,18.1268269830149,36,16961,462438,0,100.0000000000000000,0.0437488202186834
+postgres,"select
+  t.oid::int8 as id,
+  t.typname as name,
+  n.nspname as schema,
+  format_type (t.oid, $1) as format,
+  coalesce(t_enums.enums, $2) as enums,
+  coalesce(t_attributes.attributes, $3) as attributes,
+  obj_description (t.oid, $4) as comment
+from
+  pg_type t
+  left join pg_namespace n on n.oid = t.typnamespace
+  left join (
+    select
+      enumtypid,
+      jsonb_agg(enumlabel order by enumsortorder) as enums
+    from
+      pg_enum
+    group by
+      enumtypid
+  ) as t_enums on t_enums.enumtypid = t.oid
+  left join (
+    select
+      oid,
+      jsonb_agg(
+        jsonb_build_object($5, a.attname, $6, a.atttypid::int8)
+        order by a.attnum asc
+      ) as attributes
+    from
+      pg_class c
+      join pg_attribute a on a.attrelid = c.oid
+    where
+      c.relkind = $7 and not a.attisdropped
+    group by
+      c.oid
+  ) as t_attributes on t_attributes.oid = t.typrelid
+
+    where
+      (
+        t.typrelid = $8
+        or (
+          select
+            c.relkind = $9
+          from
+            pg_class c
+          where
+            c.oid = t.typrelid
+        )
+      )
+     and not exists (
+                 select
+                 from
+                   pg_type el
+                 where
+                   el.oid = t.typelem
+                   and el.typarray = t.oid
+               ) and n.nspname NOT IN ($10,$11,$12)",515,7839.59988899999,1.625712,55.971946,15.2225240563107,11,6080,519080,0,100.0000000000000000,0.0401714536329602

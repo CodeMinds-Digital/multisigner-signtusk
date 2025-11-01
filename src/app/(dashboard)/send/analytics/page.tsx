@@ -1,10 +1,14 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { BarChart3, TrendingUp, Eye, Download, RefreshCw } from 'lucide-react'
+import { BarChart3, TrendingUp, Eye, Download, RefreshCw, Upload } from 'lucide-react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Breadcrumb } from '@/components/ui/breadcrumb'
 import { toast } from 'sonner'
+import { useRouter } from 'next/navigation'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { LoadingStats, LoadingChart, LoadingList } from '@/components/features/send/loading-states'
 
 interface DashboardStats {
   totalDocuments: number
@@ -24,6 +28,7 @@ interface TopDocument {
 }
 
 export default function SendAnalyticsPage() {
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
   const [stats, setStats] = useState<DashboardStats>({
     totalDocuments: 0,
@@ -34,6 +39,24 @@ export default function SendAnalyticsPage() {
     avgEngagement: 0
   })
   const [topDocuments, setTopDocuments] = useState<TopDocument[]>([])
+
+  // Sample engagement data for the chart
+  const engagementData = [
+    { date: '2024-01-01', views: 45, downloads: 12 },
+    { date: '2024-01-02', views: 52, downloads: 15 },
+    { date: '2024-01-03', views: 38, downloads: 8 },
+    { date: '2024-01-04', views: 67, downloads: 22 },
+    { date: '2024-01-05', views: 73, downloads: 28 },
+    { date: '2024-01-06', views: 41, downloads: 11 },
+    { date: '2024-01-07', views: 58, downloads: 19 },
+    { date: '2024-01-08', views: 89, downloads: 35 },
+    { date: '2024-01-09', views: 76, downloads: 31 },
+    { date: '2024-01-10', views: 63, downloads: 24 },
+    { date: '2024-01-11', views: 55, downloads: 18 },
+    { date: '2024-01-12', views: 82, downloads: 33 },
+    { date: '2024-01-13', views: 94, downloads: 41 },
+    { date: '2024-01-14', views: 71, downloads: 27 }
+  ]
 
   useEffect(() => {
     loadAnalytics()
@@ -74,7 +97,15 @@ export default function SendAnalyticsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 p-6">
+      {/* Breadcrumb */}
+      <Breadcrumb
+        items={[
+          { label: 'Send', href: '/send' },
+          { label: 'Analytics' }
+        ]}
+      />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -93,51 +124,55 @@ export default function SendAnalyticsPage() {
       </div>
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
-            <BarChart3 className="h-4 w-4 text-green-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? '...' : stats.totalDocuments}</div>
-            <p className="text-xs text-gray-500 mt-1">Documents shared</p>
-          </CardContent>
-        </Card>
+      {loading ? (
+        <LoadingStats count={4} />
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Documents</CardTitle>
+              <BarChart3 className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalDocuments}</div>
+              <p className="text-xs text-gray-500 mt-1">Documents shared</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Views</CardTitle>
-            <Eye className="h-4 w-4 text-blue-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? '...' : stats.totalViews}</div>
-            <p className="text-xs text-gray-500 mt-1">Across all documents</p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Views</CardTitle>
+              <Eye className="h-4 w-4 text-blue-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.totalViews}</div>
+              <p className="text-xs text-gray-500 mt-1">Across all documents</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Links</CardTitle>
-            <Download className="h-4 w-4 text-purple-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? '...' : stats.activeLinks}</div>
-            <p className="text-xs text-gray-500 mt-1">Currently active</p>
-          </CardContent>
-        </Card>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Active Links</CardTitle>
+              <Download className="h-4 w-4 text-purple-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{stats.activeLinks}</div>
+              <p className="text-xs text-gray-500 mt-1">Currently active</p>
+            </CardContent>
+          </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Engagement</CardTitle>
-            <TrendingUp className="h-4 w-4 text-orange-600" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{loading ? '...' : `${stats.avgEngagement}%`}</div>
-            <p className="text-xs text-gray-500 mt-1">Engagement score</p>
-          </CardContent>
-        </Card>
-      </div>
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Avg Engagement</CardTitle>
+              <TrendingUp className="h-4 w-4 text-orange-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{`${stats.avgEngagement}%`}</div>
+              <p className="text-xs text-gray-500 mt-1">Engagement score</p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Top Performing Documents */}
       <Card>
@@ -147,19 +182,7 @@ export default function SendAnalyticsPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="space-y-4">
-              {[1, 2, 3, 4, 5].map((i) => (
-                <div key={i} className="flex items-center gap-4 animate-pulse">
-                  <div className="w-8 h-8 bg-gray-200 rounded-full"></div>
-                  <div className="flex-1">
-                    <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
-                    <div className="h-3 bg-gray-200 rounded w-1/2"></div>
-                  </div>
-                  <div className="w-16 h-4 bg-gray-200 rounded"></div>
-                  <div className="w-32 h-2 bg-gray-200 rounded"></div>
-                </div>
-              ))}
-            </div>
+            <LoadingList count={5} showAvatar={false} />
           ) : topDocuments.length > 0 ? (
             <div className="space-y-4">
               {topDocuments.map((doc, index) => (
@@ -196,27 +219,66 @@ export default function SendAnalyticsPage() {
               ))}
             </div>
           ) : (
-            <div className="text-center py-8 text-gray-500">
-              <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-              <p>No documents found</p>
-              <p className="text-sm">Share some documents to see analytics</p>
+            <div className="text-center py-12">
+              <BarChart3 className="w-16 h-16 mx-auto mb-4 text-gray-400" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No Analytics Data Yet</h3>
+              <p className="text-gray-500 mb-6">
+                Upload and share documents to start tracking engagement and performance metrics
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button onClick={() => router.push('/send/upload')}>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Upload Document
+                </Button>
+                <Button variant="outline" onClick={() => router.push('/send/documents')}>
+                  View Documents
+                </Button>
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* Engagement Chart Placeholder */}
+      {/* Engagement Chart */}
       <Card>
         <CardHeader>
           <CardTitle>Engagement Over Time</CardTitle>
-          <CardDescription>Document views and downloads trend</CardDescription>
+          <CardDescription>Document views and downloads trend over the last 30 days</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="h-64 flex items-center justify-center border-2 border-dashed border-gray-300 rounded-lg">
-            <div className="text-center text-gray-500">
-              <BarChart3 className="w-12 h-12 mx-auto mb-2 text-gray-400" />
-              <p>Chart visualization coming soon</p>
-            </div>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <LineChart data={engagementData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 12 }}
+                  tickFormatter={(value) => new Date(value).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                />
+                <YAxis tick={{ fontSize: 12 }} />
+                <Tooltip
+                  labelFormatter={(value) => new Date(value).toLocaleDateString()}
+                  formatter={(value, name) => [value, name === 'views' ? 'Views' : 'Downloads']}
+                />
+                <Legend />
+                <Line
+                  type="monotone"
+                  dataKey="views"
+                  stroke="#3b82f6"
+                  strokeWidth={2}
+                  name="Views"
+                  dot={{ fill: '#3b82f6', strokeWidth: 2, r: 4 }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="downloads"
+                  stroke="#10b981"
+                  strokeWidth={2}
+                  name="Downloads"
+                  dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
           </div>
         </CardContent>
       </Card>

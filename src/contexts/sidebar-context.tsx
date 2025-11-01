@@ -6,18 +6,26 @@ interface SidebarContextType {
   isCollapsed: boolean
   toggleSidebar: () => void
   setIsCollapsed: (collapsed: boolean) => void
+  selectedModuleId: string | null
+  setSelectedModuleId: (moduleId: string) => void
 }
 
 const SidebarContext = createContext<SidebarContextType | undefined>(undefined)
 
 export function SidebarProvider({ children }: { children: ReactNode }) {
   const [isCollapsed, setIsCollapsed] = useState(false)
+  const [selectedModuleId, setSelectedModuleIdState] = useState<string | null>(null)
 
-  // Load saved preference from localStorage
+  // Load saved preferences from localStorage
   useEffect(() => {
-    const saved = localStorage.getItem('sidebar-collapsed')
-    if (saved !== null) {
-      setIsCollapsed(saved === 'true')
+    const savedCollapsed = localStorage.getItem('sidebar-collapsed')
+    if (savedCollapsed !== null) {
+      setIsCollapsed(savedCollapsed === 'true')
+    }
+
+    const savedModule = localStorage.getItem('sidebar-selected-module')
+    if (savedModule !== null) {
+      setSelectedModuleIdState(savedModule)
     }
   }, [])
 
@@ -35,11 +43,18 @@ export function SidebarProvider({ children }: { children: ReactNode }) {
     localStorage.setItem('sidebar-collapsed', String(collapsed))
   }
 
+  const handleSetSelectedModuleId = (moduleId: string) => {
+    setSelectedModuleIdState(moduleId)
+    localStorage.setItem('sidebar-selected-module', moduleId)
+  }
+
   return (
     <SidebarContext.Provider value={{
       isCollapsed,
       toggleSidebar,
-      setIsCollapsed: handleSetIsCollapsed
+      setIsCollapsed: handleSetIsCollapsed,
+      selectedModuleId,
+      setSelectedModuleId: handleSetSelectedModuleId
     }}>
       {children}
     </SidebarContext.Provider>

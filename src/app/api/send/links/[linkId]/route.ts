@@ -28,6 +28,8 @@ export async function GET(
     const password = searchParams.get('password')
     const email = searchParams.get('email')
 
+    console.log('🔍 GET request for link:', { linkId, hasPassword: !!password, hasEmail: !!email })
+
     // Fetch link details with document info
     const { data: link, error: linkError } = await supabaseAdmin
       .from('send_document_links')
@@ -105,14 +107,17 @@ export async function GET(
         )
       }
 
-      // Check if email is verified
-      const { data: verification } = await supabaseAdmin
+      // Check if email is verified (get the most recent verified record)
+      const { data: verifications, error: verificationError } = await supabaseAdmin
         .from('send_email_verifications')
         .select('*')
         .eq('link_id', link.id)
         .eq('email', email)
         .eq('verified', true)
-        .single()
+        .order('verified_at', { ascending: false })
+        .limit(1)
+
+      const verification = verifications && verifications.length > 0 ? verifications[0] : null
 
       if (!verification) {
         return NextResponse.json(
@@ -144,8 +149,7 @@ export async function GET(
         .from('send_document_ndas')
         .select('*')
         .eq('link_id', link.id)
-        .eq('signer_email', email)
-        .eq('accepted', true)
+        .eq('acceptor_email', email)
         .single()
 
       if (!nda) {
@@ -161,21 +165,33 @@ export async function GET(
       }
     }
 
+    // Clean up filename for display (remove storage prefix)
+    const cleanFileName = (fileName: string) => {
+      if (!fileName) return fileName
+      // Remove timestamp prefix like "1760016189209-vpudsnv1-"
+      return fileName.replace(/^\d+-[a-z0-9]+-/, '')
+    }
+
     // All checks passed - return link and document details
     return NextResponse.json({
       success: true,
       link: {
         id: link.id,
         linkId: link.link_id,
-        name: link.name,
+        name: link.title,
         allowDownload: link.allow_download,
-        allowPrinting: link.allow_printing,
-        enableWatermark: link.enable_watermark,
-        watermarkText: link.watermark_text,
-        viewCount: link.view_count,
+        allowPrinting: true, // Default value since field doesn't exist in schema
+        enableWatermark: false, // Default value since field doesn't exist in schema
+        watermarkText: null, // Default value since field doesn't exist in schema
+        enhancedWatermarkConfig: null, // Default value since field doesn't exist in schema
+        viewCount: link.current_views,
         expiresAt: link.expires_at
       },
-      document: link.document
+      document: {
+        ...link.document,
+        file_name: cleanFileName(link.document.file_name), // Clean filename for display
+        title: link.document.title || cleanFileName(link.document.file_name) // Use clean filename as fallback title
+      }
     })
   } catch (error: any) {
     console.error('Link verification error:', error)
@@ -199,20 +215,25 @@ export async function POST(
     const body = await request.json()
     const { email, action } = body
 
+    console.log('📧 Email verification POST request:', { linkId, email, action })
+
     if (action === 'send-verification') {
       // Get link details for document title
       const { data: link } = await supabaseAdmin
         .from('send_document_links')
-        .select('name')
+        .select('title')
         .eq('link_id', linkId)
         .single()
 
       if (!link) {
+        console.log('❌ Link not found in database:', linkId)
         return NextResponse.json(
           { success: false, error: 'Link not found' },
           { status: 404 }
         )
       }
+
+      console.log('✅ Link found:', { linkId, linkTitle: link.title })
 
       // Check rate limiting (max 5 attempts per hour)
       const attemptCount = await SendEmailVerification.getAttemptCount(email, linkId)
@@ -224,7 +245,7 @@ export async function POST(
       }
 
       // Send verification code
-      const result = await SendEmailVerification.sendVerificationCode(email, linkId, link.name)
+      const result = await SendEmailVerification.sendVerificationCode(email, linkId, link.title)
 
       if (!result.success) {
         return NextResponse.json(
@@ -310,14 +331,17 @@ export async function POST(
       const { error: ndaError } = await supabaseAdmin
         .from('send_document_ndas')
         .insert({
-          document_id: link.document_id,
           link_id: link.id,
-          signer_email: email,
           nda_text: ndaText,
-          accepted: true,
+          acceptor_name: email, // Use email as name if not provided
+          acceptor_email: email,
+          acceptor_ip: ipAddress,
+          signature_data: null,
           accepted_at: new Date().toISOString(),
-          ip_address: ipAddress,
-          user_agent: userAgent
+          legal_binding: true,
+          user_agent: userAgent,
+          nda_template_id: 'basic-nda',
+          metadata: { acceptance_method: 'legacy' }
         })
 
       if (ndaError) {

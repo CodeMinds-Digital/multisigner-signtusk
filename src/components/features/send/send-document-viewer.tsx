@@ -13,9 +13,11 @@ import {
   Minimize2,
   ChevronLeft,
   ChevronRight,
-  Eye
+  Eye,
+  MessageSquare
 } from 'lucide-react'
 import { SendAnalyticsService } from '@/lib/send-analytics-service'
+import { AIDocumentAssistant } from './ai-document-assistant'
 
 interface PDFTemplate {
   basePdf: string
@@ -87,6 +89,9 @@ export default function SendDocumentViewer({
   const [scrollDepth, setScrollDepth] = useState<number>(0)
   const [sessionStartTime] = useState<number>(Date.now())
 
+  // AI Assistant
+  const [showAIAssistant, setShowAIAssistant] = useState<boolean>(false)
+
   // Load PDF
   useEffect(() => {
     const fetchPdf = async () => {
@@ -94,7 +99,30 @@ export default function SendDocumentViewer({
         setLoading(true)
         setError(null)
 
-        const base64String = await convertToBase64(fileUrl)
+        let base64String: string
+
+        // Use proxy API if linkId is available (for public viewer)
+        if (linkId) {
+          console.log('🔗 Using proxy API for linkId:', linkId)
+          const response = await fetch(`/api/send/documents/content/${linkId}`)
+
+          if (!response.ok) {
+            throw new Error(`Failed to fetch document: ${response.status} ${response.statusText}`)
+          }
+
+          const data = await response.json()
+          if (!data.success || !data.data?.base64) {
+            throw new Error(data.error || 'Invalid response from document API')
+          }
+
+          base64String = data.data.base64
+          console.log('✅ Document loaded via proxy API')
+        } else {
+          // Fallback to direct URL conversion (for authenticated users)
+          console.log('🔗 Using direct URL conversion for:', fileUrl)
+          base64String = await convertToBase64(fileUrl)
+          console.log('✅ Document loaded via direct conversion')
+        }
 
         const template: PDFTemplate = {
           basePdf: base64String,
@@ -120,10 +148,10 @@ export default function SendDocumentViewer({
       }
     }
 
-    if (fileUrl) {
+    if (fileUrl || linkId) {
       fetchPdf()
     }
-  }, [fileUrl, onView, linkId, documentId, viewerEmail])
+  }, [fileUrl, linkId, onView, documentId, viewerEmail])
 
   // Initialize PDF viewer
   useEffect(() => {
@@ -299,6 +327,17 @@ export default function SendDocumentViewer({
                   <Maximize2 className="w-4 h-4" />
                 )}
               </Button>
+
+              {/* AI Assistant Toggle */}
+              <Button
+                variant={showAIAssistant ? "default" : "outline"}
+                size="sm"
+                onClick={() => setShowAIAssistant(!showAIAssistant)}
+                className="flex items-center gap-2"
+              >
+                <MessageSquare className="w-4 h-4" />
+                AI Assistant
+              </Button>
             </div>
           </div>
         </div>
@@ -348,6 +387,15 @@ export default function SendDocumentViewer({
           )}
         </CardContent>
       </Card>
+
+      {/* AI Document Assistant */}
+      <AIDocumentAssistant
+        documentId={documentId || ''}
+        documentTitle={fileName}
+        linkId={linkId}
+        isVisible={showAIAssistant}
+        onToggle={() => setShowAIAssistant(false)}
+      />
     </div>
   )
 }

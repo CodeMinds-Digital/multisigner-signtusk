@@ -80,9 +80,97 @@ export class SendNotifications {
   }
 
   /**
-   * Send email notification
+   * Send email notification (now uses queue for better performance)
    */
   static async sendEmailNotification(
+    userId: string,
+    userEmail: string,
+    userName: string,
+    notification: NotificationData
+  ): Promise<void> {
+    try {
+      // Import queue service dynamically to avoid circular dependencies
+      const { SendEmailQueueService } = await import('./send-email-queue-service')
+
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+      const analyticsUrl = `${appUrl}/send/analytics/${notification.documentId}`
+
+      // Queue appropriate email based on notification type
+      switch (notification.type) {
+        case 'document_viewed':
+          await SendEmailQueueService.queueDocumentViewedEmail({
+            to: userEmail,
+            ownerName: userName,
+            documentTitle: notification.documentTitle,
+            viewerEmail: notification.visitorEmail,
+            viewerLocation: notification.visitorLocation,
+            viewTime: new Date().toLocaleString(),
+            analyticsUrl,
+            userId: userId,
+            documentId: notification.documentId
+          }, 'normal')
+          break
+
+        case 'document_downloaded':
+          await SendEmailQueueService.queueDocumentDownloadedEmail({
+            to: userEmail,
+            ownerName: userName,
+            documentTitle: notification.documentTitle,
+            downloaderEmail: notification.visitorEmail,
+            downloadTime: new Date().toLocaleString(),
+            analyticsUrl,
+            userId: userId,
+            documentId: notification.documentId
+          }, 'normal')
+          break
+
+        case 'nda_accepted':
+          await SendEmailQueueService.queueNDAAcceptedEmail({
+            to: userEmail,
+            ownerName: userName,
+            documentTitle: notification.documentTitle,
+            signerName: notification.metadata?.signerName || 'Unknown',
+            signerEmail: notification.visitorEmail || 'Unknown',
+            signedAt: new Date().toLocaleString(),
+            analyticsUrl,
+            userId: userId,
+            documentId: notification.documentId
+          }, 'high')
+          break
+
+        case 'high_engagement':
+          await SendEmailQueueService.queueHighEngagementEmail({
+            to: userEmail,
+            ownerName: userName,
+            documentTitle: notification.documentTitle,
+            visitorEmail: notification.visitorEmail,
+            engagementScore: notification.metadata?.engagementScore || 0,
+            pagesViewed: notification.metadata?.pagesViewed || 0,
+            timeSpent: notification.metadata?.timeSpent || '0 min',
+            analyticsUrl,
+            userId: userId,
+            documentId: notification.documentId
+          }, 'high')
+          break
+
+        default:
+          console.log('No email template for notification type:', notification.type)
+      }
+
+      console.log(`📧 Queued ${notification.type} email for ${userEmail}`)
+    } catch (error) {
+      console.error('Failed to queue email notification:', error)
+
+      // Fallback to synchronous sending if queue fails
+      console.warn('⚠️ Falling back to synchronous email sending')
+      await this.sendEmailNotificationSync(userId, userEmail, userName, notification)
+    }
+  }
+
+  /**
+   * Synchronous email sending (fallback)
+   */
+  private static async sendEmailNotificationSync(
     userId: string,
     userEmail: string,
     userName: string,
@@ -146,7 +234,7 @@ export class SendNotifications {
           console.log('No email template for notification type:', notification.type)
       }
     } catch (error) {
-      console.error('Failed to send email notification:', error)
+      console.error('Failed to send email notification synchronously:', error)
     }
   }
 

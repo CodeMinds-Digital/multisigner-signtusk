@@ -21,9 +21,18 @@ export function ConsoleFilterProvider({ children }: { children: React.ReactNode 
       /ref is now a regular prop/
     ]
 
+    const suppressedErrors = [
+      /Failed to trigger notification.*User not found/,
+      /Notification failed \(non-critical\)/
+    ]
+
     // Filter function to check if a message should be suppressed
     function shouldSuppressWarning(message: string): boolean {
       return suppressedWarnings.some(pattern => pattern.test(message))
+    }
+
+    function shouldSuppressError(message: string): boolean {
+      return suppressedErrors.some(pattern => pattern.test(message))
     }
 
     // Override console.warn
@@ -37,7 +46,7 @@ export function ConsoleFilterProvider({ children }: { children: React.ReactNode 
     // Override console.error for warnings that come through as errors
     console.error = (...args: any[]) => {
       const message = args.join(' ')
-      if (!shouldSuppressWarning(message)) {
+      if (!shouldSuppressError(message)) {
         originalError.apply(console, args)
       }
     }

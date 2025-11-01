@@ -11,6 +11,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
+import { IsolatedInput } from './isolated-input'
+import { EnhancedWatermarkSettings } from './enhanced-watermark-settings'
+import { EnhancedWatermarkConfig } from '@/lib/enhanced-watermark-service'
+import { OneClickNDASettings } from './one-click-nda-settings'
+import { OneClickNDAConfig } from '@/lib/one-click-nda-service'
 
 interface CreateLinkModalProps {
   documentId: string
@@ -33,6 +38,7 @@ export function CreateLinkModal({
   const [recipientEmail, setRecipientEmail] = useState('')
   const [emailMessage, setEmailMessage] = useState('')
   const [sendingEmail, setSendingEmail] = useState(false)
+  const [autoSendEmail, setAutoSendEmail] = useState(false)
 
   // Basic Link Settings
   const [linkName, setLinkName] = useState(`${documentTitle} - Share Link`)
@@ -54,11 +60,7 @@ export function CreateLinkModal({
   const [allowedDomains, setAllowedDomains] = useState<string[]>([])
   const [blockedDomains, setBlockedDomains] = useState<string[]>([])
 
-  // Separate input states for each field to prevent focus issues
-  const [allowedEmailInput, setAllowedEmailInput] = useState('')
-  const [blockedEmailInput, setBlockedEmailInput] = useState('')
-  const [allowedDomainInput, setAllowedDomainInput] = useState('')
-  const [blockedDomainInput, setBlockedDomainInput] = useState('')
+  // Note: Individual input states removed - now handled by IsolatedInput components
 
   // Geographic & IP Restrictions
   const [allowedCountries, setAllowedCountries] = useState<string[]>([])
@@ -73,6 +75,36 @@ export function CreateLinkModal({
   const [selectedNda, setSelectedNda] = useState('')
   const [enableWatermark, setEnableWatermark] = useState(false)
   const [watermarkText, setWatermarkText] = useState('')
+
+  // Enhanced Watermark Configuration
+  const [enhancedWatermarkConfig, setEnhancedWatermarkConfig] = useState<EnhancedWatermarkConfig>({
+    enabled: false,
+    template: '{{user_email}} - {{date}} {{time}}',
+    opacity: 0.3,
+    color: '#000000',
+    position: 'bottom-right',
+    fontSize: 12,
+    rotation: 0,
+    fontFamily: 'Arial, sans-serif'
+  })
+
+  const [oneClickNDAConfig, setOneClickNDAConfig] = useState<OneClickNDAConfig>({
+    enabled: false,
+    templateId: 'basic-nda',
+    requireSignature: false,
+    requireFullName: true,
+    requireWitness: false,
+    autoAcceptDomains: [],
+    customVariables: {
+      company_name: 'Your Company'
+    },
+    acceptanceMessage: 'Thank you for accepting the NDA. You can now access the document.',
+    emailNotifications: {
+      notifyOwner: true,
+      notifyAcceptor: true,
+      notifyWitness: false
+    }
+  })
 
   // Screenshot Protection
   const [screenshotProtection, setScreenshotProtection] = useState(false)
@@ -94,74 +126,13 @@ export function CreateLinkModal({
   const [showEmailDomainModal, setShowEmailDomainModal] = useState(false)
   const [activeTab, setActiveTab] = useState('basic')
 
-  // Helper functions for email/domain management
-  const addEmail = (type: 'allow' | 'block') => {
-    const inputValue = type === 'allow' ? allowedEmailInput : blockedEmailInput
-    if (!inputValue.trim()) return
-
-    const email = inputValue.trim().toLowerCase()
-
-    // Check for valid email format
-    if (!email.includes('@')) {
-      toast.error('Please enter a valid email address')
-      return
-    }
-
-    if (type === 'allow') {
-      if (allowedEmails.includes(email)) {
-        toast.error('Email already added')
-        return
-      }
-      setAllowedEmails(prev => [...prev, email])
-      setAllowedEmailInput('')
-      toast.success('Email added to allowed list')
-    } else {
-      if (blockedEmails.includes(email)) {
-        toast.error('Email already added')
-        return
-      }
-      setBlockedEmails(prev => [...prev, email])
-      setBlockedEmailInput('')
-      toast.success('Email added to blocked list')
-    }
-  }
+  // Helper functions for email/domain management (now handled by IsolatedInput components)
 
   const removeEmail = (email: string, type: 'allow' | 'block') => {
     if (type === 'allow') {
       setAllowedEmails(prev => prev.filter(e => e !== email))
     } else {
       setBlockedEmails(prev => prev.filter(e => e !== email))
-    }
-  }
-
-  const addDomain = (type: 'allow' | 'block') => {
-    const inputValue = type === 'allow' ? allowedDomainInput : blockedDomainInput
-    if (!inputValue.trim()) return
-
-    const domain = inputValue.trim().toLowerCase()
-
-    // Basic domain validation
-    if (!domain.includes('.') || domain.includes('@')) {
-      toast.error('Please enter a valid domain (e.g., company.com)')
-      return
-    }
-
-    if (type === 'allow') {
-      if (allowedDomains.includes(domain)) {
-        toast.error('Domain already added')
-        return
-      }
-      setAllowedDomains(prev => [...prev, domain])
-      setAllowedDomainInput('')
-      toast.success('Domain added to allowed list')
-    } else {
-      if (blockedDomains.includes(domain)) {
-        toast.error('Domain already added')
-        return
-      }
-      setBlockedDomains(prev => [...prev, domain])
-      setBlockedDomainInput('')
-      toast.success('Domain added to blocked list')
     }
   }
 
@@ -243,6 +214,10 @@ export function CreateLinkModal({
           screenshotProtection,
           watermarkOpacity: enableWatermark ? watermarkOpacity : undefined,
           watermarkColor: enableWatermark ? watermarkColor : undefined,
+          // Enhanced watermark configuration
+          enhancedWatermark: enhancedWatermarkConfig.enabled ? enhancedWatermarkConfig : undefined,
+          // One-Click NDA configuration
+          oneClickNDA: oneClickNDAConfig.enabled ? oneClickNDAConfig : undefined,
           printProtection,
           rightClickProtection,
           welcomeMessage: welcomeMessage || undefined,
@@ -269,6 +244,21 @@ export function CreateLinkModal({
       const data = await response.json()
       setCreatedLink(data.link)
 
+      // Auto-send email if enabled and recipient email is provided
+      console.log('Auto-email check:', { autoSendEmail, recipientEmail })
+      if (autoSendEmail && recipientEmail) {
+        console.log('Triggering auto-email send...')
+        try {
+          await handleSendEmail(true, data.link)
+          console.log('Auto-email sent successfully')
+        } catch (emailError) {
+          console.error('Auto-email failed:', emailError)
+          // Don't fail the link creation if email fails
+        }
+      } else {
+        console.log('Auto-email not triggered:', { autoSendEmail, recipientEmail })
+      }
+
       if (onLinkCreated) {
         onLinkCreated(data.link)
       }
@@ -288,14 +278,25 @@ export function CreateLinkModal({
     }
   }
 
-  const handleSendEmail = async () => {
+  const handleSendEmail = async (isAutoSend = false, linkData = null) => {
     if (!recipientEmail) {
-      setError('Please enter recipient email')
+      if (!isAutoSend) {
+        setError('Please enter recipient email')
+      }
+      return
+    }
+
+    // Use provided linkData or fall back to createdLink state
+    const linkToUse = linkData || createdLink
+    if (!linkToUse) {
+      console.error('No link data available for email sending')
       return
     }
 
     setSendingEmail(true)
-    setError(null)
+    if (!isAutoSend) {
+      setError(null)
+    }
 
     try {
       const response = await fetch('/api/send/links/send-email', {
@@ -304,11 +305,11 @@ export function CreateLinkModal({
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          linkId: createdLink.id,
+          linkId: linkToUse.id,
           recipientEmail,
           message: emailMessage,
           documentTitle,
-          shareUrl: createdLink.shareUrl,
+          shareUrl: linkToUse.shareUrl,
           password: password || undefined
         })
       })
@@ -318,14 +319,18 @@ export function CreateLinkModal({
         throw new Error(errorData.error || 'Failed to send email')
       }
 
-      // Success - reset form and show success message
-      setRecipientEmail('')
-      setEmailMessage('')
-      setShowEmailForm(false)
-      alert('Email sent successfully!')
+      // Success - reset form and show success message (only for manual sends)
+      if (!isAutoSend) {
+        setRecipientEmail('')
+        setEmailMessage('')
+        setShowEmailForm(false)
+        alert('Email sent successfully!')
+      }
     } catch (err: any) {
       console.error('Send email error:', err)
-      setError(err.message || 'Failed to send email')
+      if (!isAutoSend) {
+        setError(err.message || 'Failed to send email')
+      }
     } finally {
       setSendingEmail(false)
     }
@@ -458,7 +463,7 @@ export function CreateLinkModal({
             )}
 
             <Button
-              onClick={handleSendEmail}
+              onClick={() => handleSendEmail()}
               disabled={sendingEmail || !recipientEmail}
               className="w-full bg-green-600 hover:bg-green-700"
             >
@@ -574,20 +579,26 @@ export function CreateLinkModal({
 
               {/* Email/Domain Input Fields - Conditional Rendering */}
               {emailRestrictionType === 'allow' && (
-                <div className="space-y-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                <div key="allow-section" className="space-y-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                   <div>
                     <Label className="text-sm font-medium">Allowed Emails</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Input
-                        placeholder="Enter email address"
-                        value={allowedEmailInput}
-                        onChange={(e) => setAllowedEmailInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addEmail('allow')}
-                      />
-                      <Button onClick={() => addEmail('allow')} size="sm">
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    <IsolatedInput
+                      placeholder="Enter email address"
+                      onAdd={(email) => {
+                        const trimmedEmail = email.toLowerCase()
+                        if (!trimmedEmail.includes('@')) {
+                          toast.error('Please enter a valid email address')
+                          return
+                        }
+                        if (allowedEmails.includes(trimmedEmail)) {
+                          toast.error('Email already added')
+                          return
+                        }
+                        setAllowedEmails(prev => [...prev, trimmedEmail])
+                        toast.success('Email added to allowed list')
+                      }}
+                      className="mt-1"
+                    />
                     <div className="flex flex-wrap gap-1 mt-2">
                       {allowedEmails.map((email) => (
                         <span key={email} className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs flex items-center gap-1">
@@ -600,17 +611,23 @@ export function CreateLinkModal({
 
                   <div>
                     <Label className="text-sm font-medium">Allowed Domains</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Input
-                        placeholder="Enter domain (e.g., company.com)"
-                        value={allowedDomainInput}
-                        onChange={(e) => setAllowedDomainInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addDomain('allow')}
-                      />
-                      <Button onClick={() => addDomain('allow')} size="sm">
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    <IsolatedInput
+                      placeholder="Enter domain (e.g., company.com)"
+                      onAdd={(domain) => {
+                        const trimmedDomain = domain.toLowerCase()
+                        if (!trimmedDomain.includes('.') || trimmedDomain.includes('@')) {
+                          toast.error('Please enter a valid domain (e.g., company.com)')
+                          return
+                        }
+                        if (allowedDomains.includes(trimmedDomain)) {
+                          toast.error('Domain already added')
+                          return
+                        }
+                        setAllowedDomains(prev => [...prev, trimmedDomain])
+                        toast.success('Domain added to allowed list')
+                      }}
+                      className="mt-1"
+                    />
                     <div className="flex flex-wrap gap-1 mt-2">
                       {allowedDomains.map((domain) => (
                         <span key={domain} className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs flex items-center gap-1">
@@ -624,20 +641,26 @@ export function CreateLinkModal({
               )}
 
               {emailRestrictionType === 'block' && (
-                <div className="space-y-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <div key="block-section" className="space-y-4 p-4 bg-red-50 border border-red-200 rounded-lg">
                   <div>
                     <Label className="text-sm font-medium">Blocked Emails</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Input
-                        placeholder="Enter email address"
-                        value={blockedEmailInput}
-                        onChange={(e) => setBlockedEmailInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addEmail('block')}
-                      />
-                      <Button onClick={() => addEmail('block')} size="sm">
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    <IsolatedInput
+                      placeholder="Enter email address"
+                      onAdd={(email) => {
+                        const trimmedEmail = email.toLowerCase()
+                        if (!trimmedEmail.includes('@')) {
+                          toast.error('Please enter a valid email address')
+                          return
+                        }
+                        if (blockedEmails.includes(trimmedEmail)) {
+                          toast.error('Email already added')
+                          return
+                        }
+                        setBlockedEmails(prev => [...prev, trimmedEmail])
+                        toast.success('Email added to blocked list')
+                      }}
+                      className="mt-1"
+                    />
                     <div className="flex flex-wrap gap-1 mt-2">
                       {blockedEmails.map((email) => (
                         <span key={email} className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs flex items-center gap-1">
@@ -650,17 +673,23 @@ export function CreateLinkModal({
 
                   <div>
                     <Label className="text-sm font-medium">Blocked Domains</Label>
-                    <div className="flex gap-2 mt-1">
-                      <Input
-                        placeholder="Enter domain (e.g., competitor.com)"
-                        value={blockedDomainInput}
-                        onChange={(e) => setBlockedDomainInput(e.target.value)}
-                        onKeyPress={(e) => e.key === 'Enter' && addDomain('block')}
-                      />
-                      <Button onClick={() => addDomain('block')} size="sm">
-                        <Plus className="w-4 h-4" />
-                      </Button>
-                    </div>
+                    <IsolatedInput
+                      placeholder="Enter domain (e.g., competitor.com)"
+                      onAdd={(domain) => {
+                        const trimmedDomain = domain.toLowerCase()
+                        if (!trimmedDomain.includes('.') || trimmedDomain.includes('@')) {
+                          toast.error('Please enter a valid domain (e.g., company.com)')
+                          return
+                        }
+                        if (blockedDomains.includes(trimmedDomain)) {
+                          toast.error('Domain already added')
+                          return
+                        }
+                        setBlockedDomains(prev => [...prev, trimmedDomain])
+                        toast.success('Domain added to blocked list')
+                      }}
+                      className="mt-1"
+                    />
                     <div className="flex flex-wrap gap-1 mt-2">
                       {blockedDomains.map((domain) => (
                         <span key={domain} className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs flex items-center gap-1">
@@ -856,6 +885,38 @@ export function CreateLinkModal({
               </div>
             </CardContent>
           </Card>
+
+          {/* Email Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                Email Settings
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="recipientEmailBasic">Recipient Email (Optional)</Label>
+                <Input
+                  id="recipientEmailBasic"
+                  type="email"
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  placeholder="recipient@example.com"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  If provided, an email will be sent to this address when the link is created.
+                </p>
+              </div>
+              <div className="flex items-center space-x-2">
+                <CustomSwitch
+                  checked={autoSendEmail}
+                  onCheckedChange={setAutoSendEmail}
+                />
+                <Label htmlFor="autoSendEmail">Automatically send email when link is created</Label>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="access" className="space-y-6">
@@ -883,6 +944,9 @@ export function CreateLinkModal({
                         if (checked) {
                           setRequireEmail(false)
                           setEmailRestrictionType('none')
+                        } else {
+                          setRequireEmail(true)
+                          setEmailRestrictionType('none')
                         }
                       }}
                     />
@@ -896,7 +960,12 @@ export function CreateLinkModal({
                     <CustomSwitch
                       checked={!!password}
                       onCheckedChange={(checked) => {
-                        if (!checked) setPassword('')
+                        if (!checked) {
+                          setPassword('')
+                        } else {
+                          // When enabling password protection, set a placeholder
+                          setPassword('password123')
+                        }
                       }}
                     />
                   </div>
@@ -997,7 +1066,14 @@ export function CreateLinkModal({
                 <CustomSwitch
                   checked={!!expiresAt}
                   onCheckedChange={(checked) => {
-                    if (!checked) setExpiresAt('')
+                    if (!checked) {
+                      setExpiresAt('')
+                    } else {
+                      // Set default expiration to 30 days from now
+                      const defaultExpiry = new Date()
+                      defaultExpiry.setDate(defaultExpiry.getDate() + 30)
+                      setExpiresAt(defaultExpiry.toISOString().split('T')[0])
+                    }
                   }}
                 />
               </div>
@@ -1100,6 +1176,33 @@ export function CreateLinkModal({
                   placeholder="Maximum number of views"
                 />
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Enhanced Watermark Settings */}
+          <EnhancedWatermarkSettings
+            config={enhancedWatermarkConfig}
+            onChange={setEnhancedWatermarkConfig}
+            disabled={loading}
+          />
+
+          {/* One-Click NDA Settings */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Shield className="w-4 h-4" />
+                One-Click NDA System
+              </CardTitle>
+              <CardDescription>
+                Require NDA acceptance before document access
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <OneClickNDASettings
+                config={oneClickNDAConfig}
+                onChange={setOneClickNDAConfig}
+                disabled={loading}
+              />
             </CardContent>
           </Card>
         </TabsContent>

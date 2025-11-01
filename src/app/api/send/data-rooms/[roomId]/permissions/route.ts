@@ -17,7 +17,7 @@ export async function GET(
     const resourceId = searchParams.get('resource_id')
 
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -79,9 +79,55 @@ export async function GET(
       )
     }
 
+    // Enhance permissions with group and resource information
+    const enhancedPermissions = await Promise.all(
+      (permissions || []).map(async (permission: any) => {
+        let groupInfo = null
+        let resourceInfo = null
+
+        // Get group information if it's a group permission
+        if (permission.viewer_group_id) {
+          const { data: group } = await supabaseAdmin
+            .from('send_dataroom_viewer_groups')
+            .select('name, color')
+            .eq('id', permission.viewer_group_id)
+            .single()
+
+          if (group) {
+            groupInfo = {
+              group_name: group.name,
+              group_color: group.color
+            }
+          }
+        }
+
+        // Get resource information
+        if (permission.resource_type === 'document') {
+          const { data: document } = await supabaseAdmin
+            .from('send_shared_documents')
+            .select('title')
+            .eq('id', permission.resource_id)
+            .single()
+
+          if (document) {
+            resourceInfo = { resource_name: document.title }
+          }
+        } else if (permission.resource_type === 'folder') {
+          // For folders, we might need to implement folder name lookup
+          resourceInfo = { resource_name: 'Folder' }
+        }
+
+        return {
+          ...permission,
+          ...groupInfo,
+          ...resourceInfo
+        }
+      })
+    )
+
     return NextResponse.json({
       success: true,
-      permissions: permissions || []
+      permissions: enhancedPermissions
     })
 
   } catch (error) {
@@ -101,7 +147,7 @@ export async function POST(
   try {
     const { roomId } = await params
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },
@@ -128,7 +174,7 @@ export async function POST(
     }
 
     const body = await request.json()
-    const { 
+    const {
       permissions // Array of permission objects
     } = body
 
@@ -273,7 +319,7 @@ export async function DELETE(
     const permissionIds = searchParams.get('ids')?.split(',') || []
 
     const { accessToken } = getAuthTokensFromRequest(request)
-    
+
     if (!accessToken) {
       return NextResponse.json(
         { error: 'Authentication required' },

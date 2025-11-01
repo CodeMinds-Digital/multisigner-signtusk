@@ -264,7 +264,7 @@ export default function BrandingPage() {
     <div className="space-y-6 p-6">
       <Breadcrumb
         items={[
-          { label: 'Settings', href: '/send' },
+          { label: 'Settings', href: '/send/settings' },
           { label: 'Branding' }
         ]}
       />

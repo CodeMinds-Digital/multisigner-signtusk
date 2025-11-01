@@ -17,23 +17,34 @@ const supabaseAdmin = createClient(
 /**
  * GET /api/send/analytics/[documentId]
  * Get detailed analytics for a document
+ * Updated to fix authentication issues
  */
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ documentId: string }> }
 ) {
   try {
-    const supabase = createRouteHandlerClient({ cookies })
-    const {
-      data: { user },
-    } = await supabase.auth.getUser()
+    // Use auth tokens from cookies for authentication
+    const { getAuthTokensFromRequest } = await import('@/lib/auth-cookies')
+    const { verifyAccessToken } = await import('@/lib/jwt-utils')
 
-    if (!user) {
+    const tokens = getAuthTokensFromRequest(request)
+    if (!tokens?.accessToken) {
       return NextResponse.json(
-        { success: false, error: 'Unauthorized' },
+        { success: false, error: 'Unauthorized - No access token' },
         { status: 401 }
       )
     }
+
+    const payload = await verifyAccessToken(tokens.accessToken)
+    if (!payload?.userId) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized - Invalid token' },
+        { status: 401 }
+      )
+    }
+
+    const userId = payload.userId
 
     const { documentId } = await params
 
@@ -42,7 +53,7 @@ export async function GET(
       .from('send_shared_documents')
       .select('*')
       .eq('id', documentId)
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .single()
 
     if (!document) {
@@ -52,11 +63,12 @@ export async function GET(
       )
     }
 
-    // Get document links for this document
+    // Get document links for this document with full details
     const { data: links } = await supabaseAdmin
       .from('send_document_links')
-      .select('id')
+      .select('*')
       .eq('document_id', documentId)
+      .order('created_at', { ascending: false })
 
     const linkIds = links?.map(l => l.id) || []
 
@@ -178,6 +190,13 @@ export async function GET(
         title: document.title,
         totalPages: document.page_count
       },
+      links: links?.map(link => ({
+        id: link.id,
+        link_id: link.link_id,
+        title: link.title,
+        created_at: link.created_at,
+        is_active: link.is_active
+      })) || [],
       summary: {
         totalViews,
         uniqueViewers,
