@@ -1157,7 +1157,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                         <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                         {isRefreshing ? 'Refreshing...' : 'Refresh'}
                     </Button>
-                    <div className="relative">
+                    <div className="relative" data-tour="search">
                         <Search className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
                         <input
                             type="text"

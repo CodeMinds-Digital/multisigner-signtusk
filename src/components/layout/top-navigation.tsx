@@ -1,22 +1,24 @@
+/**
+ * @deprecated This component is no longer used in the dashboard layout.
+ * Its functionality (logo, notification bell, user profile) has been moved to ModuleSidebar.
+ * This file is kept for reference and can be safely removed in future cleanup.
+ * See: components/layout/module-sidebar.tsx
+ */
+
 'use client'
 
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { User, Settings } from 'lucide-react'
 import { NotificationBell } from '@/components/ui/notification-bell'
 import { useAuth } from '@/components/providers/secure-auth-provider'
-import { getAllServices, getServiceByRoute, type Service } from '@/config/services'
 import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 
 export function TopNavigation() {
-  const pathname = usePathname()
   const router = useRouter()
   const { user, signOut } = useAuth()
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false)
   const userMenuRef = useRef<HTMLDivElement>(null)
-
-  const allServices = getAllServices()
-  const currentService = getServiceByRoute(pathname)
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -30,10 +32,6 @@ export function TopNavigation() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
-  const handleServiceClick = (service: Service) => {
-    router.push(service.route)
-  }
-
   const handleLogout = async () => {
     await signOut()
   }
@@ -45,7 +43,7 @@ export function TopNavigation() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white shadow-sm">
-      <div className="flex h-14 items-center px-4 gap-4">
+      <div className="flex h-14 items-center px-4 justify-between">
         {/* Logo */}
         <div className="flex items-center gap-2">
           <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
@@ -53,36 +51,8 @@ export function TopNavigation() {
           </span>
         </div>
 
-        {/* Service Tabs */}
-        <nav className="hidden md:flex items-center gap-1 ml-4">
-          {allServices.map((service) => {
-            const Icon = service.icon
-            const isActive = currentService?.id === service.id
-
-            return (
-              <button
-                key={service.id}
-                onClick={() => handleServiceClick(service)}
-                className={`
-                  flex items-center gap-2 px-4 py-2 rounded-lg
-                  transition-all duration-200 font-medium text-sm
-                  ${isActive
-                    ? 'bg-blue-50 text-blue-700 shadow-sm border-b-2'
-                    : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
-                  }
-                `}
-                style={isActive ? { borderBottomColor: service.color } : {}}
-                title={service.description}
-              >
-                <Icon className="w-4 h-4" />
-                <span>{service.displayName}</span>
-              </button>
-            )
-          })}
-        </nav>
-
         {/* Right Side Actions */}
-        <div className="ml-auto flex items-center gap-2">
+        <div className="flex items-center gap-2">
           {/* Notification Bell */}
           <NotificationBell />
 

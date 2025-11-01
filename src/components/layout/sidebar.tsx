@@ -8,6 +8,12 @@ import { useSidebar } from '@/contexts/sidebar-context'
 import { getServiceByRoute, getAllServices } from '@/config/services'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { AppLogo } from '@/components/ui/app-logo'
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip'
 
 export function Sidebar() {
   const pathname = usePathname()
@@ -65,9 +71,15 @@ export function Sidebar() {
 
   return (
     <div
+      data-tour="module-sidebar"
       className={`bg-white border-r border-gray-200 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'
         }`}
     >
+      {/* Header Section with Logo */}
+      <div className="border-b border-gray-200 p-4 flex items-center justify-center">
+        <AppLogo variant={isCollapsed ? 'compact' : 'full'} />
+      </div>
+
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto p-2 pt-4">
         {/* Main Items */}
@@ -76,31 +88,47 @@ export function Sidebar() {
             const Icon = item.icon
             const active = isActive(item.route)
 
+            const linkContent = (
+              <Link
+                href={item.route}
+                className={`relative flex items-center px-3 py-2 rounded-md transition-colors ${active
+                  ? 'text-blue-600 bg-blue-50 font-medium'
+                  : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                title={isCollapsed ? item.label : undefined}
+                aria-label={isCollapsed ? item.label : undefined}
+              >
+                <Icon className="w-5 h-5 flex-shrink-0" />
+                {!isCollapsed && (
+                  <>
+                    <span className="ml-3 truncate">{item.label}</span>
+                    {item.badge && (
+                      <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
+                        {item.badge}
+                      </span>
+                    )}
+                  </>
+                )}
+                {isCollapsed && item.badge && (
+                  <span className="absolute right-1 top-1 w-2 h-2 bg-red-500 rounded-full" />
+                )}
+              </Link>
+            )
+
             return (
               <li key={item.id}>
-                <Link
-                  href={item.route}
-                  className={`flex items-center px-3 py-2 rounded-md transition-colors ${active
-                    ? 'text-blue-600 bg-blue-50 font-medium'
-                    : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  title={isCollapsed ? item.label : undefined}
-                >
-                  <Icon className="w-5 h-5 flex-shrink-0" />
-                  {!isCollapsed && (
-                    <>
-                      <span className="ml-3 truncate">{item.label}</span>
-                      {item.badge && (
-                        <span className="ml-auto bg-red-500 text-white text-xs px-2 py-0.5 rounded-full">
-                          {item.badge}
-                        </span>
-                      )}
-                    </>
-                  )}
-                  {isCollapsed && item.badge && (
-                    <span className="absolute right-1 top-1 w-2 h-2 bg-red-500 rounded-full" />
-                  )}
-                </Link>
+                {isCollapsed ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      {linkContent}
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <p>{item.label}</p>
+                    </TooltipContent>
+                  </Tooltip>
+                ) : (
+                  linkContent
+                )}
               </li>
             )
           })}
@@ -122,22 +150,38 @@ export function Sidebar() {
                 const Icon = item.icon
                 const active = isActive(item.route)
 
+                const linkContent = (
+                  <Link
+                    href={item.route}
+                    prefetch={false}
+                    className={`relative flex items-center px-3 py-2 rounded-md transition-colors ${active
+                      ? 'text-blue-600 bg-blue-50 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    title={isCollapsed ? item.label : undefined}
+                    aria-label={isCollapsed ? item.label : undefined}
+                  >
+                    <Icon className="w-5 h-5 flex-shrink-0" />
+                    {!isCollapsed && (
+                      <span className="ml-3 truncate">{item.label}</span>
+                    )}
+                  </Link>
+                )
+
                 return (
                   <li key={item.id}>
-                    <Link
-                      href={item.route}
-                      prefetch={false}
-                      className={`flex items-center px-3 py-2 rounded-md transition-colors ${active
-                        ? 'text-blue-600 bg-blue-50 font-medium'
-                        : 'text-gray-700 hover:bg-gray-100'
-                        }`}
-                      title={isCollapsed ? item.label : undefined}
-                    >
-                      <Icon className="w-5 h-5 flex-shrink-0" />
-                      {!isCollapsed && (
-                        <span className="ml-3 truncate">{item.label}</span>
-                      )}
-                    </Link>
+                    {isCollapsed ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          {linkContent}
+                        </TooltipTrigger>
+                        <TooltipContent side="right">
+                          <p>{item.label}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : (
+                      linkContent
+                    )}
                   </li>
                 )
               })}

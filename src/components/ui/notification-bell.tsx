@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { Bell, CheckCheck } from 'lucide-react'
+import { Bell, CheckCheck, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -12,17 +12,22 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 
 interface NotificationBellProps {
   className?: string
+  anchorPosition?: 'top' | 'bottom'
 }
 
-export function NotificationBell({ className }: NotificationBellProps) {
+export function NotificationBell({ className, anchorPosition = 'top' }: NotificationBellProps) {
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const buttonRef = useRef<HTMLButtonElement>(null)
+  const closeButtonRef = useRef<HTMLButtonElement>(null)
   const router = useRouter()
   const channelRef = useRef<RealtimeChannel | null>(null)
   const [realtimeEnabled, setRealtimeEnabled] = useState(false)
+  const [isRTL, setIsRTL] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   // Fetch notifications and unread count
   const fetchNotifications = async () => {
@@ -177,6 +182,19 @@ export function NotificationBell({ className }: NotificationBellProps) {
     }
   }
 
+  // Detect RTL and mobile viewport
+  useEffect(() => {
+    setIsRTL(document.documentElement.dir === 'rtl')
+
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 640) // sm breakpoint
+    }
+
+    checkMobile()
+    window.addEventListener('resize', checkMobile)
+    return () => window.removeEventListener('resize', checkMobile)
+  }, [])
+
   // Click outside handler
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -188,6 +206,58 @@ export function NotificationBell({ className }: NotificationBellProps) {
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
+
+  // Escape key handler and focus management
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape' && isOpen) {
+        setIsOpen(false)
+        buttonRef.current?.focus()
+      }
+    }
+
+    if (isOpen) {
+      document.addEventListener('keydown', handleKeyDown)
+      // Focus the close button when panel opens
+      setTimeout(() => {
+        closeButtonRef.current?.focus()
+      }, 0)
+    }
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isOpen])
+
+  // Basic focus trap
+  useEffect(() => {
+    if (!isOpen || !dropdownRef.current) return
+
+    const focusableElements = dropdownRef.current.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )
+    const firstElement = focusableElements[0] as HTMLElement
+    const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement
+
+    function handleTabKey(event: KeyboardEvent) {
+      if (event.key !== 'Tab') return
+
+      if (event.shiftKey) {
+        if (document.activeElement === firstElement) {
+          event.preventDefault()
+          lastElement?.focus()
+        }
+      } else {
+        if (document.activeElement === lastElement) {
+          event.preventDefault()
+          firstElement?.focus()
+        }
+      }
+    }
+
+    document.addEventListener('keydown', handleTabKey)
+    return () => document.removeEventListener('keydown', handleTabKey)
+  }, [isOpen])
 
   // ✅ REALTIME: Setup real-time subscription for notifications
   useEffect(() => {
@@ -337,10 +407,14 @@ export function NotificationBell({ className }: NotificationBellProps) {
   return (
     <div className={`relative ${className}`} ref={dropdownRef}>
       <Button
+        ref={buttonRef}
         variant="ghost"
         size="sm"
         className="relative"
         onClick={() => setIsOpen(!isOpen)}
+        aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ''}`}
+        aria-expanded={isOpen}
+        aria-haspopup="dialog"
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
@@ -354,88 +428,123 @@ export function NotificationBell({ className }: NotificationBellProps) {
       </Button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 opacity-100"
-          style={{ backgroundColor: 'white', opacity: 1 }}
-        >
-          <div className="flex items-center justify-between p-2">
-            <h3 className="px-2 py-1.5 text-sm font-semibold">Notifications</h3>
-            {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleMarkAllRead}
-                className="text-xs"
-              >
-                <CheckCheck className="h-3 w-3 mr-1" />
-                Mark all read
-              </Button>
-            )}
-          </div>
+        <>
+          {/* Mobile: Full-screen overlay */}
+          {isMobile && (
+            <div
+              className="fixed inset-0 bg-black/20 z-40"
+              onClick={() => {
+                setIsOpen(false)
+                buttonRef.current?.focus()
+              }}
+            />
+          )}
 
-          <div className="-mx-1 my-1 h-px bg-gray-200" />
-
-          <ScrollArea className="h-96">
-            {loading ? (
-              <div className="p-4 text-center text-sm text-muted-foreground">
-                Loading notifications...
-              </div>
-            ) : notifications.length === 0 ? (
-              <div className="p-4 text-center text-sm text-muted-foreground">
-                No notifications yet
-              </div>
-            ) : (
-              <div className="space-y-1">
-                {notifications.map((notification) => (
-                  <div
-                    key={notification.id}
-                    className={`p-3 cursor-pointer hover:bg-accent transition-colors ${!notification.is_read ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
-                      }`}
-                    onClick={() => handleNotificationClick(notification)}
+          <div
+            role="dialog"
+            aria-labelledby="notifications-title"
+            className={`bg-white border border-gray-200 shadow-lg z-50 transition-all duration-200 ease-in-out ${isMobile
+              ? 'fixed bottom-0 left-0 right-0 rounded-t-2xl max-h-[80vh]'
+              : `absolute w-80 rounded-lg ${anchorPosition === 'bottom'
+                ? `bottom-full mb-2 ${isRTL ? 'right-0' : 'left-0'}`
+                : `top-full mt-2 ${isRTL ? 'left-0' : 'right-0'}`
+              }`
+              }`}
+            style={{ backgroundColor: 'white', opacity: 1 }}
+          >
+            <div className="flex items-center justify-between p-2 border-b border-gray-100">
+              <h3 id="notifications-title" className="px-2 py-1.5 text-sm font-semibold">Notifications</h3>
+              <div className="flex items-center gap-1">
+                {unreadCount > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleMarkAllRead}
+                    className="text-xs"
                   >
-                    <div className="flex items-start space-x-3">
-                      <span className="text-lg flex-shrink-0">
-                        {getNotificationIcon(notification.type)}
-                      </span>
-                      <div className="flex-1 min-w-0">
-                        <p className={`text-sm font-medium ${!notification.is_read ? 'text-foreground' : 'text-muted-foreground'}`}>
-                          {notification.title}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
-                          {notification.message}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {formatRelativeTime(notification.created_at)}
-                        </p>
-                      </div>
-                      {!notification.is_read && (
-                        <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1" />
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </ScrollArea>
-
-          {notifications.length > 0 && (
-            <>
-              <div className="-mx-1 my-1 h-px bg-gray-200" />
-              <div className="p-2">
+                    <CheckCheck className="h-3 w-3 mr-1" />
+                    Mark all read
+                  </Button>
+                )}
                 <Button
+                  ref={closeButtonRef}
                   variant="ghost"
                   size="sm"
-                  className="w-full text-xs"
                   onClick={() => {
                     setIsOpen(false)
-                    router.push('/notifications')
+                    buttonRef.current?.focus()
                   }}
+                  aria-label="Close notifications"
+                  className="h-8 w-8 p-0"
                 >
-                  View all notifications
+                  <X className="h-4 w-4" />
                 </Button>
               </div>
-            </>
-          )}
-        </div>
+            </div>
+
+            <ScrollArea className="h-96">
+              {loading ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  Loading notifications...
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="p-4 text-center text-sm text-muted-foreground">
+                  No notifications yet
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {notifications.map((notification) => (
+                    <div
+                      key={notification.id}
+                      className={`p-3 cursor-pointer hover:bg-accent transition-colors ${!notification.is_read ? 'bg-blue-50 border-l-2 border-l-blue-500' : ''
+                        }`}
+                      onClick={() => handleNotificationClick(notification)}
+                    >
+                      <div className="flex items-start space-x-3">
+                        <span className="text-lg flex-shrink-0">
+                          {getNotificationIcon(notification.type)}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-sm font-medium ${!notification.is_read ? 'text-foreground' : 'text-muted-foreground'}`}>
+                            {notification.title}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1 line-clamp-2">
+                            {notification.message}
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {formatRelativeTime(notification.created_at)}
+                          </p>
+                        </div>
+                        {!notification.is_read && (
+                          <div className="w-2 h-2 bg-blue-500 rounded-full flex-shrink-0 mt-1" />
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+
+            {notifications.length > 0 && (
+              <>
+                <div className="-mx-1 my-1 h-px bg-gray-200" />
+                <div className="p-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="w-full text-xs"
+                    onClick={() => {
+                      setIsOpen(false)
+                      router.push('/notifications')
+                    }}
+                  >
+                    View all notifications
+                  </Button>
+                </div>
+              </>
+            )}
+          </div>
+        </>
       )}
     </div>
   )

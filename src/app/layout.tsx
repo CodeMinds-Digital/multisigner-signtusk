@@ -5,6 +5,7 @@ import { SecureAuthProvider } from "@/components/providers/secure-auth-provider"
 import { ConsoleFilterProvider } from "@/components/providers/console-filter-provider";
 import { ToastProvider } from "@/components/ui/toast";
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -27,10 +28,12 @@ export default function RootLayout({
         <div id="root">
           <ConsoleFilterProvider>
             <SecureAuthProvider>
-              <ToastProvider>
-                {children}
-                <Toaster />
-              </ToastProvider>
+              <TooltipProvider delayDuration={0}>
+                <ToastProvider>
+                  {children}
+                  <Toaster />
+                </ToastProvider>
+              </TooltipProvider>
             </SecureAuthProvider>
           </ConsoleFilterProvider>
         </div>
