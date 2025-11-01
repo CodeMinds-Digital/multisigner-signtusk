@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Facebook, Twitter, Linkedin, Instagram, Mail, Phone, MapPin } from 'lucide-react'
+import { Twitter, Linkedin, Github, Youtube, Mail, Phone, MapPin } from 'lucide-react'
 
 const footerLinks = {
   product: [
@@ -35,16 +35,21 @@ const footerLinks = {
 }
 
 const socialLinks = [
-  { name: 'Facebook', icon: Facebook, href: 'https://facebook.com/signtusk' },
-  { name: 'Twitter', icon: Twitter, href: 'https://twitter.com/signtusk' },
   { name: 'LinkedIn', icon: Linkedin, href: 'https://linkedin.com/company/signtusk' },
-  { name: 'Instagram', icon: Instagram, href: 'https://instagram.com/signtusk' }
+  { name: 'X (Twitter)', icon: Twitter, href: 'https://twitter.com/signtusk' },
+  { name: 'GitHub', icon: Github, href: 'https://github.com/signtusk' },
+  { name: 'YouTube', icon: Youtube, href: 'https://youtube.com/@signtusk' }
 ]
 
 export function PublicFooter() {
   return (
-    <footer className="bg-gray-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <footer className="bg-gradient-to-br from-gray-900 via-blue-900 to-violet-900 text-white relative overflow-hidden">
+      {/* Background Decoration */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute top-0 left-0 w-96 h-96 bg-blue-500 rounded-full blur-3xl" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-violet-500 rounded-full blur-3xl" />
+      </div>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
         {/* Main Footer Content */}
         <div className="py-16">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-8">
@@ -56,9 +61,8 @@ export function PublicFooter() {
                 </div>
                 <span className="text-xl font-bold">SignTusk</span>
               </div>
-              <p className="text-gray-400 mb-6 leading-relaxed">
-                The most trusted digital signature platform for businesses worldwide.
-                Sign documents securely, legally, and efficiently.
+              <p className="text-blue-100 mb-6 leading-relaxed">
+                Send, track, and sign documents with enterprise-grade security. One unified platform for all your document workflows.
               </p>
 
               {/* Contact Info */}

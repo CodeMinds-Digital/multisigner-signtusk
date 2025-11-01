@@ -2,10 +2,148 @@
 @tailwind components;
 @tailwind utilities;
 
+/**
+ * Custom Utility Classes
+ *
+ * This file contains custom utility classes for glassmorphism effects,
+ * gradient backgrounds, animations, and text effects.
+ *
+ * Note: We use custom utility classes instead of Tailwind plugins for:
+ * - Better control over specific design requirements
+ * - Reduced bundle size
+ * - Easier customization and maintenance
+ */
+
 /* Background pattern for share page layouts */
 .bg-grid-pattern {
     background-image:
         linear-gradient(rgba(0, 0, 0, 0.1) 1px, transparent 1px),
         linear-gradient(90deg, rgba(0, 0, 0, 0.1) 1px, transparent 1px);
     background-size: 20px 20px;
+}
+
+/* Glassmorphism Effects */
+@layer components {
+    .glass-panel {
+        @apply bg-white/10 backdrop-blur-md border border-white/20 shadow-glass;
+    }
+
+    .glass-card {
+        @apply bg-white/10 backdrop-blur-md border border-white/20 shadow-glass rounded-2xl p-6 transition-all duration-300;
+    }
+
+    .glass-card:hover {
+        @apply bg-white/20 shadow-xl transform scale-105;
+    }
+
+    .glass-button {
+        @apply bg-white/10 backdrop-blur-md border border-white/30 hover:bg-white/20 transition-all duration-300;
+    }
+}
+
+/* Gradient Backgrounds */
+@layer utilities {
+    .gradient-mesh {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-size: 200% 200%;
+    }
+
+    .gradient-radial {
+        background: radial-gradient(circle at center, var(--tw-gradient-stops));
+    }
+
+    .gradient-conic {
+        background: conic-gradient(from 180deg at 50% 50%, var(--tw-gradient-stops));
+    }
+
+    .animate-gradient {
+        background-size: 200% 200%;
+        animation: gradient 8s linear infinite;
+    }
+}
+
+/* Animation Utilities */
+@layer utilities {
+    .animate-float {
+        animation: float 3s ease-in-out infinite;
+    }
+
+    .animate-glow {
+        animation: glow 2s ease-in-out infinite;
+    }
+}
+
+/* Scroll Effects */
+@layer utilities {
+    .parallax-slow {
+        transform: translateY(calc(var(--scroll) * 0.5px));
+    }
+
+    .parallax-medium {
+        transform: translateY(calc(var(--scroll) * 1px));
+    }
+
+    .parallax-fast {
+        transform: translateY(calc(var(--scroll) * 2px));
+    }
+
+    .fade-in-on-scroll {
+        opacity: 0;
+        transition: opacity 0.6s ease-out;
+    }
+
+    .fade-in-on-scroll.visible {
+        opacity: 1;
+    }
+}
+
+/* Text Effects */
+@layer utilities {
+    .text-gradient {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+
+    .text-glow {
+        text-shadow: 0 0 20px rgba(59, 130, 246, 0.5);
+    }
+}
+
+/* Smooth Scrolling */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        scroll-behavior: auto !important;
+    }
+
+    /* Disable specific animations */
+    .animate-float,
+    .animate-glow,
+    .animate-gradient,
+    .animate-fadeIn,
+    .animate-slideInUp,
+    .animate-slideInDown,
+    .animate-scaleIn {
+        animation: none !important;
+    }
+
+    /* Reduce blur effects for performance */
+    .backdrop-blur-sm,
+    .backdrop-blur-md,
+    .backdrop-blur-lg,
+    .backdrop-blur-xl {
+        backdrop-filter: none !important;
+    }
 }
