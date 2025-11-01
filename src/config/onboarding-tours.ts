@@ -28,14 +28,14 @@ export const GLOBAL_ONBOARDING_TOUR: TourConfig = {
       disableBeacon: true,
     },
     {
-      target: '[data-tour="primary-sidebar"]',
-      content: 'Your main navigation. Click icons to switch between Sign and Send modules.',
-      title: 'Main Navigation',
+      target: '[data-tour="unified-sidebar"]',
+      content: 'Switch between modules and navigate features from this single sidebar. Click module icons at the top to switch contexts.',
+      title: 'Unified Navigation',
       placement: 'right',
     },
     {
       target: '[data-tour="user-actions"]',
-      content: 'Access notifications and account settings here. Panels open from these icons.',
+      content: 'Access notifications and your account menu here. The collapse button is below your profile.',
       title: 'Notifications & Account',
       placement: 'right',
     },
@@ -44,12 +44,6 @@ export const GLOBAL_ONBOARDING_TOUR: TourConfig = {
       content: 'Use the search bar to quickly find documents, requests, and other items.',
       title: 'Search / Command Bar',
       placement: 'bottom',
-    },
-    {
-      target: '[data-tour="module-sidebar"]',
-      content: 'Navigate within the current module. This sidebar shows module-specific features.',
-      title: 'Module Navigation',
-      placement: 'right',
     },
     {
       target: 'body',

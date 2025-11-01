@@ -1,8 +1,7 @@
 'use client'
 
 import { useAuth } from '@/components/providers/secure-auth-provider'
-import { Sidebar } from '@/components/layout/sidebar'
-import { ModuleSidebar } from '@/components/layout/module-sidebar'
+import { DashNav } from '@/components/layout/dash-nav'
 import { MobileHeader } from '@/components/layout/mobile-header'
 import { SidebarProvider } from '@/contexts/sidebar-context'
 import { useRouter } from 'next/navigation'
@@ -42,17 +41,11 @@ export default function DashboardLayout({
             {/* Mobile Header - visible only on mobile */}
             <MobileHeader />
 
-            {/* Module Sidebar - hidden on mobile */}
-            <ModuleSidebar />
+            {/* Unified DashNav - hidden on mobile */}
+            <DashNav />
 
-            {/* Wrapper for Sidebar and Main Content with left margin */}
-            <div className="flex flex-1 overflow-hidden md:ml-16 pt-14 md:pt-0">
-              {/* Collapsible Sidebar - hidden on mobile */}
-              <div className="hidden md:flex">
-                <Sidebar />
-              </div>
-
-              {/* Page Content */}
+            {/* Main Content */}
+            <div className="flex flex-1 overflow-hidden pt-14 md:pt-0">
               <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6">
                 <ErrorBoundary>
                   {children}
