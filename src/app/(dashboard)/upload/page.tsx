@@ -8,7 +8,7 @@ export default function UploadPage() {
 
   const handleWorkflowComplete = (documentId: string) => {
     // Redirect to sign inbox page after successful workflow completion
-    router.push(`/sign-inbox?success=true&documentId=${documentId}`)
+    router.push(`/sign/inbox?success=true&documentId=${documentId}`)
   }
 
   return (

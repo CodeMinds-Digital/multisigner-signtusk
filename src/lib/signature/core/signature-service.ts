@@ -374,10 +374,10 @@ export class SignatureService {
         throw createInternalError('Failed to cancel signature request', error)
       }
 
-      // Update all pending signers
+      // Update all pending signers to CANCELLED status (Comment 8)
       await this.client
         .from('signing_request_signers')
-        .update({ status: SignerStatus.EXPIRED })
+        .update({ status: SignerStatus.CANCELLED })
         .eq('signing_request_id', requestId)
         .in('status', [SignerStatus.PENDING, SignerStatus.SENT, SignerStatus.VIEWED])
 

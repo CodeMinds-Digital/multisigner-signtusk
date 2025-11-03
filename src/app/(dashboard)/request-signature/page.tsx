@@ -12,7 +12,7 @@ export default function RequestSignaturePage() {
 
   const handleRequestSent = (requestId: string) => {
     // Redirect to sign inbox page with success message
-    router.push(`/sign-inbox?success=signature-request&requestId=${requestId}`)
+    router.push(`/sign/inbox?success=signature-request&requestId=${requestId}`)
   }
 
   return (

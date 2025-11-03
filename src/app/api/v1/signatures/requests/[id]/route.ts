@@ -33,7 +33,7 @@ export async function GET(
     if (!result.success) {
       return NextResponse.json(
         { error: result.error },
-        { status: 500 }
+        { status: result.error?.statusCode || 500 }
       )
     }
 
@@ -88,7 +88,7 @@ export async function PATCH(
     if (!result.success) {
       return NextResponse.json(
         { error: result.error },
-        { status: 500 }
+        { status: result.error?.statusCode || 500 }
       )
     }
 
@@ -127,7 +127,7 @@ export async function DELETE(
     if (!result.success) {
       return NextResponse.json(
         { error: result.error },
-        { status: 500 }
+        { status: result.error?.statusCode || 500 }
       )
     }
 

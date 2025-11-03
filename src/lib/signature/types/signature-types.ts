@@ -22,6 +22,7 @@ export enum SignerStatus {
   SIGNED = 'signed',
   DECLINED = 'declined',
   EXPIRED = 'expired',
+  CANCELLED = 'cancelled',
 }
 
 export enum SigningOrder {
@@ -133,12 +134,19 @@ export interface SignatureAuditLog {
 // Result Types
 // ============================================================================
 
+export interface ErrorRecoverySuggestion {
+  action: string
+  description: string
+}
+
 export interface ErrorDetails {
   code: string
   message: string
+  statusCode: number
   field?: string
   details?: Record<string, unknown>
   timestamp: string
+  recoverySuggestions?: ErrorRecoverySuggestion[]
 }
 
 export interface Result<T> {

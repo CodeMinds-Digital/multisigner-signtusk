@@ -119,7 +119,7 @@ export async function POST(
     if (!result.success) {
       return NextResponse.json(
         { error: result.error },
-        { status: 500 }
+        { status: result.error?.statusCode || 500 }
       )
     }
 

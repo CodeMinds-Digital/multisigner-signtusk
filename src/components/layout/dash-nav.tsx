@@ -54,6 +54,13 @@ export function DashNav() {
   const isActive = (path: string) => {
     // Exact match first
     if (pathname === path) return true
+
+    // Special case: if path equals the service root route (e.g., /sign for Dashboard),
+    // only return true on exact match to avoid highlighting Dashboard when on /sign/inbox
+    if (path === currentService?.route) {
+      return false // Already checked exact match above
+    }
+
     // Prefix match for nested routes (e.g., /sign/settings/documents matches /sign/settings/*)
     return pathname.startsWith(path + '/')
   }
@@ -165,8 +172,8 @@ export function DashNav() {
               onClick={() => handleModuleClick(service.id, service.route)}
               aria-label={service.displayName}
               className={`w-full flex items-center px-4 py-2.5 transition-all duration-200 relative ${isActiveModule
-                  ? 'bg-opacity-10 border-l-4'
-                  : 'hover:bg-gray-50 border-l-4 border-transparent'
+                ? 'bg-opacity-10 border-l-4'
+                : 'hover:bg-gray-50 border-l-4 border-transparent'
                 } ${isCollapsed ? 'justify-center' : ''}`}
               style={{
                 backgroundColor: isActiveModule ? `${service.color}15` : undefined,
@@ -227,8 +234,8 @@ export function DashNav() {
               <Link
                 href={item.route}
                 className={`relative flex items-center px-3 py-2 rounded-md transition-colors ${active
-                    ? 'text-blue-600 bg-blue-50 font-medium'
-                    : 'text-gray-700 hover:bg-gray-100'
+                  ? 'text-blue-600 bg-blue-50 font-medium'
+                  : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 title={isCollapsed ? item.label : undefined}
                 aria-label={isCollapsed ? item.label : undefined}
@@ -290,8 +297,8 @@ export function DashNav() {
                     href={item.route}
                     prefetch={false}
                     className={`relative flex items-center px-3 py-2 rounded-md transition-colors ${active
-                        ? 'text-blue-600 bg-blue-50 font-medium'
-                        : 'text-gray-700 hover:bg-gray-100'
+                      ? 'text-blue-600 bg-blue-50 font-medium'
+                      : 'text-gray-700 hover:bg-gray-100'
                       }`}
                     title={isCollapsed ? item.label : undefined}
                     aria-label={isCollapsed ? item.label : undefined}
