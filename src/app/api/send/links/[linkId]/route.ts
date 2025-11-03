@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { SendPasswordService } from '@/lib/send-password-service'
 import { SendEmailVerification } from '@/lib/send-email-verification'
+import { AccessControlEnforcer } from '@/lib/access-control-enforcer'
+import { IPGeolocationService } from '@/lib/ip-geolocation-service'
+import { Ratelimit } from '@upstash/ratelimit'
+import { redis } from '@/lib/upstash-config'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -14,9 +18,18 @@ const supabaseAdmin = createClient(
   }
 )
 
+// Rate limiter for password verification (5 attempts per 15 minutes)
+const passwordRateLimiter = new Ratelimit({
+  redis,
+  limiter: Ratelimit.slidingWindow(5, '15 m'),
+  analytics: true,
+  prefix: 'rl:password',
+})
+
 /**
  * GET /api/send/links/[linkId]
  * Verify access to a share link and return document details
+ * Note: Password verification moved to POST /verify-password
  */
 export async function GET(
   request: NextRequest,
@@ -25,10 +38,9 @@ export async function GET(
   try {
     const { linkId } = await params
     const { searchParams } = new URL(request.url)
-    const password = searchParams.get('password')
     const email = searchParams.get('email')
 
-    console.log('🔍 GET request for link:', { linkId, hasPassword: !!password, hasEmail: !!email })
+    console.log('🔍 GET request for link:', { linkId, hasEmail: !!email })
 
     // Fetch link details with document info
     const { data: link, error: linkError } = await supabaseAdmin
@@ -71,27 +83,17 @@ export async function GET(
       )
     }
 
-    // Check password protection
+    // Check password protection (password must be verified via POST /verify-password)
     if (link.password_hash) {
-      if (!password) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Password required',
-            requiresPassword: true
-          },
-          { status: 401 }
-        )
-      }
-
-      // Verify password using bcrypt
-      const isValid = await SendPasswordService.verifyPassword(password, link.password_hash)
-      if (!isValid) {
-        return NextResponse.json(
-          { success: false, error: 'Incorrect password' },
-          { status: 401 }
-        )
-      }
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Password required',
+          requiresPassword: true,
+          errorCode: 'PASSWORD_REQUIRED'
+        },
+        { status: 401 }
+      )
     }
 
     // Check email verification requirement
@@ -138,7 +140,8 @@ export async function GET(
           {
             success: false,
             error: 'Email required for NDA',
-            requiresEmail: true
+            requiresEmail: true,
+            errorCode: 'EMAIL_REQUIRED'
           },
           { status: 401 }
         )
@@ -158,11 +161,45 @@ export async function GET(
             success: false,
             error: 'NDA acceptance required',
             requiresNda: true,
+            errorCode: 'NDA_REQUIRED',
             ndaText: 'By accessing this document, you agree to keep all information confidential and not share it with third parties.'
           },
           { status: 401 }
         )
       }
+    }
+
+    // Enforce access controls (email, domain, IP, country)
+    const forwarded = request.headers.get('x-forwarded-for')
+    const realIP = request.headers.get('x-real-ip')
+    const cfConnectingIP = request.headers.get('cf-connecting-ip')
+    let ipAddress = cfConnectingIP || realIP || forwarded?.split(',')[0] || undefined
+    ipAddress = ipAddress?.trim()
+
+    // Get geolocation for country-based controls
+    let country: string | undefined
+    if (ipAddress) {
+      const location = await IPGeolocationService.getCachedLocation(ipAddress)
+      country = location?.countryCode
+    }
+
+    // Check access controls
+    const accessCheck = await AccessControlEnforcer.checkAccess(
+      link.id,
+      email || undefined,
+      ipAddress,
+      country
+    )
+
+    if (!accessCheck.allowed) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: accessCheck.reason || 'Access denied',
+          errorCode: accessCheck.errorCode || 'ACCESS_DENIED'
+        },
+        { status: 403 }
+      )
     }
 
     // Clean up filename for display (remove storage prefix)
@@ -180,11 +217,8 @@ export async function GET(
         linkId: link.link_id,
         name: link.title,
         allowDownload: link.allow_download,
-        allowPrinting: true, // Default value since field doesn't exist in schema
-        enableWatermark: false, // Default value since field doesn't exist in schema
-        watermarkText: null, // Default value since field doesn't exist in schema
-        enhancedWatermarkConfig: null, // Default value since field doesn't exist in schema
-        viewCount: link.current_views,
+        // Use consistent view count field from schema
+        viewCount: link.view_count || 0,
         expiresAt: link.expires_at
       },
       document: {
@@ -203,8 +237,8 @@ export async function GET(
 }
 
 /**
- * POST /api/send/links/[linkId]/verify-email
- * Send email verification code
+ * POST /api/send/links/[linkId]
+ * Handle link actions: verify-password, send-verification, verify-code, accept-nda
  */
 export async function POST(
   request: NextRequest,
@@ -213,9 +247,108 @@ export async function POST(
   try {
     const { linkId } = await params
     const body = await request.json()
-    const { email, action } = body
+    const { email, action, password } = body
 
-    console.log('📧 Email verification POST request:', { linkId, email, action })
+    console.log('📧 Link action POST request:', { linkId, email, action })
+
+    // Handle password verification
+    if (action === 'verify-password') {
+      if (!password) {
+        return NextResponse.json(
+          { success: false, error: 'Password is required', errorCode: 'PASSWORD_REQUIRED' },
+          { status: 400 }
+        )
+      }
+
+      // Get IP address for rate limiting
+      const forwarded = request.headers.get('x-forwarded-for')
+      const realIP = request.headers.get('x-real-ip')
+      const cfConnectingIP = request.headers.get('cf-connecting-ip')
+      let ipAddress = cfConnectingIP || realIP || forwarded?.split(',')[0] || '127.0.0.1'
+      ipAddress = ipAddress.trim()
+
+      // Apply rate limiting (5 attempts per 15 minutes per IP/linkId)
+      const rateLimitKey = `${ipAddress}:${linkId}`
+      const { success: rateLimitOk, remaining } = await passwordRateLimiter.limit(rateLimitKey)
+
+      if (!rateLimitOk) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Too many password attempts. Please try again later.',
+            errorCode: 'RATE_LIMITED',
+            retryAfter: 900 // 15 minutes in seconds
+          },
+          { status: 429 }
+        )
+      }
+
+      // Get link details
+      const { data: link, error: linkError } = await supabaseAdmin
+        .from('send_document_links')
+        .select('id, password_hash')
+        .eq('link_id', linkId)
+        .single()
+
+      if (linkError || !link) {
+        return NextResponse.json(
+          { success: false, error: 'Link not found', errorCode: 'LINK_NOT_FOUND' },
+          { status: 404 }
+        )
+      }
+
+      if (!link.password_hash) {
+        return NextResponse.json(
+          { success: false, error: 'Link is not password protected', errorCode: 'NO_PASSWORD' },
+          { status: 400 }
+        )
+      }
+
+      // Verify password
+      const isValid = await SendPasswordService.verifyPassword(password, link.password_hash)
+
+      if (!isValid) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: 'Incorrect password',
+            errorCode: 'INVALID_PASSWORD',
+            attemptsRemaining: remaining
+          },
+          { status: 401 }
+        )
+      }
+
+      // Get geolocation for access control checks
+      let country: string | undefined
+      const location = await IPGeolocationService.getCachedLocation(ipAddress)
+      country = location?.countryCode
+
+      // Enforce access controls before granting password access
+      const accessCheck = await AccessControlEnforcer.checkAccess(
+        link.id,
+        email || undefined,
+        ipAddress,
+        country
+      )
+
+      if (!accessCheck.allowed) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: accessCheck.reason || 'Access denied',
+            errorCode: accessCheck.errorCode || 'ACCESS_DENIED'
+          },
+          { status: 403 }
+        )
+      }
+
+      // Password verified and access granted
+      return NextResponse.json({
+        success: true,
+        message: 'Password verified successfully'
+      })
+    }
 
     if (action === 'send-verification') {
       // Get link details for document title

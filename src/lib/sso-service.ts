@@ -1,11 +1,27 @@
 import { createClient } from '@supabase/supabase-js'
 
 import crypto from 'crypto'
+import * as samlify from 'samlify'
+import { createClient as createRedisClient } from 'redis'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+// Redis client for replay protection
+let redisClient: ReturnType<typeof createRedisClient> | null = null
+
+async function getRedisClient() {
+  if (!redisClient && process.env.UPSTASH_REDIS_REST_URL) {
+    redisClient = createRedisClient({
+      url: process.env.UPSTASH_REDIS_REST_URL,
+      password: process.env.UPSTASH_REDIS_REST_TOKEN
+    })
+    await redisClient.connect()
+  }
+  return redisClient
+}
 
 export interface SSOProvider {
   id: string
@@ -139,6 +155,38 @@ export class SSOService {
   }
 
   /**
+   * Get SSO provider by slug
+   */
+  static async getProviderBySlug(
+    slug: string,
+    organizationId?: string | null
+  ): Promise<SSOProvider | null> {
+    try {
+      let query = supabase
+        .from('sso_providers')
+        .select('*')
+        .eq('name', slug)
+        .eq('active', true)
+
+      if (organizationId) {
+        query = query.eq('organization_id', organizationId)
+      }
+
+      const { data, error } = await query.single()
+
+      if (error) {
+        console.error('Error fetching SSO provider by slug:', error)
+        return null
+      }
+
+      return data
+    } catch (error) {
+      console.error('Error fetching SSO provider by slug:', error)
+      return null
+    }
+  }
+
+  /**
    * Generate OAuth authorization URL
    */
   static generateOAuthURL(provider: SSOProvider, state?: string): string {
@@ -240,54 +288,173 @@ export class SSOService {
   }
 
   /**
-   * Generate SAML authentication request
+   * Initialize SAML Service Provider
    */
-  static generateSAMLRequest(provider: SSOProvider): string {
+  static initializeSAMLServiceProvider(): samlify.ServiceProviderInstance {
+    const spConfig = {
+      entityID: process.env.SAML_SP_ENTITY_ID || `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/sso/saml/metadata`,
+      assertionConsumerService: [
+        {
+          Binding: samlify.Constants.namespace.binding.post,
+          Location: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/sso/saml/acs`
+        }
+      ],
+      singleLogoutService: [
+        {
+          Binding: samlify.Constants.namespace.binding.redirect,
+          Location: `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/sso/saml/slo`
+        }
+      ],
+      privateKey: process.env.SAML_SP_PRIVATE_KEY,
+      privateKeyPass: process.env.SAML_SP_PRIVATE_KEY_PASS,
+      isAssertionEncrypted: false,
+      wantMessageSigned: true
+    }
+
+    return samlify.ServiceProvider(spConfig)
+  }
+
+  /**
+   * Initialize SAML Identity Provider from config
+   */
+  static initializeSAMLIdentityProvider(provider: SSOProvider): samlify.IdentityProviderInstance {
     if (provider.type !== 'saml') {
       throw new Error('Provider is not SAML')
     }
 
-    const requestId = crypto.randomUUID()
-    const timestamp = new Date().toISOString()
+    const idpConfig = {
+      entityID: provider.config.entity_id!,
+      singleSignOnService: [
+        {
+          Binding: samlify.Constants.namespace.binding.redirect,
+          Location: provider.config.sso_url!
+        }
+      ],
+      singleLogoutService: [
+        {
+          Binding: samlify.Constants.namespace.binding.redirect,
+          Location: provider.config.sso_url!.replace('/sso', '/slo')
+        }
+      ],
+      signingCert: provider.config.certificate,
+      wantAuthnRequestsSigned: true
+    }
 
-    const samlRequest = `
-      <samlp:AuthnRequest
-        xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
-        xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion"
-        ID="${requestId}"
-        Version="2.0"
-        IssueInstant="${timestamp}"
-        Destination="${provider.config.sso_url}"
-        AssertionConsumerServiceURL="${provider.config.redirect_uri}">
-        <saml:Issuer>${provider.config.entity_id}</saml:Issuer>
-        <samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress" AllowCreate="true"/>
-      </samlp:AuthnRequest>
-    `.trim()
-
-    // Base64 encode the request
-    return Buffer.from(samlRequest).toString('base64')
+    return samlify.IdentityProvider(idpConfig)
   }
 
   /**
-   * Handle SAML response
+   * Generate SAML authentication request
+   */
+  static async generateSAMLRequest(provider: SSOProvider): Promise<{ url: string; id: string }> {
+    if (provider.type !== 'saml') {
+      throw new Error('Provider is not SAML')
+    }
+
+    const sp = this.initializeSAMLServiceProvider()
+    const idp = this.initializeSAMLIdentityProvider(provider)
+
+    const { context } = sp.createLoginRequest(idp, 'redirect')
+
+    // Store request ID for replay protection
+    const requestId = context.id
+    const redis = await getRedisClient()
+    if (redis) {
+      await redis.setEx(`saml:request:${requestId}`, 600, 'pending') // 10 min expiry
+    }
+
+    return {
+      url: context,
+      id: requestId
+    }
+  }
+
+  /**
+   * Handle SAML response with signature validation and replay protection
    */
   static async handleSAMLResponse(
     providerId: string,
-    samlResponse: string
-  ): Promise<{ user: any; session: SSOSession } | null> {
+    samlResponse: string,
+    relayState?: string
+  ): Promise<{
+    success: boolean;
+    user?: any;
+    session?: SSOSession;
+    error?: string;
+    errorCode?: string;
+  }> {
     try {
       const provider = await this.getProvider(providerId)
       if (!provider) {
-        throw new Error('Provider not found')
+        return { success: false, error: 'Provider not found', errorCode: 'SAML_CONFIG_MISSING' }
       }
 
-      // Decode and parse SAML response
-      const decodedResponse = Buffer.from(samlResponse, 'base64').toString('utf-8')
+      if (provider.type !== 'saml') {
+        return { success: false, error: 'Provider is not SAML', errorCode: 'SAML_CONFIG_MISSING' }
+      }
 
-      // In a production environment, you would use a proper SAML library
-      // to validate the signature and parse the response
-      // For now, we'll simulate the parsing
-      const userData = this.parseSAMLResponse(decodedResponse)
+      const sp = this.initializeSAMLServiceProvider()
+      const idp = this.initializeSAMLIdentityProvider(provider)
+
+      // Parse and validate SAML response
+      const { extract } = await sp.parseLoginResponse(idp, 'post', {
+        body: { SAMLResponse: samlResponse }
+      })
+
+      // Validate signature
+      if (!extract.signature || !extract.signature.verified) {
+        await this.logSSOAudit(provider.id, null, 'saml_login_failed', {
+          error: 'Invalid signature',
+          errorCode: 'SAML_INVALID_SIGNATURE'
+        })
+        return { success: false, error: 'Invalid SAML signature', errorCode: 'SAML_INVALID_SIGNATURE' }
+      }
+
+      // Check assertion expiration
+      const conditions = extract.conditions
+      if (conditions) {
+        const now = new Date()
+        if (conditions.notBefore && new Date(conditions.notBefore) > now) {
+          return { success: false, error: 'Assertion not yet valid', errorCode: 'SAML_ASSERTION_EXPIRED' }
+        }
+        if (conditions.notOnOrAfter && new Date(conditions.notOnOrAfter) <= now) {
+          return { success: false, error: 'Assertion expired', errorCode: 'SAML_ASSERTION_EXPIRED' }
+        }
+      }
+
+      // Validate audience
+      const audience = extract.audience
+      const expectedAudience = process.env.SAML_SP_ENTITY_ID || `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/sso/saml/metadata`
+      if (audience && audience !== expectedAudience) {
+        return { success: false, error: 'Audience mismatch', errorCode: 'SAML_AUDIENCE_MISMATCH' }
+      }
+
+      // Replay protection - check if assertion ID has been used
+      const assertionId = extract.assertionId || extract.response?.id
+      if (assertionId) {
+        const redis = await getRedisClient()
+        if (redis) {
+          const exists = await redis.get(`saml:assertion:${assertionId}`)
+          if (exists) {
+            await this.logSSOAudit(provider.id, null, 'saml_replay_detected', {
+              assertionId,
+              errorCode: 'SAML_REPLAY_DETECTED'
+            })
+            return { success: false, error: 'Assertion replay detected', errorCode: 'SAML_REPLAY_DETECTED' }
+          }
+          // Store assertion ID for 24 hours
+          await redis.setEx(`saml:assertion:${assertionId}`, 86400, 'used')
+        }
+      }
+
+      // Extract user attributes
+      const attributes = extract.attributes || {}
+      const userData = {
+        email: attributes.email || attributes['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress'],
+        firstName: attributes.firstName || attributes.givenName || attributes['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname'],
+        lastName: attributes.lastName || attributes.surname || attributes['http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname'],
+        nameId: extract.nameID
+      }
 
       // Map user attributes
       const mappedUser = this.mapUserAttributes(userData, provider.config.attribute_mapping)
@@ -296,7 +463,7 @@ export class SSOService {
       const user = await this.createOrUpdateUser(mappedUser, provider.id, userData.nameId)
 
       if (!user) {
-        throw new Error('Failed to create or update user')
+        return { success: false, error: 'Failed to create or update user', errorCode: 'USER_CREATE_FAILED' }
       }
 
       // Create SSO session
@@ -304,13 +471,45 @@ export class SSOService {
         provider.id,
         user.id,
         userData.nameId,
-        { saml_response: samlResponse }
+        { saml_response: samlResponse, assertion_id: assertionId }
       )
 
-      return { user, session }
-    } catch (error) {
+      // Log successful authentication
+      await this.logSSOAudit(provider.id, user.id, 'saml_login_success', {
+        nameId: userData.nameId,
+        email: userData.email
+      })
+
+      return { success: true, user, session }
+    } catch (error: any) {
       console.error('Error handling SAML response:', error)
-      return null
+      await this.logSSOAudit(providerId, null, 'saml_login_error', {
+        error: error.message,
+        errorCode: 'SAML_PARSE_ERROR'
+      })
+      return { success: false, error: error.message || 'Failed to process SAML response', errorCode: 'SAML_PARSE_ERROR' }
+    }
+  }
+
+  /**
+   * Log SSO audit event
+   */
+  static async logSSOAudit(
+    providerId: string,
+    userId: string | null,
+    event: string,
+    metadata: any
+  ): Promise<void> {
+    try {
+      await supabase.from('sso_audit_logs').insert({
+        provider_id: providerId,
+        user_id: userId,
+        event,
+        metadata,
+        created_at: new Date().toISOString()
+      })
+    } catch (error) {
+      console.error('Failed to log SSO audit:', error)
     }
   }
 

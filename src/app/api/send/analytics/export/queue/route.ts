@@ -1,165 +1,251 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { supabaseAdmin } from '@/lib/supabase-admin'
-import { AdvancedAnalyticsExport, ExportJob } from '@/lib/advanced-analytics-export'
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
+import { cookies } from 'next/headers'
+import { createClient } from '@supabase/supabase-js'
+import { Client } from '@upstash/qstash'
 
-export async function POST(request: NextRequest) {
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
+)
+
+const qstashClient = process.env.QSTASH_TOKEN
+  ? new Client({ token: process.env.QSTASH_TOKEN })
+  : null
+
+/**
+ * GET /api/send/analytics/export/queue
+ * Get export job history for a document
+ */
+export async function GET(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { job, userId } = body
+    const supabase = createRouteHandlerClient({ cookies })
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-    if (!job || !userId) {
+    if (!user) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { success: false, error: 'Unauthorized', errorCode: 'UNAUTHORIZED' },
+        { status: 401 }
+      )
+    }
+
+    const { searchParams } = new URL(request.url)
+    const documentId = searchParams.get('documentId')
+    const limit = parseInt(searchParams.get('limit') || '10')
+
+    if (!documentId) {
+      return NextResponse.json(
+        { success: false, error: 'Document ID required', errorCode: 'MISSING_DOCUMENT_ID' },
         { status: 400 }
       )
     }
 
-    // Store the export job in the database
-    const { error: insertError } = await supabaseAdmin
-      .from('send_export_jobs')
-      .insert({
-        id: job.id,
-        document_id: job.documentId,
-        user_id: userId,
-        config: job.config,
-        status: job.status,
-        progress: job.progress,
-        created_at: job.createdAt,
-        expires_at: job.expiresAt
-      })
+    // Fetch jobs for this document and user
+    const { data: jobs, error } = await supabaseAdmin
+      .from('send_analytics_export_history')
+      .select('*')
+      .eq('document_id', documentId)
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(limit)
 
-    if (insertError) {
-      console.error('Failed to store export job:', insertError)
+    if (error) {
+      console.error('Failed to fetch jobs:', error)
       return NextResponse.json(
-        { error: 'Failed to queue export job' },
+        { success: false, error: 'Failed to fetch jobs', errorCode: 'FETCH_FAILED' },
         { status: 500 }
       )
     }
 
-    // In a real implementation, this would queue the job for background processing
-    // For now, we'll simulate processing by updating the job status
-    setTimeout(async () => {
-      try {
-        // Simulate processing time
-        await new Promise(resolve => setTimeout(resolve, 5000))
-
-        // Generate the export data
-        let downloadUrl: string | undefined
-        let error: string | undefined
-
-        try {
-          switch (job.config.format) {
-            case 'csv':
-              const csvData = await AdvancedAnalyticsExport.generateCSVExport(
-                job.documentId,
-                job.config
-              )
-              downloadUrl = await storeExportFile(job.id, csvData, 'text/csv', 'csv')
-              break
-            
-            case 'excel':
-              const excelData = await AdvancedAnalyticsExport.generateExcelExport(
-                job.documentId,
-                job.config
-              )
-              downloadUrl = await storeExportFile(job.id, excelData, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx')
-              break
-            
-            case 'pdf':
-              const pdfData = await AdvancedAnalyticsExport.generatePDFExport(
-                job.documentId,
-                job.config
-              )
-              downloadUrl = await storeExportFile(job.id, pdfData, 'text/html', 'html')
-              break
-            
-            case 'json':
-              const jsonData = await AdvancedAnalyticsExport.generateJSONExport(
-                job.documentId,
-                job.config
-              )
-              downloadUrl = await storeExportFile(job.id, jsonData, 'application/json', 'json')
-              break
-            
-            default:
-              throw new Error(`Unsupported format: ${job.config.format}`)
-          }
-        } catch (exportError: any) {
-          error = exportError.message || 'Export generation failed'
-        }
-
-        // Update job status
-        await supabaseAdmin
-          .from('send_export_jobs')
-          .update({
-            status: error ? 'failed' : 'completed',
-            progress: 100,
-            download_url: downloadUrl,
-            error: error,
-            completed_at: new Date().toISOString()
-          })
-          .eq('id', job.id)
-
-      } catch (processingError) {
-        console.error('Export processing error:', processingError)
-        
-        // Mark job as failed
-        await supabaseAdmin
-          .from('send_export_jobs')
-          .update({
-            status: 'failed',
-            error: 'Processing failed',
-            completed_at: new Date().toISOString()
-          })
-          .eq('id', job.id)
-      }
-    }, 1000) // Start processing after 1 second
-
     return NextResponse.json({
       success: true,
-      jobId: job.id,
-      message: 'Export job queued successfully'
+      jobs: jobs || []
     })
-
   } catch (error: any) {
-    console.error('Export queue error:', error)
+    console.error('Job history error:', error)
     return NextResponse.json(
-      { error: 'Failed to queue export job' },
+      { success: false, error: 'Failed to fetch job history', errorCode: 'INTERNAL_ERROR' },
       { status: 500 }
     )
   }
 }
 
 /**
- * Store export file in Supabase storage
+ * POST /api/send/analytics/export/queue
+ * Queue a new export job
  */
-async function storeExportFile(
-  jobId: string,
-  data: string,
-  contentType: string,
-  extension: string
-): Promise<string> {
-  const fileName = `exports/${jobId}.${extension}`
-  
-  // Convert data to blob
-  const blob = new Blob([data], { type: contentType })
-  
-  // Upload to Supabase storage
-  const { data: uploadData, error } = await supabaseAdmin.storage
-    .from('send-exports')
-    .upload(fileName, blob, {
-      contentType,
-      upsert: true
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = createRouteHandlerClient({ cookies })
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized', errorCode: 'UNAUTHORIZED' },
+        { status: 401 }
+      )
+    }
+
+    const body = await request.json()
+    const {
+      documentId,
+      linkId,
+      format,
+      includeVisitors,
+      includeEvents,
+      includePageStats,
+      scheduledFor
+    } = body
+
+    if (!documentId || !format) {
+      return NextResponse.json(
+        { success: false, error: 'Missing required fields', errorCode: 'MISSING_FIELDS' },
+        { status: 400 }
+      )
+    }
+
+    // Validate format
+    if (!['csv', 'excel', 'pdf', 'json'].includes(format)) {
+      return NextResponse.json(
+        { success: false, error: 'Invalid format', errorCode: 'INVALID_FORMAT' },
+        { status: 400 }
+      )
+    }
+
+    // Create job record
+    const jobId = crypto.randomUUID()
+    const { error: insertError } = await supabaseAdmin
+      .from('send_analytics_export_history')
+      .insert({
+        id: jobId,
+        document_id: documentId,
+        link_id: linkId,
+        user_id: user.id,
+        format,
+        status: scheduledFor ? 'scheduled' : 'pending',
+        scheduled_for: scheduledFor,
+        created_at: new Date().toISOString()
+      })
+
+    if (insertError) {
+      console.error('Failed to create job:', insertError)
+      return NextResponse.json(
+        { success: false, error: 'Failed to create job', errorCode: 'CREATE_FAILED' },
+        { status: 500 }
+      )
+    }
+
+    // Queue job with QStash or fallback to immediate processing
+    const workerUrl = `${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/send/analytics/export/worker`
+
+    if (qstashClient && !scheduledFor) {
+      // Use QStash for background processing
+      try {
+        await qstashClient.publishJSON({
+          url: workerUrl,
+          body: {
+            jobId,
+            documentId,
+            linkId,
+            format,
+            includeVisitors,
+            includeEvents,
+            includePageStats,
+            userId: user.id
+          }
+        })
+
+        console.log(`✅ Job ${jobId} queued with QStash`)
+      } catch (qstashError) {
+        console.error('QStash error, falling back to direct processing:', qstashError)
+        // Fallback: trigger worker directly (non-blocking)
+        fetch(workerUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jobId,
+            documentId,
+            linkId,
+            format,
+            includeVisitors,
+            includeEvents,
+            includePageStats,
+            userId: user.id
+          })
+        }).catch(err => console.error('Worker trigger error:', err))
+      }
+    } else if (scheduledFor) {
+      // Schedule for later with QStash
+      if (qstashClient) {
+        try {
+          const scheduleTime = Math.floor(new Date(scheduledFor).getTime() / 1000)
+          await qstashClient.publishJSON({
+            url: workerUrl,
+            body: {
+              jobId,
+              documentId,
+              linkId,
+              format,
+              includeVisitors,
+              includeEvents,
+              includePageStats,
+              userId: user.id
+            },
+            notBefore: scheduleTime
+          })
+
+          console.log(`✅ Job ${jobId} scheduled for ${scheduledFor}`)
+        } catch (qstashError) {
+          console.error('QStash scheduling error:', qstashError)
+          return NextResponse.json(
+            { success: false, error: 'Failed to schedule job', errorCode: 'SCHEDULE_FAILED' },
+            { status: 500 }
+          )
+        }
+      } else {
+        return NextResponse.json(
+          { success: false, error: 'Scheduling not available', errorCode: 'QSTASH_NOT_CONFIGURED' },
+          { status: 503 }
+        )
+      }
+    } else {
+      // No QStash, trigger worker directly
+      fetch(workerUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jobId,
+          documentId,
+          linkId,
+          format,
+          includeVisitors,
+          includeEvents,
+          includePageStats,
+          userId: user.id
+        })
+      }).catch(err => console.error('Worker trigger error:', err))
+    }
+
+    return NextResponse.json({
+      success: true,
+      jobId,
+      message: 'Export job queued successfully'
     })
-
-  if (error) {
-    throw new Error(`Failed to store export file: ${error.message}`)
+  } catch (error: any) {
+    console.error('Export queue error:', error)
+    return NextResponse.json(
+      { success: false, error: 'Failed to queue export job', errorCode: 'INTERNAL_ERROR' },
+      { status: 500 }
+    )
   }
-
-  // Get public URL
-  const { data: urlData } = supabaseAdmin.storage
-    .from('send-exports')
-    .getPublicUrl(fileName)
-
-  return urlData.publicUrl
 }
