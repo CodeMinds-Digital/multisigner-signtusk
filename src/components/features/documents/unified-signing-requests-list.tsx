@@ -3,8 +3,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { File, CheckCircle, Trash2, Share2, Users, Send, Inbox, Filter, X, Search, Shield, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
-import { type SigningRequestListItem } from '@/lib/signing-workflow-service'
+import type { SignatureRequest } from '@/lib/signature/types/signature-types'
+import { SignatureStatus } from '@/lib/signature/types/signature-types'
 import { supabase } from '@/lib/supabase'
+
+// Type alias for backward compatibility
+type SigningRequestListItem = SignatureRequest
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading'
@@ -43,15 +47,9 @@ interface UnifiedSigningRequest extends SigningRequestListItem {
     can_sign?: boolean
     decline_reason?: string
     document_url?: string
-    document_id?: string
     document_sign_id?: string // NEW: Document Sign ID
     final_pdf_url?: string
     context_display?: string
-    metadata?: {
-        signing_mode?: 'sequential' | 'parallel'
-        message?: string
-        created_at?: string
-    }
 }
 
 interface RequestStats {
@@ -146,7 +144,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
             // Filter by date range and categorize requests
             const filteredRequests = allRequests
-                .filter((req: any) => new Date(req.initiated_at) >= dateFilter)
+                .filter((req: any) => new Date(req.created_at) >= dateFilter)
                 .map((req: any) => {
                     // Determine if this is a sent or received request
                     const isSent = !req.initiated_by_name // Sent requests don't have initiated_by_name
@@ -158,7 +156,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                         user_status: isSent ? undefined : req.status
                     }
                 })
-                .sort((a: any, b: any) => new Date(b.initiated_at).getTime() - new Date(a.initiated_at).getTime())
+                .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
             const sentCount = filteredRequests.filter((req: any) => req.type === 'sent').length
             const receivedCount = filteredRequests.filter((req: any) => req.type === 'received').length
@@ -425,7 +423,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             const isCompleted = request.status === 'completed' || request.document_status === 'completed'
             if (isCompleted) {
                 // Show completion time instead of expiry
-                const completedAt = request.initiated_at // Use initiated_at as fallback since updated_at doesn't exist
+                const completedAt = request.updated_at || request.created_at
                 if (completedAt) {
                     const completedDate = new Date(completedAt)
                     const formattedDate = completedDate.toLocaleDateString('en-US', {
@@ -993,11 +991,9 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const getFromToDisplay = (request: UnifiedSigningRequest) => {
         if (request.type === 'sent') {
             // For sent requests, show recipient information
-            const signerCount = request.signers?.length || 0
+            const signerCount = request.total_signers || 0
             if (signerCount === 1) {
-                // Show the recipient's name if available, otherwise show "1 recipient"
-                const recipientName = request.signers?.[0]?.email || request.signers?.[0]?.name
-                return recipientName ? `To: ${recipientName}` : `To: 1 recipient`
+                return `To: 1 recipient`
             } else if (signerCount > 1) {
                 return `To: ${signerCount} recipients`
             }
@@ -1009,40 +1005,29 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     }
 
     const getAllSignersDisplay = (request: UnifiedSigningRequest) => {
-        const signers = request.signers || []
-        if (signers.length === 0) return null
+        const totalSigners = request.total_signers || 0
+        const completedSigners = request.completed_signers || 0
+        if (totalSigners === 0) return null
 
         return (
             <div className="space-y-1">
-                {signers.map((signer, index) => {
-                    const statusColor =
-                        signer.status === 'signed' ? 'text-green-600' :
-                            signer.status === 'declined' ? 'text-red-600' :
-                                signer.status === 'viewed' ? 'text-blue-600' :
-                                    'text-gray-600'
-
-                    const statusIcon =
-                        signer.status === 'signed' ? '✓' :
-                            signer.status === 'declined' ? '✕' :
-                                signer.status === 'viewed' ? '👁' :
-                                    '○'
-
-                    return (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                            <span className={`font-medium ${statusColor}`}>{statusIcon}</span>
-                            <span className="text-gray-700">{signer.name || signer.email}</span>
-                            <span className={`text-xs ${statusColor} capitalize`}>
-                                ({signer.status || 'pending'})
-                            </span>
-                        </div>
-                    )
-                })}
+                <div className="flex items-center gap-2 text-sm">
+                    <span className="text-gray-700">
+                        {completedSigners} of {totalSigners} signed
+                    </span>
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div
+                            className="bg-green-600 h-2 rounded-full"
+                            style={{ width: `${totalSigners > 0 ? (completedSigners / totalSigners) * 100 : 0}%` }}
+                        ></div>
+                    </div>
+                </div>
             </div>
         )
     }
 
     const getSignatureTypeDisplay = (request: UnifiedSigningRequest) => {
-        const signerCount = request.signers?.length || 0
+        const signerCount = request.total_signers || 0
 
         if (signerCount === 1) {
             return (
@@ -1052,7 +1037,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             )
         } else if (signerCount > 1) {
             // Get signing mode from metadata
-            const signingMode = request.metadata?.signing_mode || 'sequential'
+            const signingMode = (request.metadata as any)?.signing_mode || 'sequential'
             const modeLabel = signingMode === 'parallel' ? 'Parallel' : 'Sequential'
             const modeColor = signingMode === 'parallel' ? 'bg-purple-100 text-purple-800' : 'bg-indigo-100 text-indigo-800'
 
@@ -1081,6 +1066,20 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             case '6m': return 'Last 6 months'
             case '1y': return 'Last 1 year'
             default: return 'Last 30 days'
+        }
+    }
+
+    // Adapter function to convert UnifiedSigningRequest to RequestDetailsModal format
+    const adaptRequestForModal = (request: UnifiedSigningRequest) => {
+        return {
+            ...request,
+            initiated_at: request.created_at,
+            progress: {
+                viewed: request.viewed_signers,
+                signed: request.completed_signers,
+                total: request.total_signers
+            },
+            signers: [] // Empty array since we don't have individual signer details in the list view
         }
     }
 
@@ -1373,7 +1372,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             {
                 viewingRequest && (
                     <RequestDetailsModal
-                        request={viewingRequest}
+                        request={adaptRequestForModal(viewingRequest)}
                         isOpen={!!viewingRequest}
                         onClose={() => setViewingRequest(null)}
                         currentUserEmail={user?.email}
@@ -1381,7 +1380,13 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                             // ✅ PERFORMANCE FIX: Update specific request instead of full reload
                             setRequests(prev => prev.map(req =>
                                 req.id === requestId
-                                    ? { ...req, ...updates }
+                                    ? {
+                                        ...req,
+                                        status: updates.status as SignatureStatus,
+                                        completed_signers: updates.signed_count,
+                                        total_signers: updates.total_signers,
+                                        updated_at: updates.updated_at
+                                    }
                                     : req
                             ))
                             setViewingRequest(null)
@@ -1418,40 +1423,38 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                             {/* Content */}
                             <div className="p-4 overflow-y-auto max-h-[calc(70vh-80px)]">
                                 {showSignersSheet.type === 'sent' ? (
-                                    // Show signers for sent requests
+                                    // Show signer summary for sent requests
                                     <div className="space-y-3">
                                         <p className="text-sm text-gray-600 mb-4">
-                                            {showSignersSheet.signers?.length === 1
+                                            {showSignersSheet.total_signers === 1
                                                 ? 'This document requires a single signature:'
-                                                : `This document requires ${showSignersSheet.signers?.length || 0} signatures:`
+                                                : `This document requires ${showSignersSheet.total_signers} signatures:`
                                             }
                                         </p>
-                                        {showSignersSheet.signers?.map((signer, index) => (
-                                            <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                                    <Users className="w-4 h-4 text-blue-600" />
+                                        <div className="p-4 bg-gray-50 rounded-lg">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-sm font-medium text-gray-700">Progress</span>
+                                                <span className="text-sm font-medium text-gray-900">
+                                                    {showSignersSheet.completed_signers} / {showSignersSheet.total_signers}
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                                <div
+                                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                                    style={{ width: `${(showSignersSheet.completed_signers / showSignersSheet.total_signers) * 100}%` }}
+                                                />
+                                            </div>
+                                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                                <div className="flex items-center gap-1">
+                                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                    <span className="text-gray-600">Signed: {showSignersSheet.completed_signers}</span>
                                                 </div>
-                                                <div className="flex-1">
-                                                    <p className="font-medium text-gray-900">{signer.name}</p>
-                                                    <p className="text-sm text-gray-600">{signer.email}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${signer.status === 'signed' ? 'bg-green-100 text-green-800' :
-                                                        signer.status === 'viewed' ? 'bg-blue-100 text-blue-800' :
-                                                            signer.status === 'declined' ? 'bg-red-100 text-red-800' :
-                                                                'bg-yellow-100 text-yellow-800'
-                                                        }`}>
-                                                        {/* Display proper capitalized status */}
-                                                        {signer.status === 'signed' ? 'Signed' :
-                                                            signer.status === 'viewed' ? 'Viewed' :
-                                                                signer.status === 'declined' ? 'Declined' :
-                                                                    signer.status || 'Pending'}
-                                                    </span>
+                                                <div className="flex items-center gap-1">
+                                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                    <span className="text-gray-600">Viewed: {showSignersSheet.viewed_signers}</span>
                                                 </div>
                                             </div>
-                                        )) || (
-                                                <p className="text-sm text-gray-500 italic">No signers found</p>
-                                            )}
+                                        </div>
                                     </div>
                                 ) : (
                                     // Show sender info for received requests
@@ -1680,13 +1683,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                             title: signingRequest.title,
                             document_url: signingRequest.document_url || '',
                             expires_at: signingRequest.expires_at || '',
-                            signers: signingRequest.signers.map(s => ({
-                                id: s.email,
-                                name: s.name,
-                                email: s.email,
-                                status: s.status,
-                                signing_order: 1
-                            }))
+                            signers: [] // Signer details not available in list view
                         }}
                         currentUserEmail={user?.email || ''}
                         onClose={() => setSigningRequest(null)}

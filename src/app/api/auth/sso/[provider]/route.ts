@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { SSOService } from '@/lib/sso-service'
-import { createClient } from '@/lib/supabase/server'
+import { getSupabaseClient } from '@/lib/dynamic-supabase'
 
 /**
  * GET /api/auth/sso/[provider]
@@ -8,20 +8,20 @@ import { createClient } from '@/lib/supabase/server'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { provider: string } }
+  { params }: { params: Promise<{ provider: string }> }
 ) {
   try {
-    const { provider: providerSlug } = params
+    const { provider: providerSlug } = await params
     const searchParams = request.nextUrl.searchParams
     const organizationId = searchParams.get('org')
 
     // Get provider configuration
     const provider = await SSOService.getProviderBySlug(providerSlug, organizationId)
-    
+
     if (!provider) {
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'SSO provider not found',
           errorCode: 'SAML_CONFIG_MISSING'
         },
@@ -31,8 +31,8 @@ export async function GET(
 
     if (!provider.active) {
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'SSO provider is not active',
           errorCode: 'SAML_CONFIG_MISSING'
         },
@@ -44,7 +44,7 @@ export async function GET(
     if (provider.type === 'saml') {
       // Generate SAML request
       const { url, id } = await SSOService.generateSAMLRequest(provider)
-      
+
       // Log initiation
       await SSOService.logSSOAudit(provider.id, null, 'saml_login_initiated', {
         requestId: id,
@@ -55,8 +55,8 @@ export async function GET(
       return NextResponse.redirect(url)
     } else if (provider.type === 'oauth' || provider.type === 'oidc') {
       // Generate OAuth/OIDC authorization URL
-      const authUrl = await SSOService.generateOAuthAuthorizationUrl(provider)
-      
+      const { url: authUrl } = await SSOService.generateOAuthAuthorizationUrl(provider)
+
       // Log initiation
       await SSOService.logSSOAudit(provider.id, null, 'oauth_login_initiated', {
         organizationId
@@ -65,8 +65,8 @@ export async function GET(
       return NextResponse.redirect(authUrl)
     } else {
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Unsupported SSO type',
           errorCode: 'SAML_CONFIG_MISSING'
         },
@@ -76,8 +76,8 @@ export async function GET(
   } catch (error: any) {
     console.error('SSO initiation error:', error)
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to initiate SSO',
         errorCode: 'INTERNAL_ERROR'
       },
@@ -92,18 +92,18 @@ export async function GET(
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { provider: string } }
+  { params }: { params: Promise<{ provider: string }> }
 ) {
   try {
-    const { provider: providerSlug } = params
+    const { provider: providerSlug } = await params
     const formData = await request.formData()
     const samlResponse = formData.get('SAMLResponse') as string
     const relayState = formData.get('RelayState') as string | undefined
 
     if (!samlResponse) {
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Missing SAML response',
           errorCode: 'MISSING_PARAMS'
         },
@@ -113,11 +113,11 @@ export async function POST(
 
     // Get provider configuration
     const provider = await SSOService.getProviderBySlug(providerSlug)
-    
+
     if (!provider) {
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'SSO provider not found',
           errorCode: 'SAML_CONFIG_MISSING'
         },
@@ -134,8 +134,8 @@ export async function POST(
 
     if (!result.success) {
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: result.error,
           errorCode: result.errorCode
         },
@@ -144,7 +144,7 @@ export async function POST(
     }
 
     // Create Supabase session
-    const supabase = await createClient()
+    const supabase = getSupabaseClient()
     const { data: sessionData, error: sessionError } = await supabase.auth.signInWithPassword({
       email: result.user.email,
       password: result.user.id // Use user ID as password for SSO users
@@ -153,8 +153,8 @@ export async function POST(
     if (sessionError) {
       console.error('Failed to create Supabase session:', sessionError)
       return NextResponse.json(
-        { 
-          success: false, 
+        {
+          success: false,
           error: 'Failed to create session',
           errorCode: 'SESSION_CREATE_FAILED'
         },
@@ -165,7 +165,7 @@ export async function POST(
     // Redirect to application with session
     const redirectUrl = relayState || process.env.NEXT_PUBLIC_APP_URL || '/'
     const response = NextResponse.redirect(redirectUrl)
-    
+
     // Set session cookie
     response.cookies.set('sso_session', result.session!.id, {
       httpOnly: true,
@@ -178,22 +178,13 @@ export async function POST(
   } catch (error: any) {
     console.error('SSO callback error:', error)
     return NextResponse.json(
-      { 
-        success: false, 
+      {
+        success: false,
         error: 'Failed to process SSO callback',
         errorCode: 'INTERNAL_ERROR'
       },
       { status: 500 }
     )
-  }
-}
-
-/**
- * Helper: Get provider by slug
- */
-declare module '@/lib/sso-service' {
-  export class SSOService {
-    static getProviderBySlug(slug: string, organizationId?: string | null): Promise<any>
   }
 }
 

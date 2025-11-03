@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { File, Clock, CheckCircle, AlertTriangle, MoreHorizontal, Eye, Trash2, Share2, Users, Calendar } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
-import { SigningWorkflowService, type SigningRequestListItem } from '@/lib/signing-workflow-service'
+import { signatureService } from '@/lib/signature/core/signature-service'
+import type { SignatureRequest } from '@/lib/signature/types/signature-types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading'
@@ -25,6 +26,9 @@ import {
 } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 
+// Type alias for backward compatibility
+type SigningRequestListItem = SignatureRequest
+
 interface DocumentListProps {
     onRefresh?: () => void
 }
@@ -38,12 +42,12 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
     // Helper function to check if all signers have completed signing
     const isRequestCompleted = (request: SigningRequestListItem): boolean => {
         // Check if status is explicitly completed
-        if (request.status === 'Completed' || request.status === 'completed') {
+        if (request.status === 'completed') {
             return true
         }
 
-        // Check if all signers have signed (signed equals total)
-        if (request.progress && request.progress.signed >= request.progress.total) {
+        // Check if all signers have signed based on counts
+        if (request.total_signers > 0 && request.completed_signers === request.total_signers) {
             return true
         }
 
@@ -63,8 +67,17 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
         setError('')
 
         try {
-            const requests = await SigningWorkflowService.getSigningRequests(user.id)
-            setSigningRequests(requests)
+            const result = await signatureService.listRequests(user.id, user.email || '', {
+                view: 'sent',
+                page: 1,
+                pageSize: 100
+            })
+
+            if (result.success) {
+                setSigningRequests(result.data || [])
+            } else {
+                setError(result.error?.message || 'Failed to load requests')
+            }
         } catch (err) {
             setError('Failed to load signing requests')
             console.error('Error loading signing requests:', err)
@@ -87,8 +100,8 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
         if (!user?.id || !confirm('Are you sure you want to cancel this signing request?')) return
 
         try {
-            const success = await SigningWorkflowService.cancelSigningRequest(requestId, user.id)
-            if (success) {
+            const result = await signatureService.deleteRequest(requestId, user.id, user.email || '')
+            if (result.success) {
                 setSigningRequests(requests => requests.filter(req => req.id !== requestId))
                 onRefresh?.()
             } else {
@@ -231,29 +244,11 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
                                         {getStatusBadge(request.status)}
                                     </TableCell>
                                     <TableCell>
-                                        <div className="flex -space-x-2">
-                                            {request.signers.slice(0, 3).map((signer, i) => {
-                                                const statusColor = signer.signed_at
-                                                    ? 'bg-green-500 text-white'
-                                                    : signer.viewed_at
-                                                        ? 'bg-yellow-500 text-white'
-                                                        : 'bg-gray-200 text-gray-700'
-
-                                                return (
-                                                    <div
-                                                        key={i}
-                                                        title={`${signer.name} (${signer.email}) - ${signer.status}`}
-                                                        className={`h-6 w-6 rounded-full flex items-center justify-center font-semibold text-xs uppercase border-2 border-white ${statusColor}`}
-                                                    >
-                                                        {signer.name.charAt(0)}
-                                                    </div>
-                                                )
-                                            })}
-                                            {request.signers.length > 3 && (
-                                                <div className="h-6 w-6 rounded-full flex items-center justify-center bg-gray-100 text-gray-500 text-xs border-2 border-white">
-                                                    +{request.signers.length - 3}
-                                                </div>
-                                            )}
+                                        <div className="flex items-center gap-2">
+                                            <Users className="h-4 w-4 text-gray-500" />
+                                            <span className="text-sm text-gray-600">
+                                                {request.completed_signers}/{request.total_signers} signed
+                                            </span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -261,17 +256,17 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
                                             <div className="w-16 bg-gray-200 rounded-full h-2">
                                                 <div
                                                     className="bg-blue-600 h-2 rounded-full"
-                                                    style={{ width: `${(request.progress.signed / request.progress.total) * 100}%` }}
+                                                    style={{ width: `${request.total_signers > 0 ? (request.completed_signers / request.total_signers) * 100 : 0}%` }}
                                                 ></div>
                                             </div>
                                             <span className="text-xs text-gray-600">
-                                                {request.progress.signed}/{request.progress.total}
+                                                {request.completed_signers}/{request.total_signers}
                                             </span>
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <span className="text-sm text-gray-600">
-                                            {formatDate(request.initiated_at)}
+                                            {formatDate(request.created_at)}
                                         </span>
                                     </TableCell>
                                     <TableCell>
@@ -279,14 +274,6 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
                                             <span className="text-sm text-gray-600">
                                                 {request.expires_at ? formatDate(request.expires_at) : 'No expiry'}
                                             </span>
-                                            {request.days_remaining !== undefined && request.days_remaining <= 3 && (
-                                                <div className="flex items-center space-x-1">
-                                                    <Calendar className="w-3 h-3 text-orange-500" />
-                                                    <span className="text-xs text-orange-600">
-                                                        {request.days_remaining === 0 ? 'Today' : `${request.days_remaining}d`}
-                                                    </span>
-                                                </div>
-                                            )}
                                         </div>
                                     </TableCell>
                                     <TableCell>
@@ -312,7 +299,7 @@ export function DocumentList({ onRefresh }: DocumentListProps) {
                                                     <DropdownMenuItem
                                                         onClick={() => handleCancel(request.id)}
                                                         className="text-red-600"
-                                                        disabled={request.status === 'Completed' || request.status === 'Cancelled'}
+                                                        disabled={request.status === 'completed' || request.status === 'cancelled'}
                                                     >
                                                         <Trash2 className="w-4 h-4 mr-2" />
                                                         Cancel Request

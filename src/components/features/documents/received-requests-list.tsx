@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { File, Eye } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
-import { SigningWorkflowService, type SigningRequestListItem } from '@/lib/signing-workflow-service'
+import { signatureService } from '@/lib/signature/core/signature-service'
+import type { SignatureRequest } from '@/lib/signature/types/signature-types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading'
@@ -18,6 +19,8 @@ import {
     TableRow,
 } from '@/components/ui/table'
 
+// Type alias for backward compatibility
+type SigningRequestListItem = SignatureRequest
 
 export function ReceivedRequestsList() {
     const [receivedRequests, setReceivedRequests] = useState<SigningRequestListItem[]>([])
@@ -26,15 +29,24 @@ export function ReceivedRequestsList() {
     const { user } = useAuth()
 
     const loadReceivedRequests = useCallback(async () => {
-        if (!user?.id) return
+        if (!user?.id || !user?.email) return
 
         setLoading(true)
         setError('')
 
         try {
             // Get requests where the user is a signer
-            const requests = await SigningWorkflowService.getReceivedSigningRequests(user.email)
-            setReceivedRequests(requests)
+            const result = await signatureService.listRequests(user.id, user.email || '', {
+                view: 'received',
+                page: 1,
+                pageSize: 100
+            })
+
+            if (result.success) {
+                setReceivedRequests(result.data || [])
+            } else {
+                setError(result.error?.message || 'Failed to load requests')
+            }
         } catch (err) {
             setError('Failed to load received signing requests')
             console.error('Error loading received signing requests:', err)
@@ -155,7 +167,7 @@ export function ReceivedRequestsList() {
                                     </TableCell>
                                     <TableCell>
                                         <span className="text-sm text-gray-600">
-                                            {request.initiated_by_name || 'Unknown'}
+                                            {request.initiated_by || 'Unknown'}
                                         </span>
                                     </TableCell>
                                     <TableCell>
@@ -163,7 +175,7 @@ export function ReceivedRequestsList() {
                                     </TableCell>
                                     <TableCell>
                                         <span className="text-sm text-gray-600">
-                                            {formatDate(request.initiated_at)}
+                                            {formatDate(request.created_at)}
                                         </span>
                                     </TableCell>
                                     <TableCell>
@@ -183,7 +195,7 @@ export function ReceivedRequestsList() {
                                             >
                                                 <Eye className="w-4 h-4" />
                                             </Button>
-                                            {request.status === 'pending' && (
+                                            {(request.status === 'initiated' || request.status === 'in_progress') && (
                                                 <Button
                                                     size="sm"
                                                     onClick={() => handleSign(request)}

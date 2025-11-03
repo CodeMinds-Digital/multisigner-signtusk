@@ -2,26 +2,12 @@ import { createClient } from '@supabase/supabase-js'
 
 import crypto from 'crypto'
 import * as samlify from 'samlify'
-import { createClient as createRedisClient } from 'redis'
+import { redis } from '@/lib/upstash-config'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
-
-// Redis client for replay protection
-let redisClient: ReturnType<typeof createRedisClient> | null = null
-
-async function getRedisClient() {
-  if (!redisClient && process.env.UPSTASH_REDIS_REST_URL) {
-    redisClient = createRedisClient({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      password: process.env.UPSTASH_REDIS_REST_TOKEN
-    })
-    await redisClient.connect()
-  }
-  return redisClient
-}
 
 export interface SSOProvider {
   id: string
@@ -354,18 +340,58 @@ export class SSOService {
     const sp = this.initializeSAMLServiceProvider()
     const idp = this.initializeSAMLIdentityProvider(provider)
 
-    const { context } = sp.createLoginRequest(idp, 'redirect')
+    const { context, id } = sp.createLoginRequest(idp, 'redirect')
 
     // Store request ID for replay protection
-    const requestId = context.id
-    const redis = await getRedisClient()
-    if (redis) {
-      await redis.setEx(`saml:request:${requestId}`, 600, 'pending') // 10 min expiry
+    const requestId = id || crypto.randomBytes(16).toString('hex')
+    try {
+      await redis.setex(`saml:request:${requestId}`, 600, 'pending') // 10 min expiry
+    } catch (error) {
+      console.error('Failed to store SAML request ID in Redis:', error)
     }
 
     return {
       url: context,
       id: requestId
+    }
+  }
+
+  /**
+   * Generate OAuth/OIDC authorization URL
+   */
+  static async generateOAuthAuthorizationUrl(provider: SSOProvider): Promise<{ url: string; state: string }> {
+    if (provider.type !== 'oauth' && provider.type !== 'oidc') {
+      throw new Error('Provider is not OAuth/OIDC')
+    }
+
+    // Generate random state for CSRF protection
+    const state = crypto.randomBytes(32).toString('hex')
+
+    // Store state in Redis for verification
+    try {
+      await redis.setex(`oauth:state:${state}`, 600, provider.id) // 10 min expiry
+    } catch (error) {
+      console.error('Failed to store OAuth state in Redis:', error)
+    }
+
+    // Build authorization URL
+    const scope = Array.isArray(provider.config.scope)
+      ? provider.config.scope.join(' ')
+      : (provider.config.scope || 'openid profile email')
+
+    const params = new URLSearchParams({
+      client_id: provider.config.client_id!,
+      redirect_uri: provider.config.redirect_uri!,
+      response_type: 'code',
+      scope,
+      state
+    })
+
+    const authUrl = `${provider.config.authorization_url}?${params.toString()}`
+
+    return {
+      url: authUrl,
+      state
     }
   }
 
@@ -432,8 +458,7 @@ export class SSOService {
       // Replay protection - check if assertion ID has been used
       const assertionId = extract.assertionId || extract.response?.id
       if (assertionId) {
-        const redis = await getRedisClient()
-        if (redis) {
+        try {
           const exists = await redis.get(`saml:assertion:${assertionId}`)
           if (exists) {
             await this.logSSOAudit(provider.id, null, 'saml_replay_detected', {
@@ -443,7 +468,9 @@ export class SSOService {
             return { success: false, error: 'Assertion replay detected', errorCode: 'SAML_REPLAY_DETECTED' }
           }
           // Store assertion ID for 24 hours
-          await redis.setEx(`saml:assertion:${assertionId}`, 86400, 'used')
+          await redis.setex(`saml:assertion:${assertionId}`, 86400, 'used')
+        } catch (error) {
+          console.error('Failed to check/store assertion ID in Redis:', error)
         }
       }
 

@@ -306,17 +306,35 @@ export default function UniversalDocumentViewer({
                 }}
                 onPlay={async () => {
                   if (linkId && documentId) {
-                    await SendAnalyticsService.trackEvent(linkId, documentId, 'video_play', viewerEmail)
+                    await SendAnalyticsService.trackEvent({
+                      linkId,
+                      documentId,
+                      eventType: 'view',
+                      email: viewerEmail,
+                      metadata: { action: 'video_play' }
+                    })
                   }
                 }}
                 onPause={async () => {
                   if (linkId && documentId) {
-                    await SendAnalyticsService.trackEvent(linkId, documentId, 'video_pause', viewerEmail)
+                    await SendAnalyticsService.trackEvent({
+                      linkId,
+                      documentId,
+                      eventType: 'view',
+                      email: viewerEmail,
+                      metadata: { action: 'video_pause' }
+                    })
                   }
                 }}
                 onSeeking={async () => {
                   if (linkId && documentId) {
-                    await SendAnalyticsService.trackEvent(linkId, documentId, 'video_seek', viewerEmail)
+                    await SendAnalyticsService.trackEvent({
+                      linkId,
+                      documentId,
+                      eventType: 'view',
+                      email: viewerEmail,
+                      metadata: { action: 'video_seek' }
+                    })
                   }
                 }}
               >
@@ -359,12 +377,24 @@ export default function UniversalDocumentViewer({
                   className="w-full"
                   onPlay={async () => {
                     if (linkId && documentId) {
-                      await SendAnalyticsService.trackEvent(linkId, documentId, 'audio_play', viewerEmail)
+                      await SendAnalyticsService.trackEvent({
+                        linkId,
+                        documentId,
+                        eventType: 'view',
+                        email: viewerEmail,
+                        metadata: { action: 'audio_play' }
+                      })
                     }
                   }}
                   onPause={async () => {
                     if (linkId && documentId) {
-                      await SendAnalyticsService.trackEvent(linkId, documentId, 'audio_pause', viewerEmail)
+                      await SendAnalyticsService.trackEvent({
+                        linkId,
+                        documentId,
+                        eventType: 'view',
+                        email: viewerEmail,
+                        metadata: { action: 'audio_pause' }
+                      })
                     }
                   }}
                 >

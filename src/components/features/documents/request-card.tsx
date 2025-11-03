@@ -3,43 +3,36 @@ import { Calendar, Clock, User, FileText, Eye, Info, CheckCircle, Download, More
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { SignatureType, SigningOrder, SignatureStatus } from '@/lib/signature/types/signature-types'
 
 interface UnifiedSigningRequest {
     id: string
     title: string
     type: 'sent' | 'received'
-    status: string
+    status: SignatureStatus
     user_status?: string
     document_status?: string
     document_sign_id?: string
-    initiated_at: string
+    created_at: string
+    updated_at: string
     expires_at?: string
     sender_name?: string
     can_sign?: boolean
     final_pdf_url?: string
-    signers: Array<{
-        name: string
-        email: string
-        status: string
-        viewed_at?: string
-        signed_at?: string
-    }>
+    total_signers: number
+    completed_signers: number
+    viewed_signers: number
     decline_reason?: string
-    progress: {
-        viewed: number
-        signed: number
-        total: number
-    }
-    days_remaining?: number
-    initiated_by_name?: string
+    initiated_by: string
     document_url?: string
-    document_id?: string
+    document_id: string
     context_display?: string
-    metadata?: {
-        signing_mode?: 'sequential' | 'parallel'
-        message?: string
-        created_at?: string
-    }
+    metadata: Record<string, unknown>
+    signature_type: SignatureType
+    signing_order: SigningOrder
+    require_totp: boolean
+    description?: string
+    completed_at?: string
 }
 
 interface RequestCardProps {
@@ -144,7 +137,7 @@ export function RequestCard({
                             </div>
 
                             {/* From/To - Only show for single signature or sent requests */}
-                            {(request.signers?.length === 1 || request.type === 'sent') && (
+                            {(request.total_signers === 1 || request.type === 'sent') && (
                                 <div className="flex items-center gap-2">
                                     <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
                                     <button
@@ -157,7 +150,7 @@ export function RequestCard({
                             )}
 
                             {/* All Signers - Show for multi-signature received requests */}
-                            {request.type === 'received' && request.signers?.length > 1 && (
+                            {request.type === 'received' && request.total_signers > 1 && (
                                 <div className="space-y-2">
                                     <div className="flex items-center gap-2">
                                         <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
@@ -179,7 +172,7 @@ export function RequestCard({
                             {/* Date */}
                             <div className="flex items-center gap-2">
                                 <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                <span className="text-gray-700">{formatDate(request.initiated_at)}</span>
+                                <span className="text-gray-700">{formatDate(request.created_at)}</span>
                             </div>
                         </div>
 

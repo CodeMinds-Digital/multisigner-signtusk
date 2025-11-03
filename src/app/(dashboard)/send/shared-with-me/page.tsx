@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,7 +47,8 @@ interface SharedItem {
 }
 
 export default function SharedWithMePage() {
-  const { data: session } = useSession()
+  const supabase = createClientComponentClient()
+  const [user, setUser] = useState<any>(null)
   const [items, setItems] = useState<SharedItem[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -63,13 +64,21 @@ export default function SharedWithMePage() {
     unreadCount: 0
   })
 
+  useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+    }
+    getUser()
+  }, [])
+
   const fetchSharedItems = async () => {
-    if (!session?.user?.email) return
+    if (!user?.email) return
 
     try {
       setLoading(true)
       const params = new URLSearchParams({
-        email: session.user.email,
+        email: user.email,
         type: typeFilter,
         status: statusFilter,
         sortBy,
@@ -95,7 +104,7 @@ export default function SharedWithMePage() {
 
   useEffect(() => {
     fetchSharedItems()
-  }, [session, typeFilter, statusFilter, sortBy, sortOrder, page])
+  }, [user, typeFilter, statusFilter, sortBy, sortOrder, page])
 
   const filteredItems = items.filter(item =>
     item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

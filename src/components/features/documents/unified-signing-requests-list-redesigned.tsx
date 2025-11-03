@@ -3,8 +3,11 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { File, CheckCircle, MoreHorizontal, Eye, Download, Trash2, Share2, Users, Send, Inbox, Filter, Info, X, Search, Shield, Calendar, Clock, User, FileText } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
-import { type SigningRequestListItem } from '@/lib/signing-workflow-service'
+import type { SignatureRequest } from '@/lib/signature/types/signature-types'
 import { supabase } from '@/lib/supabase'
+
+// Type alias for backward compatibility
+type SigningRequestListItem = SignatureRequest
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading'
@@ -43,7 +46,6 @@ interface UnifiedSigningRequest extends SigningRequestListItem {
     can_sign?: boolean
     decline_reason?: string
     document_url?: string
-    document_id?: string
     document_sign_id?: string
     final_pdf_url?: string
     context_display?: string
@@ -148,10 +150,9 @@ export function UnifiedSigningRequestsListRedesigned({ onRefresh }: UnifiedSigni
 
     const getFromToDisplay = (request: UnifiedSigningRequest) => {
         if (request.type === 'sent') {
-            const signerCount = request.signers?.length || 0
+            const signerCount = request.total_signers || 0
             if (signerCount === 1) {
-                const recipientName = request.signers?.[0]?.email || request.signers?.[0]?.name
-                return recipientName || '1 recipient'
+                return '1 recipient'
             } else if (signerCount > 1) {
                 return `${signerCount} recipients`
             }
@@ -162,7 +163,7 @@ export function UnifiedSigningRequestsListRedesigned({ onRefresh }: UnifiedSigni
     }
 
     const getSignatureTypeDisplay = (request: UnifiedSigningRequest) => {
-        const signerCount = request.signers?.length || 0
+        const signerCount = request.total_signers || 0
         if (signerCount === 1) {
             return (
                 <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
@@ -563,7 +564,7 @@ function RequestCard({
                             {/* Date */}
                             <div className="flex items-center gap-2">
                                 <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                                <span className="text-gray-700">{formatDate(request.initiated_at)}</span>
+                                <span className="text-gray-700">{formatDate(request.created_at)}</span>
                             </div>
                         </div>
 

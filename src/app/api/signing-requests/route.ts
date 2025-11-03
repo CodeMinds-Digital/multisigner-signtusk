@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server'
 import { getAuthTokensFromRequest } from '@/lib/auth-cookies'
 import { verifyAccessToken } from '@/lib/jwt-utils'
-import { SigningWorkflowService } from '@/lib/signing-workflow-service'
+import { signatureService } from '@/lib/signature/core/signature-service'
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,22 +23,50 @@ export async function GET(request: NextRequest) {
     // Get query parameters
     const { searchParams } = new URL(request.url)
     const type = searchParams.get('type') // 'sent' or 'received'
+    const page = parseInt(searchParams.get('page') || '1', 10)
+    const pageSize = parseInt(searchParams.get('page_size') || '20', 10)
 
-    let requests
+    let result
     if (type === 'received') {
-      requests = await SigningWorkflowService.getReceivedSigningRequests(userEmail)
+      // Get requests where user is a signer
+      result = await signatureService.listRequests(userId, userEmail, {
+        view: 'received',
+        page,
+        pageSize
+      })
     } else {
-      // Default to sent requests
-      requests = await SigningWorkflowService.getSigningRequests(userId)
+      // Default to sent requests (initiated by user)
+      result = await signatureService.listRequests(userId, userEmail, {
+        view: 'sent',
+        page,
+        pageSize
+      })
+    }
+
+    if (!result.success) {
+      return new Response(
+        JSON.stringify({ error: result.error?.message || 'Failed to fetch requests' }),
+        { status: 500, headers: { 'Content-Type': 'application/json' } }
+      )
     }
 
     return new Response(
-      JSON.stringify({ success: true, data: requests }),
+      JSON.stringify({
+        success: true,
+        data: result.data || [],
+        pagination: result.pagination || {
+          total: 0,
+          page: 1,
+          pageSize,
+          totalPages: 0,
+          hasMore: false
+        }
+      }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )
   } catch (error) {
     console.error('Error fetching signing requests:', error)
-    
+
     if (error instanceof Error && error.message.includes('token')) {
       return new Response(
         JSON.stringify({ error: 'Invalid or expired token' }),

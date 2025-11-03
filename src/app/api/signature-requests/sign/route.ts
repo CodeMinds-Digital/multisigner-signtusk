@@ -542,7 +542,7 @@ export async function POST(request: NextRequest) {
       console.error('❌ Completion error stack:', completionError instanceof Error ? completionError.stack : 'No stack trace')
 
       // Continue without completion handling to avoid blocking the signature save
-      completionResult = { success: true, allCompleted: false }
+      completionResult = { success: true, allSigned: false, nextSigner: null }
       console.log('⚠️ Continuing without completion handling due to error')
     }
 
@@ -571,9 +571,8 @@ export async function POST(request: NextRequest) {
         message: 'Signature saved successfully',
         signedCount,
         totalSigners,
-        allSignersCompleted: completionResult.allCompleted,
-        finalPdfUrl: completionResult.finalPdfUrl,
-        nextSignerEmail: completionResult.nextSignerEmail
+        allSignersCompleted: completionResult.success ? completionResult.allSigned : false,
+        nextSignerEmail: completionResult.success ? completionResult.nextSigner : null
       }),
       { status: 200, headers: { 'Content-Type': 'application/json' } }
     )

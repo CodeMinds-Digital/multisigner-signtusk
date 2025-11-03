@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth-options'
+import { getSupabaseClient } from '@/lib/dynamic-supabase'
 
 /**
  * POST /api/send/documents/bulk-folder-upload
@@ -9,8 +8,10 @@ import { authOptions } from '@/lib/auth-options'
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const supabase = getSupabaseClient()
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+
+    if (authError || !user) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized', errorCode: 'UNAUTHORIZED' },
         { status: 401 }
@@ -59,7 +60,7 @@ export async function POST(request: NextRequest) {
           // Upload to Supabase Storage
           const fileExt = fileName.split('.').pop()
           const timestamp = Date.now()
-          const storagePath = `${session.user.id}/${timestamp}-${fileName}`
+          const storagePath = `${user.id}/${timestamp}-${fileName}`
 
           const { data: uploadData, error: uploadError } = await supabaseAdmin.storage
             .from('send-documents')
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
           const { data: document, error: dbError } = await supabaseAdmin
             .from('send_shared_documents')
             .insert({
-              user_id: session.user.id,
+              user_id: user.id,
               title: fileName,
               file_name: fileName,
               file_type: file.type,

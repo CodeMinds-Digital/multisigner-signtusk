@@ -17,6 +17,7 @@
     "@codeminds-digital/pdfme-complete": "^0.0.5",
     "@hello-pangea/dnd": "^18.0.1",
     "@hugocxl/react-to-image": "^0.0.9",
+    "@netlify/functions": "^5.0.1",
     "@pinecone-database/pinecone": "^6.1.2",
     "@radix-ui/react-checkbox": "^1.1.7",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -97,7 +98,8 @@
     "tailwindcss": "^3.4.17",
     "uuid": "^13.0.0",
     "web-vitals": "^5.1.0",
-    "ws": "^8.18.3"
+    "ws": "^8.18.3",
+    "zod": "^4.1.12"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

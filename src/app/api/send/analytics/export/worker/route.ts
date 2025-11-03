@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { verifySignatureAppRouter } from '@upstash/qstash/nextjs'
-import ExcelJS from 'exceljs'
-import PDFDocument from 'pdfkit'
 import { Readable } from 'stream'
+
+// Force Node.js runtime for ExcelJS and PDFKit
+export const runtime = 'nodejs'
 
 const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -22,10 +23,11 @@ const supabaseAdmin = createClient(
  * Called by QStash
  */
 async function handler(request: NextRequest) {
+  let jobId: string | undefined
   try {
     const body = await request.json()
     const {
-      jobId,
+      jobId: extractedJobId,
       documentId,
       linkId,
       format,
@@ -34,6 +36,7 @@ async function handler(request: NextRequest) {
       includePageStats,
       userId
     } = body
+    jobId = extractedJobId
 
     console.log(`📊 Processing export job ${jobId} for document ${documentId}`)
 
@@ -127,7 +130,7 @@ async function handler(request: NextRequest) {
     console.error('Export worker error:', error)
 
     // Update job status to failed
-    if (body?.jobId) {
+    if (jobId) {
       await supabaseAdmin
         .from('send_analytics_export_history')
         .update({
@@ -135,7 +138,7 @@ async function handler(request: NextRequest) {
           error_message: error.message || 'Export processing failed',
           completed_at: new Date().toISOString()
         })
-        .eq('id', body.jobId)
+        .eq('id', jobId)
     }
 
     return NextResponse.json(
@@ -347,6 +350,7 @@ function generateCSVExport(data: any, options: any): string {
  * Generate Excel export
  */
 async function generateExcelExport(data: any, options: any): Promise<Buffer> {
+  const ExcelJS = (await import('exceljs')).default
   const workbook = new ExcelJS.Workbook()
   workbook.creator = 'SendTusk Analytics'
   workbook.created = new Date()
@@ -457,13 +461,14 @@ async function generateExcelExport(data: any, options: any): Promise<Buffer> {
     }
   }
 
-  return await workbook.xlsx.writeBuffer() as Buffer
+  return Buffer.from(await workbook.xlsx.writeBuffer())
 }
 
 /**
  * Generate PDF export
  */
 async function generatePDFExport(data: any, options: any): Promise<Buffer> {
+  const PDFDocument = (await import('pdfkit')).default
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ margin: 50 })
     const chunks: Buffer[] = []
