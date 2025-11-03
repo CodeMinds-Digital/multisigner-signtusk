@@ -33,6 +33,11 @@ interface UnifiedSigningRequest {
     require_totp: boolean
     description?: string
     completed_at?: string
+    progress?: {
+        viewed: number
+        signed: number
+        total: number
+    }
 }
 
 interface RequestCardProps {
