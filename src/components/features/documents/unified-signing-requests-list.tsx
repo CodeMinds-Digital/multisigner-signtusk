@@ -57,6 +57,11 @@ interface UnifiedSigningRequest extends SigningRequestListItem {
         viewed_at?: string
         signed_at?: string
     }>
+    progress?: {
+        viewed: number
+        signed: number
+        total: number
+    }
 }
 
 interface RequestStats {
