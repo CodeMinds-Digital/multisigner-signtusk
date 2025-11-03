@@ -3,8 +3,12 @@
 import { useState, useEffect, useCallback, useRef, memo } from 'react'
 import { File, CheckCircle, Trash2, Share2, Users, Send, Inbox, Filter, X, Search, Shield, RefreshCw } from 'lucide-react'
 import { useAuth } from '@/components/providers/secure-auth-provider'
-import { type SigningRequestListItem } from '@/lib/signing-workflow-service'
+import type { SignatureRequest } from '@/lib/signature/types/signature-types'
+import { SignatureStatus } from '@/lib/signature/types/signature-types'
 import { supabase } from '@/lib/supabase'
+
+// Type alias for backward compatibility
+type SigningRequestListItem = SignatureRequest
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { LoadingSpinner } from '@/components/ui/loading'
@@ -43,15 +47,16 @@ interface UnifiedSigningRequest extends SigningRequestListItem {
     can_sign?: boolean
     decline_reason?: string
     document_url?: string
-    document_id?: string
     document_sign_id?: string // NEW: Document Sign ID
     final_pdf_url?: string
     context_display?: string
-    metadata?: {
-        signing_mode?: 'sequential' | 'parallel'
-        message?: string
-        created_at?: string
-    }
+    signers?: Array<{
+        name: string
+        email: string
+        status: string
+        viewed_at?: string
+        signed_at?: string
+    }>
 }
 
 interface RequestStats {
@@ -67,7 +72,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const [filteredStats, setFilteredStats] = useState<RequestStats>({ total: 0, sent: 0, received: 0 }) // NEW: Stats for filtered results
     const [loading, setLoading] = useState(true)
     const [error, setError] = useState('')
-    const [timeRange, setTimeRange] = useState<TimeRange>('30d')
+    const [timeRange, setTimeRange] = useState<TimeRange>('6m') // Changed from '30d' to '6m' to show more requests by default
     const [searchQuery, setSearchQuery] = useState('') // NEW: Search query state
     const [activeTab, setActiveTab] = useState<'all' | 'sent' | 'received'>('all') // NEW: Active tab state
     const [viewingRequest, setViewingRequest] = useState<UnifiedSigningRequest | null>(null)
@@ -78,12 +83,9 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const [pendingSigningRequest, setPendingSigningRequest] = useState<UnifiedSigningRequest | null>(null)
     const [userProfile, setUserProfile] = useState<any>(null)
 
-    // Smart Polling State
-    const [pollingRequestIds, setPollingRequestIds] = useState<Set<string>>(new Set())
+    // Realtime subscription state (replacing polling)
     const [isRefreshing, setIsRefreshing] = useState(false)
-    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
-    const pollingStartTimeRef = useRef<Map<string, number>>(new Map())
-    const lastPollTimeRef = useRef<Map<string, number>>(new Map()) // Track last poll time per request
+    const realtimeChannelRef = useRef<any>(null)
 
     // Note: Toast context may not be available in all contexts
 
@@ -144,21 +146,46 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
             const allRequests = result.data || []
 
+            // Debug: Log first request to see signers data
+            if (allRequests.length > 0) {
+                console.log('📊 Sample API request data:', {
+                    title: allRequests[0].title,
+                    progress: allRequests[0].progress,
+                    signers: allRequests[0].signers,
+                    signers_length: allRequests[0].signers?.length || 0
+                })
+            }
+
             // Filter by date range and categorize requests
             const filteredRequests = allRequests
-                .filter((req: any) => new Date(req.initiated_at) >= dateFilter)
+                .filter((req: any) => {
+                    // Use initiated_at (from API) or created_at as fallback
+                    const dateField = req.initiated_at || req.created_at
+                    const requestDate = new Date(dateField)
+                    return requestDate >= dateFilter
+                })
                 .map((req: any) => {
                     // Determine if this is a sent or received request
                     const isSent = !req.initiated_by_name // Sent requests don't have initiated_by_name
+
+                    // Map progress object to flat fields for compatibility
+                    const progress = req.progress || {}
 
                     return {
                         ...req,
                         type: isSent ? 'sent' as const : 'received' as const,
                         sender_name: req.initiated_by_name,
-                        user_status: isSent ? undefined : req.status
+                        user_status: isSent ? undefined : req.status,
+                        created_at: req.initiated_at || req.created_at, // Normalize to created_at for sorting
+                        // Map progress fields to expected flat structure
+                        total_signers: progress.total || req.total_signers || 0,
+                        completed_signers: progress.signed || req.completed_signers || 0,
+                        viewed_signers: progress.viewed || req.viewed_signers || 0,
+                        // Ensure signers array is available
+                        signers: req.signers || []
                     }
                 })
-                .sort((a: any, b: any) => new Date(b.initiated_at).getTime() - new Date(a.initiated_at).getTime())
+                .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
 
             const sentCount = filteredRequests.filter((req: any) => req.type === 'sent').length
             const receivedCount = filteredRequests.filter((req: any) => req.type === 'received').length
@@ -166,6 +193,11 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             setRequests(filteredRequests)
             setFilteredRequests(filteredRequests) // NEW: Initialize filtered requests
             setStats({
+                total: filteredRequests.length,
+                sent: sentCount,
+                received: receivedCount
+            })
+            setFilteredStats({
                 total: filteredRequests.length,
                 sent: sentCount,
                 received: receivedCount
@@ -182,7 +214,14 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     useEffect(() => {
         if (!searchQuery.trim()) {
             setFilteredRequests(requests)
-            setFilteredStats(stats)
+            // Compute stats from requests instead of copying stats to avoid cross-state coupling
+            const filteredSentCount = requests.filter(req => req.type === 'sent').length
+            const filteredReceivedCount = requests.filter(req => req.type === 'received').length
+            setFilteredStats({
+                total: requests.length,
+                sent: filteredSentCount,
+                received: filteredReceivedCount
+            })
             return
         }
 
@@ -213,157 +252,84 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             sent: filteredSentCount,
             received: filteredReceivedCount
         })
-    }, [requests, searchQuery, stats])
+    }, [requests, searchQuery])
 
     useEffect(() => {
         loadAllRequests()
     }, [loadAllRequests])
 
-    // Smart Polling: Check for PDF generation completion
-    const checkPDFStatus = useCallback(async (requestId: string) => {
-        try {
-            const response = await fetch(`/api/signature-requests/${requestId}`)
-            if (!response.ok) return null
-
-            const result = await response.json()
-            if (result.success && result.data) {
-                return result.data
-            }
-            return null
-        } catch (error) {
-            console.error('Error checking PDF status:', error)
-            return null
-        }
-    }, [])
-
-    // Smart Polling Effect
+    // Supabase Realtime Subscription for live updates (replaces polling)
     useEffect(() => {
-        if (pollingRequestIds.size === 0) {
-            // Clear interval if no requests to poll
-            if (pollingIntervalRef.current) {
-                clearInterval(pollingIntervalRef.current)
-                pollingIntervalRef.current = null
-            }
-            return
-        }
+        if (!user?.id) return
 
-        console.log('🔄 Starting smart polling for', pollingRequestIds.size, 'request(s)')
+        console.log('📡 Setting up Supabase Realtime subscription for signing requests')
 
-        // Poll every 5 seconds (increased from 3 to reduce load)
-        pollingIntervalRef.current = setInterval(async () => {
-            const now = Date.now()
-            const idsToRemove: string[] = []
+        // Subscribe to changes in signing_requests table
+        const channel = supabase
+            .channel('signing-requests-changes')
+            .on(
+                'postgres_changes',
+                {
+                    event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+                    schema: 'public',
+                    table: 'signing_requests',
+                },
+                (payload: any) => {
+                    console.log('🔔 Realtime update received:', payload.eventType)
 
-            for (const requestId of pollingRequestIds) {
-                // Check if polling has exceeded 60 seconds (timeout)
-                const startTime = pollingStartTimeRef.current.get(requestId) || now
-                if (now - startTime > 60000) {
-                    console.log('⏱️ Polling timeout for request:', requestId)
-                    idsToRemove.push(requestId)
-                    continue
+                    // Handle different event types
+                    if (payload.eventType === 'INSERT') {
+                        // New request created - reload all requests
+                        console.log('➕ New signing request created')
+                        loadAllRequests()
+                    } else if (payload.eventType === 'UPDATE') {
+                        // Request updated - update specific request in state
+                        const updatedRequest = payload.new as any
+                        console.log('🔄 Signing request updated:', updatedRequest.id)
+
+                        setRequests(prev => {
+                            const existingIndex = prev.findIndex(req => req.id === updatedRequest.id)
+                            if (existingIndex === -1) {
+                                // Request not in current list, reload all
+                                loadAllRequests()
+                                return prev
+                            }
+
+                            // Update the specific request
+                            return prev.map(req =>
+                                req.id === updatedRequest.id
+                                    ? {
+                                        ...req,
+                                        status: updatedRequest.status,
+                                        final_pdf_url: updatedRequest.final_pdf_url,
+                                        updated_at: updatedRequest.updated_at,
+                                    }
+                                    : req
+                            )
+                        })
+                    } else if (payload.eventType === 'DELETE') {
+                        // Request deleted - remove from state
+                        const deletedId = (payload.old as any).id
+                        console.log('🗑️ Signing request deleted:', deletedId)
+                        setRequests(prev => prev.filter(req => req.id !== deletedId))
+                    }
                 }
+            )
+            .subscribe((status: string) => {
+                console.log('📡 Realtime subscription status:', status)
+            })
 
-                // Throttle: Only poll if at least 2 seconds have passed since last poll
-                const lastPollTime = lastPollTimeRef.current.get(requestId) || 0
-                if (now - lastPollTime < 2000) {
-                    continue
-                }
-
-                // Update last poll time
-                lastPollTimeRef.current.set(requestId, now)
-
-                // Check PDF status
-                const updatedRequest = await checkPDFStatus(requestId)
-
-                if (updatedRequest && updatedRequest.final_pdf_url) {
-                    console.log('✅ Final PDF ready for request:', requestId)
-
-                    // Update the request in state
-                    setRequests(prev => prev.map(req =>
-                        req.id === requestId
-                            ? { ...req, final_pdf_url: updatedRequest.final_pdf_url, status: updatedRequest.status }
-                            : req
-                    ))
-
-                    // Remove from polling
-                    idsToRemove.push(requestId)
-                }
-            }
-
-            // Remove completed/timed-out requests from polling
-            if (idsToRemove.length > 0) {
-                setPollingRequestIds(prev => {
-                    const newSet = new Set(prev)
-                    idsToRemove.forEach(id => {
-                        newSet.delete(id)
-                        pollingStartTimeRef.current.delete(id)
-                        lastPollTimeRef.current.delete(id)
-                    })
-                    return newSet
-                })
-            }
-        }, 5000) // Increased from 3000 to 5000ms
+        realtimeChannelRef.current = channel
 
         // Cleanup on unmount
         return () => {
-            if (pollingIntervalRef.current) {
-                clearInterval(pollingIntervalRef.current)
-                pollingIntervalRef.current = null
+            console.log('📡 Cleaning up Realtime subscription')
+            if (realtimeChannelRef.current) {
+                supabase.removeChannel(realtimeChannelRef.current)
+                realtimeChannelRef.current = null
             }
         }
-    }, [pollingRequestIds, checkPDFStatus])
-
-    // Auto-refresh when window gains focus (with debounce to prevent multiple calls)
-    useEffect(() => {
-        let focusTimeout: NodeJS.Timeout | null = null
-
-        const handleFocus = () => {
-            // Clear any pending refresh
-            if (focusTimeout) {
-                clearTimeout(focusTimeout)
-            }
-
-            // Debounce the refresh by 1 second
-            focusTimeout = setTimeout(() => {
-                console.log('🔄 Window focused, refreshing data...')
-                loadAllRequests()
-            }, 1000)
-        }
-
-        window.addEventListener('focus', handleFocus)
-        return () => {
-            window.removeEventListener('focus', handleFocus)
-            if (focusTimeout) {
-                clearTimeout(focusTimeout)
-            }
-        }
-    }, [loadAllRequests])
-
-    // Start polling for completed requests without final PDF
-    useEffect(() => {
-        const requestsNeedingPDF = requests.filter(req =>
-            isRequestCompleted(req) && !req.final_pdf_url
-        )
-
-        if (requestsNeedingPDF.length > 0) {
-            const newPollingIds = new Set(pollingRequestIds)
-            let hasNewRequests = false
-
-            requestsNeedingPDF.forEach(req => {
-                if (!newPollingIds.has(req.id)) {
-                    newPollingIds.add(req.id)
-                    pollingStartTimeRef.current.set(req.id, Date.now())
-                    hasNewRequests = true
-                    console.log('📡 Starting to poll for PDF:', req.title)
-                }
-            })
-
-            if (hasNewRequests) {
-                setPollingRequestIds(newPollingIds)
-            }
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [requests.length, isRequestCompleted]) // Only re-run when requests count changes, not on every request update
+    }, [user?.id, loadAllRequests])
 
     // Manual refresh function
     const handleManualRefresh = useCallback(async () => {
@@ -425,7 +391,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             const isCompleted = request.status === 'completed' || request.document_status === 'completed'
             if (isCompleted) {
                 // Show completion time instead of expiry
-                const completedAt = request.initiated_at // Use initiated_at as fallback since updated_at doesn't exist
+                const completedAt = request.updated_at || request.created_at
                 if (completedAt) {
                     const completedDate = new Date(completedAt)
                     const formattedDate = completedDate.toLocaleDateString('en-US', {
@@ -877,6 +843,13 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
 
     const handleFromToClick = (request: UnifiedSigningRequest) => {
         console.log('👥 From/To clicked for:', request.title)
+        console.log('👥 Request data:', {
+            total_signers: request.total_signers,
+            completed_signers: request.completed_signers,
+            viewed_signers: request.viewed_signers,
+            signers: request.signers,
+            signers_length: request.signers?.length || 0
+        })
         setShowSignersSheet(request)
     }
 
@@ -993,11 +966,9 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     const getFromToDisplay = (request: UnifiedSigningRequest) => {
         if (request.type === 'sent') {
             // For sent requests, show recipient information
-            const signerCount = request.signers?.length || 0
+            const signerCount = request.total_signers || 0
             if (signerCount === 1) {
-                // Show the recipient's name if available, otherwise show "1 recipient"
-                const recipientName = request.signers?.[0]?.email || request.signers?.[0]?.name
-                return recipientName ? `To: ${recipientName}` : `To: 1 recipient`
+                return `To: 1 recipient`
             } else if (signerCount > 1) {
                 return `To: ${signerCount} recipients`
             }
@@ -1009,40 +980,29 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
     }
 
     const getAllSignersDisplay = (request: UnifiedSigningRequest) => {
-        const signers = request.signers || []
-        if (signers.length === 0) return null
+        const totalSigners = request.total_signers || 0
+        const completedSigners = request.completed_signers || 0
+        if (totalSigners === 0) return null
 
         return (
             <div className="space-y-1">
-                {signers.map((signer, index) => {
-                    const statusColor =
-                        signer.status === 'signed' ? 'text-green-600' :
-                            signer.status === 'declined' ? 'text-red-600' :
-                                signer.status === 'viewed' ? 'text-blue-600' :
-                                    'text-gray-600'
-
-                    const statusIcon =
-                        signer.status === 'signed' ? '✓' :
-                            signer.status === 'declined' ? '✕' :
-                                signer.status === 'viewed' ? '👁' :
-                                    '○'
-
-                    return (
-                        <div key={index} className="flex items-center gap-2 text-sm">
-                            <span className={`font-medium ${statusColor}`}>{statusIcon}</span>
-                            <span className="text-gray-700">{signer.name || signer.email}</span>
-                            <span className={`text-xs ${statusColor} capitalize`}>
-                                ({signer.status || 'pending'})
-                            </span>
-                        </div>
-                    )
-                })}
+                <div className="flex items-center gap-2 text-sm">
+                    <span className="text-gray-700">
+                        {completedSigners} of {totalSigners} signed
+                    </span>
+                    <div className="flex-1 bg-gray-200 rounded-full h-2">
+                        <div
+                            className="bg-green-600 h-2 rounded-full"
+                            style={{ width: `${totalSigners > 0 ? (completedSigners / totalSigners) * 100 : 0}%` }}
+                        ></div>
+                    </div>
+                </div>
             </div>
         )
     }
 
     const getSignatureTypeDisplay = (request: UnifiedSigningRequest) => {
-        const signerCount = request.signers?.length || 0
+        const signerCount = request.total_signers || 0
 
         if (signerCount === 1) {
             return (
@@ -1052,7 +1012,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             )
         } else if (signerCount > 1) {
             // Get signing mode from metadata
-            const signingMode = request.metadata?.signing_mode || 'sequential'
+            const signingMode = (request.metadata as any)?.signing_mode || 'sequential'
             const modeLabel = signingMode === 'parallel' ? 'Parallel' : 'Sequential'
             const modeColor = signingMode === 'parallel' ? 'bg-purple-100 text-purple-800' : 'bg-indigo-100 text-indigo-800'
 
@@ -1081,6 +1041,20 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             case '6m': return 'Last 6 months'
             case '1y': return 'Last 1 year'
             default: return 'Last 30 days'
+        }
+    }
+
+    // Adapter function to convert UnifiedSigningRequest to RequestDetailsModal format
+    const adaptRequestForModal = (request: UnifiedSigningRequest) => {
+        return {
+            ...request,
+            initiated_at: request.created_at,
+            progress: {
+                viewed: request.viewed_signers,
+                signed: request.completed_signers,
+                total: request.total_signers
+            },
+            signers: request.signers || [] // Use actual signers array from the request
         }
     }
 
@@ -1293,7 +1267,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                         handleSign={handleSign}
                                         isRequestCompleted={isRequestCompleted}
                                         setShowActionsSheet={setShowActionsSheet}
-                                        isPolling={pollingRequestIds.has(request.id)}
+                                        isPolling={false}
                                     />
                                 ))}
                                 </div>
@@ -1326,7 +1300,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                         handleSign={handleSign}
                                         isRequestCompleted={isRequestCompleted}
                                         setShowActionsSheet={setShowActionsSheet}
-                                        isPolling={pollingRequestIds.has(request.id)}
+                                        isPolling={false}
                                     />
                                 ))}
                                 </div>
@@ -1359,7 +1333,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                         handleSign={handleSign}
                                         isRequestCompleted={isRequestCompleted}
                                         setShowActionsSheet={setShowActionsSheet}
-                                        isPolling={pollingRequestIds.has(request.id)}
+                                        isPolling={false}
                                     />
                                 ))}
                                 </div>
@@ -1373,7 +1347,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
             {
                 viewingRequest && (
                     <RequestDetailsModal
-                        request={viewingRequest}
+                        request={adaptRequestForModal(viewingRequest)}
                         isOpen={!!viewingRequest}
                         onClose={() => setViewingRequest(null)}
                         currentUserEmail={user?.email}
@@ -1381,7 +1355,13 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                             // ✅ PERFORMANCE FIX: Update specific request instead of full reload
                             setRequests(prev => prev.map(req =>
                                 req.id === requestId
-                                    ? { ...req, ...updates }
+                                    ? {
+                                        ...req,
+                                        status: updates.status as SignatureStatus,
+                                        completed_signers: updates.signed_count,
+                                        total_signers: updates.total_signers,
+                                        updated_at: updates.updated_at
+                                    }
                                     : req
                             ))
                             setViewingRequest(null)
@@ -1390,22 +1370,22 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                 )
             }
 
-            {/* Signers Bottom Sheet */}
+            {/* Signers Side Sheet */}
             {
                 showSignersSheet && (
-                    <div className="fixed inset-0 z-50 flex items-end justify-center">
-                        {/* Backdrop - no opacity overlay */}
+                    <>
+                        {/* Backdrop */}
                         <div
-                            className="fixed inset-0"
+                            className="fixed inset-0 bg-black/10 z-[9998]"
                             onClick={() => setShowSignersSheet(null)}
                         />
 
-                        {/* Bottom Sheet */}
-                        <div className="relative bg-white rounded-t-lg shadow-xl w-full max-w-md max-h-[70vh] overflow-hidden transform transition-transform duration-300 ease-out translate-y-0">
+                        {/* Side Sheet */}
+                        <div className="fixed top-0 right-0 bottom-0 w-full max-w-md bg-white shadow-2xl z-[9999] flex flex-col">
                             {/* Header */}
-                            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
                                 <h3 className="text-lg font-semibold text-gray-900">
-                                    {showSignersSheet.type === 'sent' ? 'Document Signers' : 'Sender Information'}
+                                    {showSignersSheet.type === 'sent' ? `Document Signers (${showSignersSheet.signers?.length || 0})` : 'Sender Information'}
                                 </h3>
                                 <button
                                     onClick={() => setShowSignersSheet(null)}
@@ -1415,43 +1395,99 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                 </button>
                             </div>
 
-                            {/* Content */}
-                            <div className="p-4 overflow-y-auto max-h-[calc(70vh-80px)]">
+                            {/* Scrollable Content */}
+                            <div
+                                className="flex-1 overflow-y-auto p-4"
+                                style={{
+                                    overflowY: 'auto',
+                                    WebkitOverflowScrolling: 'touch'
+                                }}
+                            >
                                 {showSignersSheet.type === 'sent' ? (
-                                    // Show signers for sent requests
-                                    <div className="space-y-3">
-                                        <p className="text-sm text-gray-600 mb-4">
-                                            {showSignersSheet.signers?.length === 1
+                                    // Show signer details for sent requests
+                                    <div className="space-y-4">
+                                        <p className="text-sm text-gray-600">
+                                            {showSignersSheet.total_signers === 1
                                                 ? 'This document requires a single signature:'
-                                                : `This document requires ${showSignersSheet.signers?.length || 0} signatures:`
+                                                : `This document requires ${showSignersSheet.total_signers} signatures:`
                                             }
                                         </p>
-                                        {showSignersSheet.signers?.map((signer, index) => (
-                                            <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
-                                                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                                                    <Users className="w-4 h-4 text-blue-600" />
+
+                                        {/* Progress Summary */}
+                                        <div className="p-4 bg-gray-50 rounded-lg">
+                                            <div className="flex items-center justify-between mb-2">
+                                                <span className="text-sm font-medium text-gray-700">Progress</span>
+                                                <span className="text-sm font-medium text-gray-900">
+                                                    {showSignersSheet.completed_signers} / {showSignersSheet.total_signers}
+                                                </span>
+                                            </div>
+                                            <div className="w-full bg-gray-200 rounded-full h-2">
+                                                <div
+                                                    className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                                                    style={{ width: `${(showSignersSheet.completed_signers / showSignersSheet.total_signers) * 100}%` }}
+                                                />
+                                            </div>
+                                            <div className="mt-3 grid grid-cols-2 gap-2 text-xs">
+                                                <div className="flex items-center gap-1">
+                                                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                                                    <span className="text-gray-600">Signed: {showSignersSheet.completed_signers}</span>
                                                 </div>
-                                                <div className="flex-1">
-                                                    <p className="font-medium text-gray-900">{signer.name}</p>
-                                                    <p className="text-sm text-gray-600">{signer.email}</p>
-                                                </div>
-                                                <div className="text-right">
-                                                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${signer.status === 'signed' ? 'bg-green-100 text-green-800' :
-                                                        signer.status === 'viewed' ? 'bg-blue-100 text-blue-800' :
-                                                            signer.status === 'declined' ? 'bg-red-100 text-red-800' :
-                                                                'bg-yellow-100 text-yellow-800'
-                                                        }`}>
-                                                        {/* Display proper capitalized status */}
-                                                        {signer.status === 'signed' ? 'Signed' :
-                                                            signer.status === 'viewed' ? 'Viewed' :
-                                                                signer.status === 'declined' ? 'Declined' :
-                                                                    signer.status || 'Pending'}
-                                                    </span>
+                                                <div className="flex items-center gap-1">
+                                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                                    <span className="text-gray-600">Viewed: {showSignersSheet.viewed_signers}</span>
                                                 </div>
                                             </div>
-                                        )) || (
-                                                <p className="text-sm text-gray-500 italic">No signers found</p>
-                                            )}
+                                        </div>
+
+                                        {/* Individual Signers List */}
+                                        {showSignersSheet.signers && showSignersSheet.signers.length > 0 && (
+                                            <div className="space-y-2">
+                                                <h4 className="text-sm font-medium text-gray-700">Signers</h4>
+                                                <div className="space-y-2">
+                                                    {showSignersSheet.signers.map((signer: any, index: number) => (
+                                                        <div key={index} className="flex items-start space-x-3 p-3 bg-white border border-gray-200 rounded-lg">
+                                                            <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${signer.status === 'signed' || signer.status === 'completed'
+                                                                ? 'bg-green-100'
+                                                                : signer.status === 'viewed'
+                                                                    ? 'bg-blue-100'
+                                                                    : 'bg-gray-100'
+                                                                }`}>
+                                                                <Users className={`w-4 h-4 ${signer.status === 'signed' || signer.status === 'completed'
+                                                                    ? 'text-green-600'
+                                                                    : signer.status === 'viewed'
+                                                                        ? 'text-blue-600'
+                                                                        : 'text-gray-600'
+                                                                    }`} />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <p className="font-medium text-gray-900 truncate">{signer.name || 'Unknown'}</p>
+                                                                <p className="text-sm text-gray-600 truncate">{signer.email}</p>
+                                                                <div className="mt-1">
+                                                                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${signer.status === 'signed' || signer.status === 'completed'
+                                                                        ? 'bg-green-100 text-green-800'
+                                                                        : signer.status === 'viewed'
+                                                                            ? 'bg-blue-100 text-blue-800'
+                                                                            : signer.status === 'declined'
+                                                                                ? 'bg-red-100 text-red-800'
+                                                                                : 'bg-yellow-100 text-yellow-800'
+                                                                        }`}>
+                                                                        {signer.status === 'signed' || signer.status === 'completed' ? '✓ Signed' :
+                                                                            signer.status === 'viewed' ? '👁 Viewed' :
+                                                                                signer.status === 'declined' ? '✗ Declined' :
+                                                                                    '⏳ Pending'}
+                                                                    </span>
+                                                                </div>
+                                                                {signer.signed_at && (
+                                                                    <p className="text-xs text-gray-500 mt-1">
+                                                                        Signed: {new Date(signer.signed_at).toLocaleDateString()}
+                                                                    </p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 ) : (
                                     // Show sender info for received requests
@@ -1474,24 +1510,24 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                 )}
                             </div>
                         </div>
-                    </div>
+                    </>
                 )
             }
 
-            {/* Actions Bottom Sheet */}
+            {/* Actions Side Sheet */}
             {
                 showActionsSheet && (
-                    <div className="fixed inset-0 z-50 flex items-end justify-center">
-                        {/* Backdrop - no opacity overlay */}
+                    <>
+                        {/* Backdrop */}
                         <div
-                            className="fixed inset-0"
+                            className="fixed inset-0 bg-black/10 z-[9998]"
                             onClick={() => setShowActionsSheet(null)}
                         />
 
-                        {/* Bottom Sheet */}
-                        <div className="relative bg-white rounded-t-lg shadow-xl w-full max-w-md max-h-[50vh] overflow-hidden transform transition-transform duration-300 ease-out translate-y-0">
+                        {/* Side Sheet */}
+                        <div className="fixed top-0 right-0 bottom-0 w-full max-w-md bg-white shadow-2xl z-[9999] flex flex-col">
                             {/* Header */}
-                            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+                            <div className="flex items-center justify-between p-4 border-b border-gray-200 flex-shrink-0">
                                 <h3 className="text-lg font-semibold text-gray-900">
                                     Document Actions
                                 </h3>
@@ -1503,8 +1539,14 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                 </button>
                             </div>
 
-                            {/* Content */}
-                            <div className="p-4">
+                            {/* Scrollable Content */}
+                            <div
+                                className="flex-1 overflow-y-auto p-4"
+                                style={{
+                                    overflowY: 'auto',
+                                    WebkitOverflowScrolling: 'touch'
+                                }}
+                            >
                                 <div className="space-y-2">
                                     {/* Send Reminder Action - Only show if not expired */}
                                     {!getTimeRemaining(showActionsSheet.expires_at, showActionsSheet).includes('Expired') && (
@@ -1563,7 +1605,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                                 </div>
                             </div>
                         </div>
-                    </div>
+                    </>
                 )
             }
 
@@ -1680,13 +1722,7 @@ export function UnifiedSigningRequestsList({ onRefresh }: UnifiedSigningRequests
                             title: signingRequest.title,
                             document_url: signingRequest.document_url || '',
                             expires_at: signingRequest.expires_at || '',
-                            signers: signingRequest.signers.map(s => ({
-                                id: s.email,
-                                name: s.name,
-                                email: s.email,
-                                status: s.status,
-                                signing_order: 1
-                            }))
+                            signers: [] // Signer details not available in list view
                         }}
                         currentUserEmail={user?.email || ''}
                         onClose={() => setSigningRequest(null)}

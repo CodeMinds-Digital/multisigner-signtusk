@@ -69,6 +69,30 @@ export const rateLimiters = {
     limiter: Ratelimit.slidingWindow(30, '1 m'),
     analytics: true,
     prefix: 'rl:verify',
+  }),
+
+  // Signature operations (Comment 9)
+  signature: new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(100, '1 h'),
+    analytics: true,
+    prefix: 'rl:signature',
+  }),
+
+  // Signature bulk operations (Comment 9)
+  signatureBulk: new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(5, '1 h'),
+    analytics: true,
+    prefix: 'rl:signature:bulk',
+  }),
+
+  // Signature reminders (Comment 9)
+  signatureReminder: new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(20, '1 h'),
+    analytics: true,
+    prefix: 'rl:signature:reminder',
   })
 }
 
@@ -84,6 +108,8 @@ export const CACHE_TTL = {
   NOTIFICATION_PREFS: 30 * 60, // 30 minutes
   TEMP_DATA: 5 * 60, // 5 minutes
   VERIFICATION_TOKEN: 24 * 60 * 60, // 24 hours
+  SIGNATURE_TEMPLATE: 10 * 60, // 10 minutes (Comment 10)
+  SIGNATURE_ANALYTICS: 5 * 60, // 5 minutes (Comment 10)
 } as const
 
 // Cache Key Prefixes
@@ -107,6 +133,8 @@ export const CACHE_KEYS = {
   DOCUMENT_STATUS: 'doc_status',
   USER_SESSIONS: 'user_sessions',
   FAILED_ATTEMPTS: 'failed_attempts',
+  SIGNATURE_TEMPLATE: 'signature:template', // Comment 10
+  SIGNATURE_ANALYTICS: 'signature:analytics', // Comment 10
 } as const
 
 // Job Queue URLs

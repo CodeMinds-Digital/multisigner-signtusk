@@ -56,6 +56,7 @@ export default function UniversalDocumentViewer({
   const [error, setError] = useState<string | null>(null)
   const [documentUrl, setDocumentUrl] = useState<string | null>(null)
   const [showAIAssistant, setShowAIAssistant] = useState<boolean>(false)
+  const [textContent, setTextContent] = useState<string | null>(null)
 
   // Determine document type and how to display it
   const getDocumentType = (fileName: string, fileType?: string) => {
@@ -77,7 +78,13 @@ export default function UniversalDocumentViewer({
     if (['ppt', 'pptx'].includes(extension || '') || mimeType?.includes('presentation')) {
       return 'presentation'
     }
-    if (['txt', 'md'].includes(extension || '') || mimeType?.includes('text')) {
+    if (mimeType?.includes('video') || ['mp4', 'webm', 'ogg', 'mov', 'avi'].includes(extension || '')) {
+      return 'video'
+    }
+    if (mimeType?.includes('audio') || ['mp3', 'wav', 'ogg', 'm4a', 'aac'].includes(extension || '')) {
+      return 'audio'
+    }
+    if (['txt', 'md', 'json', 'xml', 'csv', 'log'].includes(extension || '') || mimeType?.includes('text')) {
       return 'text'
     }
     return 'unknown'
@@ -127,6 +134,18 @@ export default function UniversalDocumentViewer({
         }
 
         setDocumentUrl(url)
+
+        // Fetch text content for text files
+        if (documentType === 'text') {
+          try {
+            const textResponse = await fetch(url)
+            const text = await textResponse.text()
+            setTextContent(text)
+          } catch (err) {
+            console.error('Failed to fetch text content:', err)
+            setTextContent('Failed to load text content')
+          }
+        }
 
         // Trigger view event
         if (onView) {
@@ -240,17 +259,154 @@ export default function UniversalDocumentViewer({
 
       case 'text':
         return (
-          <div className="p-6 h-full overflow-auto">
+          <div className="p-6 h-full overflow-auto bg-white">
             <pre
-              className="whitespace-pre-wrap font-mono text-sm"
+              className="whitespace-pre-wrap font-mono text-sm text-gray-800"
               style={{
                 transform: `scale(${scale})`,
                 transformOrigin: 'top left'
               }}
             >
-              {/* Text content would be loaded here */}
-              Loading text content...
+              {textContent || 'Loading text content...'}
             </pre>
+          </div>
+        )
+
+      case 'document':
+      case 'spreadsheet':
+      case 'presentation':
+        // Use Microsoft Office Online Viewer or Google Docs Viewer
+        const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(documentUrl)}`
+        return (
+          <iframe
+            src={officeViewerUrl}
+            className="w-full h-full border-0"
+            title={`Office Document - ${fileName}`}
+            style={{
+              minHeight: '600px',
+              transform: `scale(${scale})`,
+              transformOrigin: 'top left',
+              width: `${100 / scale}%`,
+              height: `${100 / scale}%`
+            }}
+          />
+        )
+
+      case 'video':
+        return (
+          <div className="flex items-center justify-center h-full p-4 bg-black">
+            <div className="relative max-w-full max-h-full">
+              <video
+                src={documentUrl}
+                controls
+                className="max-w-full max-h-full"
+                style={{
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'center'
+                }}
+                onPlay={async () => {
+                  if (linkId && documentId) {
+                    await SendAnalyticsService.trackEvent({
+                      linkId,
+                      documentId,
+                      eventType: 'view',
+                      email: viewerEmail,
+                      metadata: { action: 'video_play' }
+                    })
+                  }
+                }}
+                onPause={async () => {
+                  if (linkId && documentId) {
+                    await SendAnalyticsService.trackEvent({
+                      linkId,
+                      documentId,
+                      eventType: 'view',
+                      email: viewerEmail,
+                      metadata: { action: 'video_pause' }
+                    })
+                  }
+                }}
+                onSeeking={async () => {
+                  if (linkId && documentId) {
+                    await SendAnalyticsService.trackEvent({
+                      linkId,
+                      documentId,
+                      eventType: 'view',
+                      email: viewerEmail,
+                      metadata: { action: 'video_seek' }
+                    })
+                  }
+                }}
+              >
+                Your browser does not support the video tag.
+              </video>
+              {/* Watermark overlay for video */}
+              {watermarkText && (
+                <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+                  <div
+                    className="text-white text-4xl font-bold opacity-20 transform rotate-[-45deg]"
+                    style={{ userSelect: 'none', textShadow: '2px 2px 4px rgba(0,0,0,0.5)' }}
+                  >
+                    {watermarkText}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )
+
+      case 'audio':
+        return (
+          <div className="flex items-center justify-center h-full p-4">
+            <div className="w-full max-w-2xl">
+              <div className="bg-white rounded-lg shadow-lg p-8">
+                <div className="flex items-center gap-4 mb-6">
+                  <div className="w-16 h-16 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
+                    <svg className="w-8 h-8 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M18 3a1 1 0 00-1.196-.98l-10 2A1 1 0 006 5v9.114A4.369 4.369 0 005 14c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V7.82l8-1.6v5.894A4.37 4.37 0 0015 12c-1.657 0-3 .895-3 2s1.343 2 3 2 3-.895 3-2V3z" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-lg font-semibold text-gray-900">{fileName}</h3>
+                    <p className="text-sm text-gray-500">Audio File</p>
+                  </div>
+                </div>
+                <audio
+                  src={documentUrl}
+                  controls
+                  className="w-full"
+                  onPlay={async () => {
+                    if (linkId && documentId) {
+                      await SendAnalyticsService.trackEvent({
+                        linkId,
+                        documentId,
+                        eventType: 'view',
+                        email: viewerEmail,
+                        metadata: { action: 'audio_play' }
+                      })
+                    }
+                  }}
+                  onPause={async () => {
+                    if (linkId && documentId) {
+                      await SendAnalyticsService.trackEvent({
+                        linkId,
+                        documentId,
+                        eventType: 'view',
+                        email: viewerEmail,
+                        metadata: { action: 'audio_pause' }
+                      })
+                    }
+                  }}
+                >
+                  Your browser does not support the audio tag.
+                </audio>
+                {watermarkText && (
+                  <div className="mt-4 text-center text-sm text-gray-500">
+                    {watermarkText}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )
 

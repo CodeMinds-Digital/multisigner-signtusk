@@ -296,6 +296,128 @@ export class SendEmailVerification {
     }
   }
 
+  /**
+   * Send verification code for dataroom link (using UUID link_id directly)
+   */
+  static async sendDataroomVerificationCode(
+    email: string,
+    dataroomLinkId: string,
+    dataroomName: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Validate email
+      if (!this.isValidEmail(email)) {
+        return { success: false, error: 'Invalid email address' }
+      }
+
+      // Generate verification code
+      const verificationCode = this.generateOTP()
+      const expiresAt = new Date(Date.now() + 15 * 60 * 1000) // 15 minutes
+
+      // Store verification code using dataroom link UUID directly
+      const { error: insertError } = await supabaseAdmin
+        .from('send_email_verifications')
+        .insert({
+          link_id: dataroomLinkId,
+          email,
+          verification_code: verificationCode,
+          expires_at: expiresAt.toISOString(),
+          verified: false
+        })
+
+      if (insertError) {
+        console.error('Failed to store verification code:', insertError)
+        return { success: false, error: 'Failed to generate verification code' }
+      }
+
+      // Send email using Resend
+      if (!process.env.RESEND_API_KEY) {
+        console.warn('RESEND_API_KEY not configured, simulating email send')
+        console.log('Verification email:', {
+          to: email,
+          subject: `Verification code for ${dataroomName}`,
+          code: verificationCode,
+          expiresIn: '15 minutes'
+        })
+        return { success: true }
+      }
+
+      const fromEmail = 'SendTusk <noreply@notifications.signtusk.com>'
+
+      const { data, error } = await resend.emails.send({
+        from: fromEmail,
+        to: [email],
+        subject: `Verification code for ${dataroomName}`,
+        html: this.generateVerificationHTML(verificationCode, dataroomName, email),
+        text: `Your verification code for ${dataroomName} is: ${verificationCode}. This code expires in 15 minutes.`
+      })
+
+      if (error) {
+        console.error('Resend API error:', error)
+        return { success: false, error: 'Failed to send verification code' }
+      }
+
+      console.log('✅ Verification email sent successfully:', data?.id)
+      return { success: true }
+    } catch (error) {
+      console.error('Send verification error:', error)
+      return { success: false, error: 'Failed to send verification code' }
+    }
+  }
+
+  /**
+   * Verify OTP code for dataroom link (using UUID link_id directly)
+   */
+  static async verifyDataroomCode(
+    email: string,
+    dataroomLinkId: string,
+    code: string
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      // Get verification record
+      const { data: verification, error: verifyError } = await supabaseAdmin
+        .from('send_email_verifications')
+        .select('*')
+        .eq('link_id', dataroomLinkId)
+        .eq('email', email)
+        .eq('verification_code', code.toUpperCase())
+        .single()
+
+      if (verifyError || !verification) {
+        return { success: false, error: 'Invalid verification code' }
+      }
+
+      // Check if already verified
+      if (verification.verified) {
+        return { success: true }
+      }
+
+      // Check if expired
+      if (new Date(verification.expires_at) < new Date()) {
+        return { success: false, error: 'Verification code expired' }
+      }
+
+      // Mark as verified
+      const { error: updateError } = await supabaseAdmin
+        .from('send_email_verifications')
+        .update({
+          verified: true,
+          verified_at: new Date().toISOString()
+        })
+        .eq('id', verification.id)
+
+      if (updateError) {
+        console.error('Failed to mark as verified:', updateError)
+        return { success: false, error: 'Failed to verify code' }
+      }
+
+      return { success: true }
+    } catch (error) {
+      console.error('Verify code error:', error)
+      return { success: false, error: 'Failed to verify code' }
+    }
+  }
+
 
 
   /**

@@ -41,19 +41,16 @@ export async function POST(request: NextRequest) {
     console.log('🔍 Validation details:', {
       requestId,
       userEmail,
-      signingMode: validation.signingMode,
-      canSign: validation.canSign,
-      error: validation.error,
+      allowed: validation.allowed,
+      reason: validation.reason,
       fullValidationJSON: JSON.stringify(validation, null, 2)
     })
 
     // CRITICAL DEBUG: Log the exact mode detection
-    if (validation.signingMode === 'parallel') {
-      console.log('🔵 SERVER DETECTED: PARALLEL MODE')
-    } else if (validation.signingMode === 'sequential') {
-      console.log('🟡 SERVER DETECTED: SEQUENTIAL MODE')
+    if (validation.allowed) {
+      console.log('🔵 SERVER DETECTED: ALLOWED TO SIGN')
     } else {
-      console.log('❓ SERVER DETECTED: UNKNOWN MODE -', validation.signingMode)
+      console.log('🟡 SERVER DETECTED: NOT ALLOWED - ' + validation.reason)
     }
 
     return new Response(
@@ -64,9 +61,8 @@ export async function POST(request: NextRequest) {
     console.error('❌ Error validating sequential signing permissions:', error)
     return new Response(
       JSON.stringify({
-        error: 'Failed to validate signing permissions',
-        canSign: true, // Default to allowing signing if validation fails
-        signingMode: 'sequential' // default to sequential to match creation default
+        allowed: true, // Default to allowing signing if validation fails
+        reason: 'Validation error - defaulting to allow'
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )

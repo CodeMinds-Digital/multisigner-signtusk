@@ -270,10 +270,20 @@ export class SendVisitorTracking {
    */
   private static async getLocationData(): Promise<{ ip?: string; country?: string; city?: string }> {
     try {
-      // In production, use a proper IP geolocation service
-      // For now, return empty data
-      return {}
+      // Get IP from client-side API call
+      const response = await fetch('/api/send/visitors/ip')
+      if (!response.ok) {
+        return {}
+      }
+
+      const data = await response.json()
+      return {
+        ip: data.ip,
+        country: data.country,
+        city: data.city
+      }
     } catch (error) {
+      console.error('Failed to get location data:', error)
       return {}
     }
   }

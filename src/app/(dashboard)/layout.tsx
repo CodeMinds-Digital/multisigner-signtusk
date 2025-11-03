@@ -45,7 +45,7 @@ export default function DashboardLayout({
             <DashNav />
 
             {/* Main Content */}
-            <div className="flex flex-1 overflow-hidden pt-14 md:pt-0">
+            <div className="flex flex-1 pt-14 md:pt-0">
               <main className="flex-1 overflow-y-auto bg-gray-50 p-4 md:p-6">
                 <ErrorBoundary>
                   {children}

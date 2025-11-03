@@ -1,6 +1,7 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
 /papermark
+/multisigner-signtusk-7.0-mid-start
 
 # Dependencies
 /node_modules
@@ -286,3 +287,4 @@ $RECYCLE.BIN/
 .Trash-*
 .nfs*
 package-lock.json
+
