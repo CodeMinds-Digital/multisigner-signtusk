@@ -4,21 +4,24 @@ import { useState, useRef, useEffect } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { User, Settings, Menu } from 'lucide-react';
-import { getServiceByRoute } from '@/config/services';
+import { getServiceByRoute, getAllServices } from '@/config/services';
 import { NotificationBell } from '@/components/ui/notification-bell';
 import { useAuth } from '@/components/providers/secure-auth-provider';
+import { useSidebar } from '@/contexts/sidebar-context';
 import { AppLogo } from '@/components/ui/app-logo';
 
 export function MobileHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const { user, signOut } = useAuth();
+  const { selectedModuleId, setSelectedModuleId } = useSidebar();
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef<HTMLDivElement>(null);
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null);
   const firstMenuItemRef = useRef<HTMLAnchorElement>(null);
 
   const currentService = getServiceByRoute(pathname);
+  const services = getAllServices();
 
   // Close user menu when clicking outside
   useEffect(() => {
@@ -61,11 +64,51 @@ export function MobileHeader() {
     return name.charAt(0).toUpperCase();
   };
 
+  const handleModuleClick = (moduleId: string, route: string) => {
+    setSelectedModuleId(moduleId);
+    router.push(route);
+  };
+
   return (
-    <div className="md:hidden fixed top-0 left-0 right-0 h-14 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-4">
+    <div className="md:hidden fixed top-0 left-0 right-0 h-16 bg-white/90 backdrop-blur-xl border-b border-gray-200 shadow-md z-50 flex items-center justify-between px-6">
       {/* Logo */}
       <div className="flex items-center">
         <AppLogo variant="compact" />
+      </div>
+
+      {/* Center - Module Selector */}
+      <div className="flex items-center gap-2 overflow-x-auto flex-1 mx-4">
+        {services.map((service) => {
+          const isActive = selectedModuleId === service.id;
+          const Icon = service.icon;
+          const tealColor = '#2A9D8F';
+
+          return (
+            <button
+              key={service.id}
+              onClick={() => handleModuleClick(service.id, service.route)}
+              className={`
+                flex items-center gap-1.5 px-3 py-1.5 rounded-2xl whitespace-nowrap
+                transition-all duration-300 ease-out min-h-[44px]
+                ${isActive
+                  ? 'shadow-md ring-2 ring-offset-2'
+                  : 'hover:bg-gray-50 hover:scale-105'
+                }
+              `}
+              style={{
+                backgroundColor: isActive ? 'rgba(42, 157, 143, 0.15)' : 'transparent',
+                borderColor: isActive ? tealColor : 'transparent',
+                color: isActive ? tealColor : '#6B7280',
+                outline: isActive ? `2px solid ${tealColor}` : 'none',
+              }}
+              aria-label={`Switch to ${service.name} module`}
+              aria-current={isActive ? 'page' : undefined}
+            >
+              <Icon className="w-4 h-4" />
+              <span className="text-xs font-medium">{service.name}</span>
+            </button>
+          );
+        })}
       </div>
 
       {/* Right side actions */}
@@ -83,7 +126,7 @@ export function MobileHeader() {
             aria-expanded={isUserMenuOpen}
             aria-haspopup="true"
           >
-            <div className="w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-medium border-2 border-white shadow-sm hover:shadow-md transition-shadow text-sm">
+            <div className="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center font-medium border-2 border-white shadow-sm hover:shadow-md transition-shadow text-sm">
               {getInitials(user?.full_name || user?.first_name)}
             </div>
           </button>
@@ -91,7 +134,7 @@ export function MobileHeader() {
           {/* User Dropdown Menu */}
           {isUserMenuOpen && (
             <div
-              className="absolute right-0 top-full mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 py-2 z-50"
+              className="absolute right-0 top-full mt-2 w-64 bg-white rounded-2xl shadow-glass-lg border border-gray-200 py-2 z-50"
               role="menu"
               aria-orientation="vertical"
             >

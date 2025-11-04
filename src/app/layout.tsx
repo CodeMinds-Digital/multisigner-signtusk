@@ -4,7 +4,6 @@ import Script from "next/script";
 import "./globals.css";
 import { SecureAuthProvider } from "@/components/providers/secure-auth-provider";
 import { ConsoleFilterProvider } from "@/components/providers/console-filter-provider";
-import { LenisProvider } from "@/components/providers/lenis-provider";
 import { ToastProvider } from "@/components/ui/toast";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -53,14 +52,12 @@ export default function RootLayout({
         <div id="root">
           <ConsoleFilterProvider>
             <SecureAuthProvider>
-              <LenisProvider>
-                <TooltipProvider delayDuration={0}>
-                  <ToastProvider>
-                    {children}
-                    <Toaster />
-                  </ToastProvider>
-                </TooltipProvider>
-              </LenisProvider>
+              <TooltipProvider delayDuration={0}>
+                <ToastProvider>
+                  {children}
+                  <Toaster />
+                </ToastProvider>
+              </TooltipProvider>
             </SecureAuthProvider>
           </ConsoleFilterProvider>
         </div>

@@ -46,6 +46,38 @@ const config: Config = {
           800: '#6b21a8',
           900: '#581c87',
         },
+        // Ultra-light blue for gradients
+        'blue-25': '#eff6ff',
+        // Modern Teal/Cool-Blue Color Palette
+        teal: {
+          50: '#E0F8F5',
+          100: '#B3EDE6',
+          200: '#80E1D6',
+          300: '#4DD5C6',
+          400: '#26CCBA',
+          500: '#00B4AA',
+          600: '#2A9D8F',
+          700: '#238276',
+          800: '#1C675D',
+          900: '#154C44',
+        },
+        coolBlue: {
+          50: '#E6F4FF',
+          100: '#BAE0FF',
+          200: '#8CCCFF',
+          300: '#5EB8FF',
+          400: '#36A9FF',
+          500: '#0E9AFF',
+          600: '#0C8AE6',
+          700: '#0A75BF',
+          800: '#086099',
+          900: '#064B73',
+        },
+        neutral: {
+          background: '#F5F7FA',
+          panel: '#E1E3E6',
+          darkText: '#1F2937',
+        },
       },
       backdropBlur: {
         xs: '2px',
@@ -54,11 +86,17 @@ const config: Config = {
         'glass': '0 8px 32px 0 rgba(31, 38, 135, 0.15)',
         'glow': '0 0 20px rgba(59, 130, 246, 0.5)',
         'glow-violet': '0 0 20px rgba(168, 85, 247, 0.5)',
+        'glass-sm': '0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06)',
+        'glass-lg': '0 8px 32px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04)',
+        'teal-glow': '0 0 20px rgba(42, 157, 143, 0.3), 0 0 40px rgba(42, 157, 143, 0.1)',
+        'panel': '0 4px 12px rgba(0, 0, 0, 0.05)',
+        'panel-hover': '0 6px 16px rgba(0, 0, 0, 0.08)',
       },
       animation: {
         'fadeIn': 'fadeIn 0.5s ease-out',
         'slideInUp': 'slideInUp 0.5s ease-out',
         'slideInDown': 'slideInDown 0.5s ease-out',
+        'slideInFromTop': 'slideInFromTop 0.4s ease-out',
         'scaleIn': 'scaleIn 0.5s ease-out',
         'float': 'float 3s ease-in-out infinite',
         'glow': 'glow 2s ease-in-out infinite',
@@ -75,6 +113,10 @@ const config: Config = {
         },
         slideInDown: {
           '0%': { transform: 'translateY(-50px)', opacity: '0' },
+          '100%': { transform: 'translateY(0)', opacity: '1' },
+        },
+        slideInFromTop: {
+          '0%': { transform: 'translateY(-100%)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
         },
         scaleIn: {
@@ -103,6 +145,19 @@ const config: Config = {
         'section-sm': '3rem',
         'section-md': '5rem',
         'section-lg': '8rem',
+        '16': '4rem', // 64px - for header height
+        '18': '4.5rem', // 72px - for extra padding
+        '22': '5.5rem', // 88px - for larger gaps
+      },
+      scale: {
+        '102': '1.02', // Subtle scale for hover effects
+      },
+      transitionDuration: {
+        '400': '400ms', // For smooth animations
+      },
+      borderRadius: {
+        '2xl': '1rem', // 16px
+        '3xl': '1.5rem', // 24px
       },
     },
   },
